@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0e766e" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Doggo Coach</title>
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet" />
@@ -14,20 +14,28 @@
 </head>
 <body>
 
-  <div id="appLoader"><div class="loader-inner"><div class="spinner"></div></div></div>
+  <div id="appLoader"><div class="loader-inner"><div class="loader-dog">🐶</div><div class="loader-text">Doggo Coach</div></div></div>
   <div id="toastContainer"></div>
+  <div id="confettiCanvas"></div>
 
   <!-- AUTH -->
   <div id="authScreen" class="auth-screen">
     <div class="auth-card">
-      <div class="auth-logo">🐶</div>
+      <div class="auth-illustration">
+        <svg viewBox="0 0 120 120" width="100" height="100"><circle cx="60" cy="60" r="56" fill="var(--primary-soft)"/><text x="60" y="72" text-anchor="middle" font-size="48">🐶</text></svg>
+      </div>
       <h1 class="auth-title">Doggo Coach</h1>
-      <p class="auth-subtitle">Щоденник виховання собаки для всієї сім'ї</p>
+      <p class="auth-subtitle">Розумний щоденник виховання собаки</p>
+      <div class="auth-pills">
+        <span class="auth-pill">📊 Трекінг</span>
+        <span class="auth-pill">🎓 Курси</span>
+        <span class="auth-pill">👨‍👩‍👦 Сім'я</span>
+      </div>
       <button class="btn-google" id="googleLoginBtn" type="button">
         <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-        Увійти через Google
+        Продовжити з Google
       </button>
-      <p class="auth-hint">Дані зберігаються у хмарі. Доступ з будь-якого пристрою.</p>
+      <p class="auth-hint">Безкоштовно · Синхронізація між пристроями</p>
     </div>
   </div>
 
@@ -36,111 +44,144 @@
 
     <!-- HEADER -->
     <header class="app-header">
-      <div class="header-left">
-        <strong id="petNameHeader">🐶</strong>
+      <div class="header-user">
+        <div class="user-avatar" id="userAvatar">🐶</div>
+        <div class="header-info">
+          <strong id="petNameHeader">Мій песик</strong>
+          <span class="header-sub" id="headerSub">Завантаження...</span>
+        </div>
       </div>
-      <div class="header-right">
-        <button class="header-btn" data-theme-toggle>🌙</button>
-        <button class="header-btn" id="logoutBtn" style="display:none">↩</button>
+      <div class="header-actions">
+        <button class="header-btn" data-theme-toggle aria-label="Тема">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="header-btn" id="logoutBtn" style="display:none" aria-label="Вийти">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
     </header>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN -->
     <main class="app-main" id="appMain">
 
-      <!-- TAB: HOME -->
+      <!-- HOME -->
       <section class="tab-panel active" id="tabHome">
+
+        <!-- Streak -->
+        <div class="streak-bar" id="streakBar">
+          <span class="streak-fire">🔥</span>
+          <span class="streak-text" id="streakText">Перший день — почнімо!</span>
+        </div>
+
+        <!-- Progress Ring -->
+        <div class="progress-section">
+          <div class="progress-ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="42"/>
+              <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="42" style="stroke-dashoffset:264"/>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-pct" id="ringPct">0%</span>
+              <span class="ring-label">успіх</span>
+            </div>
+          </div>
+          <div class="progress-stats">
+            <div class="p-stat"><span class="p-val" id="kpiPad">0</span><span class="p-lbl">🧻 Пелюшка</span></div>
+            <div class="p-stat"><span class="p-val" id="kpiOutdoor">0</span><span class="p-lbl">🌳 Вулиця</span></div>
+            <div class="p-stat"><span class="p-val" id="kpiMiss">0</span><span class="p-lbl">❌ Промах</span></div>
+          </div>
+        </div>
 
         <!-- Quick Actions -->
         <div class="quick-grid">
-          <button class="q-btn q-success" data-quick-event="pad"><span class="q-icon">🧻</span><span class="q-label">Пелюшка</span></button>
-          <button class="q-btn q-success" data-quick-event="outdoor"><span class="q-icon">🌳</span><span class="q-label">Вулиця</span></button>
-          <button class="q-btn q-danger" data-quick-event="miss"><span class="q-icon">❌</span><span class="q-label">Промах</span></button>
-          <button class="q-btn q-neutral" data-quick-event="feed"><span class="q-icon">🍖</span><span class="q-label">Їжа</span></button>
-          <button class="q-btn q-neutral" data-quick-event="sleep"><span class="q-icon">😴</span><span class="q-label">Сон</span></button>
-          <button class="q-btn q-neutral" id="openFullForm"><span class="q-icon">＋</span><span class="q-label">Інше</span></button>
+          <button class="q-btn q-success" data-quick-event="pad"><span class="q-icon">🧻</span>Пелюшка</button>
+          <button class="q-btn q-success" data-quick-event="outdoor"><span class="q-icon">🌳</span>Вулиця</button>
+          <button class="q-btn q-danger" data-quick-event="miss"><span class="q-icon">❌</span>Промах</button>
+          <button class="q-btn q-neutral" data-quick-event="feed"><span class="q-icon">🍖</span>Їжа</button>
+          <button class="q-btn q-neutral" data-quick-event="sleep"><span class="q-icon">😴</span>Сон</button>
+          <button class="q-btn q-accent" id="openFullForm"><span class="q-icon">✏️</span>Детально</button>
         </div>
 
-        <!-- Today Stats -->
-        <div class="stats-row">
-          <div class="stat"><span class="stat-val" id="kpiPad">0</span><span class="stat-lbl">🧻</span></div>
-          <div class="stat"><span class="stat-val" id="kpiOutdoor">0</span><span class="stat-lbl">🌳</span></div>
-          <div class="stat"><span class="stat-val" id="kpiMiss">0</span><span class="stat-lbl">❌</span></div>
-          <div class="stat"><span class="stat-val" id="kpiTotal">0</span><span class="stat-lbl">всього</span></div>
+        <!-- Daily Checklist -->
+        <div class="daily-card" id="dailyChecklist">
+          <div class="daily-header"><h3>📋 Сьогоднішній план</h3><span class="daily-badge" id="dailyProgress">0/3</span></div>
+          <div id="dailyItems"></div>
         </div>
 
-        <!-- Tip of the day -->
-        <div class="tip-banner" id="tipBanner">
-          <div class="tip-emoji" id="tipEmoji">💡</div>
-          <div class="tip-text" id="tipText">Завантаження...</div>
+        <!-- Tip -->
+        <div class="tip-card" id="tipCard">
+          <div class="tip-glow"></div>
+          <div class="tip-content">
+            <span class="tip-badge">💡 Порада</span>
+            <p id="tipText">Завантаження...</p>
+          </div>
         </div>
 
-        <!-- Recent Events -->
-        <div class="section-header"><h2>Сьогодні</h2></div>
+        <!-- Feed -->
+        <div class="section-header"><h2>Активність</h2><span class="subtle" id="kpiTotal">0 записів</span></div>
         <div class="feed" id="recentLogs"></div>
 
       </section>
 
-      <!-- TAB: LEARN -->
+      <!-- LEARN -->
       <section class="tab-panel" id="tabLearn">
-        <div class="section-header"><h2>Навчання</h2><span class="subtle" id="ageSummaryBadge"></span></div>
+        <div class="section-header"><h2>Навчання</h2><span class="age-pill" id="ageSummaryBadge"></span></div>
 
-        <!-- Today Plan -->
-        <div class="learn-card" id="todayPlanCard">
-          <h3>📋 План на сьогодні</h3>
-          <div id="todayPlan"></div>
+        <div class="plan-card">
+          <h3>🎯 Фокус періоду</h3>
+          <div id="priorityTips"></div>
         </div>
 
-        <!-- Courses -->
-        <div class="section-header"><h2>Курси</h2></div>
+        <div class="section-header mt-6"><h2>Курси</h2></div>
         <div class="course-list" id="courseGrid"></div>
         <div id="selectedCourse"></div>
 
-        <!-- Knowledge -->
         <div class="section-header mt-6"><h2>База знань</h2></div>
         <div class="knowledge-list" id="knowledgeGrid"></div>
 
-        <!-- Socialization -->
-        <div class="section-header mt-6"><h2>Соціалізація</h2></div>
-        <div id="socialChecklist"></div>
+        <div class="section-header mt-6"><h2>Соціалізація</h2><span class="subtle" id="socialProgress">0/8</span></div>
+        <div class="social-list" id="socialChecklist"></div>
       </section>
 
-      <!-- TAB: PROFILE -->
+      <!-- PROFILE -->
       <section class="tab-panel" id="tabProfile">
         <div class="section-header"><h2>Профіль</h2></div>
 
-        <div class="profile-card">
+        <div class="profile-hero" id="profileHero">
+          <div class="profile-avatar-big">🐶</div>
+          <h3 id="profileName">Мій песик</h3>
+          <span class="profile-meta" id="profileMeta"></span>
+        </div>
+
+        <div class="card-elevated">
           <form id="petProfileForm">
             <div class="form-row">
               <div class="field"><label>Ім'я</label><input id="petName" type="text" placeholder="Беллі" /></div>
-              <div class="field"><label>Дата народження</label><input id="petBirthDate" type="date" /></div>
+              <div class="field"><label>Народження</label><input id="petBirthDate" type="date" /></div>
             </div>
             <div class="form-row">
               <div class="field"><label>Стать</label><select id="petSex"><option value="">—</option><option value="дівчинка">♀ Дівчинка</option><option value="хлопчик">♂ Хлопчик</option></select></div>
               <div class="field"><label>Порода</label><input id="petBreed" type="text" placeholder="Метис" /></div>
             </div>
             <div class="form-row">
-              <div class="field"><label>Вага, кг</label><input id="petWeight" type="number" step="0.1" placeholder="5" /></div>
+              <div class="field"><label>Вага, кг</label><input id="petWeight" type="number" step="0.1" /></div>
               <div class="field"><label>Вдома з</label><input id="petHomeDate" type="date" /></div>
             </div>
             <div class="form-row">
-              <div class="field"><label>Вакцинація</label><select id="petVaccination"><option value="не вказано">—</option><option value="ще не завершена">Не завершена</option><option value="частково завершена">Частково</option><option value="завершена">Завершена</option></select></div>
-              <div class="field"><label>Туалет</label><select id="petToiletMode"><option value="pad">Пелюшка</option><option value="mixed">Змішаний</option><option value="outdoor">Вулиця</option></select></div>
+              <div class="field"><label>Вакцинація</label><select id="petVaccination"><option value="не вказано">—</option><option value="ще не завершена">Не завершена</option><option value="частково завершена">Частково</option><option value="завершена">✓ Завершена</option></select></div>
+              <div class="field"><label>Туалет</label><select id="petToiletMode"><option value="pad">🧻 Пелюшка</option><option value="mixed">🔄 Змішаний</option><option value="outdoor">🌳 Вулиця</option></select></div>
             </div>
-            <div class="field full"><label>Нотатки</label><textarea id="petNotes" rows="2" placeholder="Страхи, особливості..."></textarea></div>
-            <button class="btn-primary full-w" type="submit">Зберегти</button>
+            <div class="field full"><label>Нотатки</label><textarea id="petNotes" rows="2" placeholder="Страхи, особливості, алергії..."></textarea></div>
+            <button class="btn-primary" type="submit">Зберегти</button>
           </form>
         </div>
 
-        <!-- Family -->
         <div class="section-header mt-6"><h2>Сім'я</h2></div>
-        <div class="profile-card">
-          <div class="family-info">
-            <div><strong>Простір:</strong> <span id="workspaceName">—</span></div>
-            <div><strong>Код:</strong> <span id="inviteCodeView" class="mono">—</span> <button class="btn-sm" id="copyInviteBtn">📋</button></div>
-          </div>
-          <div id="membersList" class="members-list"></div>
-          <form id="joinWorkspaceForm" class="join-form">
+        <div class="card-elevated">
+          <div class="family-row"><span>Простір:</span><strong id="workspaceName">—</strong></div>
+          <div class="family-row"><span>Код:</span><code id="inviteCodeView">—</code><button class="btn-icon" id="copyInviteBtn">📋</button></div>
+          <div id="membersList" class="members-grid"></div>
+          <form id="joinWorkspaceForm" class="join-row">
             <input id="inviteCodeInput" type="text" placeholder="Код запрошення" autocapitalize="characters" />
             <button class="btn-sm" type="submit">Приєднатись</button>
           </form>
@@ -149,10 +190,10 @@
 
     </main>
 
-    <!-- BOTTOM SHEET: Full Event Form -->
-    <div class="bottom-sheet hidden" id="eventSheet">
+    <!-- BOTTOM SHEET -->
+    <div class="sheet-overlay hidden" id="eventSheet">
       <div class="sheet-backdrop" id="sheetBackdrop"></div>
-      <div class="sheet-content">
+      <div class="sheet-panel">
         <div class="sheet-handle"></div>
         <h3>Додати запис</h3>
         <form id="eventForm">
@@ -165,16 +206,25 @@
             <div class="field"><label>Хто</label><input id="eventBy" type="text" placeholder="Ім'я" /></div>
           </div>
           <div class="field full"><label>Деталі</label><textarea id="eventNote" rows="2" placeholder="Опціонально"></textarea></div>
-          <button class="btn-primary full-w" type="submit">Зберегти</button>
+          <button class="btn-primary" type="submit">Зберегти</button>
         </form>
       </div>
     </div>
 
-    <!-- BOTTOM TABS -->
+    <!-- NAV -->
     <nav class="bottom-nav">
-      <button class="nav-tab active" data-tab="tabHome"><span>🏠</span>Головна</button>
-      <button class="nav-tab" data-tab="tabLearn"><span>📖</span>Навчання</button>
-      <button class="nav-tab" data-tab="tabProfile"><span>⚙️</span>Профіль</button>
+      <button class="nav-tab active" data-tab="tabHome">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Головна</span>
+      </button>
+      <button class="nav-tab" data-tab="tabLearn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>Навчання</span>
+      </button>
+      <button class="nav-tab" data-tab="tabProfile">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Профіль</span>
+      </button>
     </nav>
 
   </div>

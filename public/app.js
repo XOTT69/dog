@@ -18,9 +18,18 @@ db.enablePersistence({ synchronizeTabs: true }).catch(function() {});
 var currentUser = null, workspaceId = null, workspaceData = null, currentPet = null;
 var currentCourseId = 'pee-pad', eventsState = [];
 var unsubEvents = null, unsubMembers = null, unsubPet = null, petFormDirty = false;
+var obMode = 'pad';
 
 function $(id) { return document.getElementById(id); }
 function $$(s) { return document.querySelectorAll(s); }
+function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
+function nowTime() { return new Date().toTimeString().slice(0, 5); }
+function createInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
+function avatarText(n) { return ((n || 'U').trim()[0] || 'U').toUpperCase(); }
+function todayStart() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function getAgeInWeeks(bd) { if (!bd) return null; var d = Date.now() - new Date(bd).getTime(); return isNaN(d) || d < 0 ? null : Math.floor(d / 604800000); }
+function getAgeLabel(w) { if (w == null) return ''; return w < 8 ? w + ' тиж.' : w < 52 ? Math.floor(w / 4.345) + ' міс.' : (w / 52).toFixed(1) + ' р.'; }
+function getProgramByAge(w) { if (w == null) return AGE_PROGRAMS[1]; return AGE_PROGRAMS.find(function(p) { return w >= p.minWeeks && w < p.maxWeeks; }) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1]; }
 
 function showToast(msg, type) {
   var c = $('toastContainer'), t = document.createElement('div');
@@ -31,32 +40,62 @@ function showToast(msg, type) {
   setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 3000);
 }
 
-function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
-function nowTime() { return new Date().toTimeString().slice(0, 5); }
-function createInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
-function avatarText(n) { return ((n || 'U').trim()[0] || 'U').toUpperCase(); }
-function todayStart() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
-
-function getAgeInWeeks(bd) { if (!bd) return null; var d = Date.now() - new Date(bd).getTime(); return isNaN(d) || d < 0 ? null : Math.floor(d / 604800000); }
-function getAgeLabel(w) { if (w == null) return ''; return w < 8 ? w + ' тиж.' : w < 52 ? Math.floor(w / 4.345) + ' міс.' : (w / 52).toFixed(1) + ' р.'; }
-function getProgramByAge(w) { if (w == null) return AGE_PROGRAMS[1]; return AGE_PROGRAMS.find(function(p) { return w >= p.minWeeks && w < p.maxWeeks; }) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1]; }
-
 function confetti() {
-  var canvas = $('confettiCanvas');
-  var colors = ['#0e766e', '#eab308', '#ef4444', '#3b82f6', '#a855f7'];
-  for (var i = 0; i < 30; i++) {
-    var piece = document.createElement('div');
-    piece.className = 'confetti-piece';
-    piece.style.left = Math.random() * 100 + '%';
-    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-    piece.style.animationDelay = Math.random() * .5 + 's';
-    piece.style.animationDuration = 2 + Math.random() * 2 + 's';
-    canvas.appendChild(piece);
+  var canvas = $('confettiCanvas'), colors = ['#0e766e', '#eab308', '#ef4444', '#3b82f6', '#a855f7', '#f97316'];
+  for (var i = 0; i < 40; i++) {
+    var p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDelay = Math.random() * .6 + 's';
+    p.style.animationDuration = 2.5 + Math.random() * 1.5 + 's';
+    p.style.width = (5 + Math.random() * 6) + 'px';
+    p.style.height = (5 + Math.random() * 6) + 'px';
+    canvas.appendChild(p);
   }
-  setTimeout(function() { canvas.innerHTML = ''; }, 4000);
+  setTimeout(function() { canvas.innerHTML = ''; }, 4500);
 }
 
-/* ─── Auth UI ─── */
+/* ═══ Onboarding ═══ */
+function showOnboarding() {
+  $('onboarding').classList.remove('hidden');
+  $('authScreen').classList.add('hidden');
+}
+
+function finishOnboarding() {
+  var name = $('obName').value.trim() || '';
+  var birth = $('obBirth').value || '';
+  $('onboarding').classList.add('hidden');
+  $('appContent').classList.remove('hidden');
+  localStorage.setItem('ob_done', '1');
+  if (name || birth || obMode !== 'pad') {
+    savePetProfile({ name: name, birthDate: birth, toiletMode: obMode });
+  }
+  confetti();
+}
+
+function bindOnboarding() {
+  $('obNext1').addEventListener('click', function() {
+    $$('.ob-screen').forEach(function(s) { s.classList.remove('active'); });
+    $('ob2').classList.add('active');
+    $$('.ob-dot').forEach(function(d, i) { d.classList.toggle('active', i === 1); });
+  });
+  $('obNext2').addEventListener('click', function() {
+    $$('.ob-screen').forEach(function(s) { s.classList.remove('active'); });
+    $('ob3').classList.add('active');
+    $$('.ob-dot').forEach(function(d, i) { d.classList.toggle('active', i === 2); });
+  });
+  $$('.ob-option').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      $$('.ob-option').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      obMode = btn.dataset.mode;
+    });
+  });
+  $('obFinish').addEventListener('click', finishOnboarding);
+}
+
+/* ═══ Auth ═══ */
 function updateAuthUI(loggedIn) {
   $('authScreen').classList.toggle('hidden', loggedIn);
   $('appContent').classList.toggle('hidden', !loggedIn);
@@ -66,12 +105,176 @@ function updateAuthUI(loggedIn) {
 function setActiveTab(id) {
   $$('.tab-panel').forEach(function(p) { p.classList.toggle('active', p.id === id); });
   $$('.nav-tab').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
+  haptic();
 }
 
 function openSheet() { $('eventSheet').classList.remove('hidden'); $('eventTime').value = nowTime(); }
 function closeSheet() { $('eventSheet').classList.add('hidden'); }
 
-/* ─── Render: Home ─── */
+/* ═══ Chart ═══ */
+function renderChart() {
+  var canvas = $('progressChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var w = rect.width, h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Get last 14 days data
+  var days = [];
+  for (var i = 13; i >= 0; i--) {
+    var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+    var next = new Date(d); next.setDate(next.getDate() + 1);
+    var dayEvents = eventsState.filter(function(e) {
+      if (!e.createdAt) return false;
+      var ts = e.createdAt.toDate ? e.createdAt.toDate() : new Date(e.createdAt);
+      return ts >= d && ts < next;
+    });
+    var success = dayEvents.filter(function(e) { return e.eventType === 'pad' || e.eventType === 'outdoor'; }).length;
+    var miss = dayEvents.filter(function(e) { return e.eventType === 'miss'; }).length;
+    var total = success + miss;
+    days.push({ date: d, pct: total > 0 ? Math.round((success / total) * 100) : null, success: success, miss: miss });
+  }
+
+  var padding = { top: 15, bottom: 20, left: 5, right: 5 };
+  var chartW = w - padding.left - padding.right;
+  var chartH = h - padding.top - padding.bottom;
+  var barW = chartW / 14;
+
+  // Grid lines
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+  ctx.lineWidth = .5;
+  [0, 50, 100].forEach(function(v) {
+    var y = padding.top + chartH - (v / 100 * chartH);
+    ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+  });
+
+  // Bars
+  var primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+  var danger = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+  var faint = getComputedStyle(document.documentElement).getPropertyValue('--faint').trim();
+
+  days.forEach(function(day, i) {
+    var x = padding.left + i * barW + barW * .2;
+    var bw = barW * .6;
+    if (day.pct === null) {
+      // No data - small gray dot
+      ctx.fillStyle = faint;
+      ctx.beginPath();
+      ctx.arc(padding.left + i * barW + barW / 2, padding.top + chartH - 3, 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      var barH = Math.max(3, (day.pct / 100) * chartH);
+      var y = padding.top + chartH - barH;
+      var color = day.pct >= 70 ? primary : day.pct >= 40 ? '#d97706' : danger;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      var r = Math.min(3, bw / 2);
+      ctx.moveTo(x, y + barH);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.lineTo(x + bw - r, y);
+      ctx.quadraticCurveTo(x + bw, y, x + bw, y + r);
+      ctx.lineTo(x + bw, y + barH);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Day label
+    if (i % 3 === 0 || i === 13) {
+      ctx.fillStyle = faint;
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      var label = day.date.getDate() + '/' + (day.date.getMonth() + 1);
+      ctx.fillText(label, padding.left + i * barW + barW / 2, h - 4);
+    }
+  });
+}
+
+/* ═══ Smart Suggestions ═══ */
+function renderSuggestion() {
+  var card = $('suggestionCard');
+  var text = $('suggestionText');
+  if (eventsState.length < 5) { card.classList.add('hidden'); return; }
+
+  var start = todayStart();
+  var last7 = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+    var next = new Date(d); next.setDate(next.getDate() + 1);
+    var dayEvents = eventsState.filter(function(e) { if (!e.createdAt) return false; var ts = e.createdAt.toDate ? e.createdAt.toDate() : new Date(e.createdAt); return ts >= d && ts < next; });
+    last7.push(dayEvents);
+  }
+
+  // Analyze triggers for misses
+  var missTriggers = {};
+  eventsState.filter(function(e) { return e.eventType === 'miss' && e.trigger; }).forEach(function(e) {
+    missTriggers[e.trigger] = (missTriggers[e.trigger] || 0) + 1;
+  });
+  var topTrigger = Object.entries(missTriggers).sort(function(a, b) { return b[1] - a[1]; })[0];
+
+  // Analyze time patterns
+  var missHours = eventsState.filter(function(e) { return e.eventType === 'miss' && e.timeLabel; }).map(function(e) { return parseInt(e.timeLabel.split(':')[0]); });
+  var avgMissHour = missHours.length > 2 ? Math.round(missHours.reduce(function(a, b) { return a + b; }, 0) / missHours.length) : null;
+
+  // Calculate weekly success rate
+  var allToilet = eventsState.filter(function(e) { return e.eventType === 'pad' || e.eventType === 'outdoor' || e.eventType === 'miss'; });
+  var recent = allToilet.slice(0, 20);
+  var successRate = recent.length > 0 ? Math.round(recent.filter(function(e) { return e.eventType !== 'miss'; }).length / recent.length * 100) : 0;
+
+  var suggestion = '';
+  if (successRate >= 80 && recent.length >= 10) {
+    suggestion = '🎉 Чудовий прогрес! ' + successRate + '% успіху за останні записи. Можна спробувати трохи розширити територію.';
+  } else if (topTrigger && topTrigger[1] >= 3) {
+    suggestion = 'Промахи найчастіше "' + topTrigger[0] + '" (' + topTrigger[1] + ' разів). Спробуйте вести на місце ПЕРЕД цим моментом.';
+  } else if (avgMissHour !== null) {
+    suggestion = 'Промахи частіше бувають ~' + avgMissHour + ':00. Будьте особливо уважні в цей час!';
+  } else if (successRate < 50 && recent.length >= 5) {
+    suggestion = 'Успішність ' + successRate + '%. Спробуйте зменшити вільну територію і частіше підводити до місця.';
+  } else {
+    suggestion = getProgramByAge(getAgeInWeeks(currentPet ? currentPet.birthDate : null)).tip;
+  }
+
+  card.classList.remove('hidden');
+  text.textContent = suggestion;
+}
+
+/* ═══ Weekly Report ═══ */
+function renderWeeklyReport() {
+  var card = $('weeklyCard');
+  var content = $('weeklyContent');
+  // Show on Mondays or if 7+ days of data
+  var today = new Date();
+  var isMonday = today.getDay() === 1;
+  var dismissed = localStorage.getItem('weekly_dismissed_' + today.toISOString().slice(0, 10));
+  if (dismissed || eventsState.length < 7) { card.classList.add('hidden'); return; }
+  if (!isMonday && eventsState.length < 20) { card.classList.add('hidden'); return; }
+
+  var weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
+  var weekEvents = eventsState.filter(function(e) { if (!e.createdAt) return false; var ts = e.createdAt.toDate ? e.createdAt.toDate() : new Date(e.createdAt); return ts >= weekStart; });
+  var toilet = weekEvents.filter(function(e) { return e.eventType === 'pad' || e.eventType === 'outdoor' || e.eventType === 'miss'; });
+  var success = toilet.filter(function(e) { return e.eventType !== 'miss'; }).length;
+  var total = toilet.length;
+  var pct = total > 0 ? Math.round(success / total * 100) : 0;
+
+  // Previous week for comparison
+  var prevStart = new Date(weekStart); prevStart.setDate(prevStart.getDate() - 7);
+  var prevEvents = eventsState.filter(function(e) { if (!e.createdAt) return false; var ts = e.createdAt.toDate ? e.createdAt.toDate() : new Date(e.createdAt); return ts >= prevStart && ts < weekStart; });
+  var prevToilet = prevEvents.filter(function(e) { return e.eventType === 'pad' || e.eventType === 'outdoor' || e.eventType === 'miss'; });
+  var prevPct = prevToilet.length > 0 ? Math.round(prevToilet.filter(function(e) { return e.eventType !== 'miss'; }).length / prevToilet.length * 100) : null;
+
+  var diff = prevPct !== null ? pct - prevPct : null;
+  var diffText = diff !== null ? (diff > 0 ? '+' + diff + '%' : diff + '%') : '—';
+  var highlight = pct >= 80 ? '🏆 Відмінний тиждень!' : pct >= 60 ? '👍 Непогано, рухаємось!' : '💪 Продовжуйте, звички формуються!';
+
+  card.classList.remove('hidden');
+  content.innerHTML = '<div class="weekly-stat"><span>Успішність</span><strong>' + pct + '%</strong></div><div class="weekly-stat"><span>Записів</span><strong>' + weekEvents.length + '</strong></div><div class="weekly-stat"><span>vs минулий тиждень</span><strong>' + diffText + '</strong></div><div class="weekly-highlight">' + highlight + '</div>';
+}
+
+/* ═══ Render Home ═══ */
 function renderHome() {
   renderKPIs();
   renderProgressRing();
@@ -80,17 +283,18 @@ function renderHome() {
   renderTip();
   renderFeed();
   renderHeaderInfo();
+  renderChart();
+  renderSuggestion();
+  renderWeeklyReport();
 }
 
 function renderHeaderInfo() {
-  var name = (currentPet && currentPet.name) || 'Мій песик';
+  var name = (currentPet && currentPet.name) || 'Песик';
   $('petNameHeader').textContent = '🐶 ' + name;
   var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
   var program = getProgramByAge(weeks);
-  $('headerSub').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + program.stage : 'Заповніть профіль →';
-  if (currentUser && currentUser.photoURL) {
-    $('userAvatar').innerHTML = '<img src="' + currentUser.photoURL + '" alt="">';
-  }
+  $('headerSub').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + program.stage : 'Заповніть профіль';
+  if (currentUser && currentUser.photoURL) $('userAvatar').innerHTML = '<img src="' + currentUser.photoURL + '">';
 }
 
 function renderKPIs() {
@@ -105,47 +309,42 @@ function renderKPIs() {
 function renderProgressRing() {
   var start = todayStart();
   var today = eventsState.filter(function(x) { if (!x.createdAt) return false; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts >= start; });
-  var success = today.filter(function(x) { return x.eventType === 'pad' || x.eventType === 'outdoor'; }).length;
-  var total = success + today.filter(function(x) { return x.eventType === 'miss'; }).length;
-  var pct = total > 0 ? Math.round((success / total) * 100) : 0;
-  var offset = 264 - (264 * pct / 100);
-  $('ringFill').style.strokeDashoffset = offset;
+  var s = today.filter(function(x) { return x.eventType === 'pad' || x.eventType === 'outdoor'; }).length;
+  var t = s + today.filter(function(x) { return x.eventType === 'miss'; }).length;
+  var pct = t > 0 ? Math.round((s / t) * 100) : 0;
+  $('ringFill').style.strokeDashoffset = 264 - (264 * pct / 100);
   $('ringPct').textContent = pct + '%';
 }
 
 function renderStreak() {
-  var start = todayStart();
-  var today = eventsState.filter(function(x) { if (!x.createdAt) return false; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts >= start; });
+  var allDates = eventsState.map(function(x) { if (!x.createdAt) return null; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts.toDateString(); }).filter(Boolean);
+  var unique = [...new Set(allDates)].sort(function(a, b) { return new Date(b) - new Date(a); });
   var days = 0;
-  if (today.length > 0) {
+  var today = new Date().toDateString();
+  if (unique[0] === today) {
     days = 1;
-    // Count consecutive days with records
-    var allDates = eventsState.map(function(x) { if (!x.createdAt) return null; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts.toDateString(); }).filter(Boolean);
-    var unique = [...new Set(allDates)].sort(function(a, b) { return new Date(b) - new Date(a); });
     for (var i = 0; i < unique.length - 1; i++) {
-      var diff = (new Date(unique[i]) - new Date(unique[i + 1])) / 86400000;
-      if (diff <= 1) days++; else break;
+      if ((new Date(unique[i]) - new Date(unique[i + 1])) / 86400000 <= 1.5) days++; else break;
     }
   }
-  var bar = $('streakBar');
-  if (days >= 3) { bar.style.display = 'flex'; $('streakText').textContent = days + ' днів поспіль! Так тримати! 🔥'; }
-  else if (today.length > 0) { bar.style.display = 'flex'; $('streakText').textContent = 'Сьогодні є записи — чудово!'; }
-  else { bar.style.display = 'flex'; $('streakText').textContent = 'Додайте перший запис сьогодні'; }
+  if (days >= 7) $('streakText').textContent = days + ' днів поспіль! Неймовірно! 🔥🔥🔥';
+  else if (days >= 3) $('streakText').textContent = days + ' днів поспіль! 🔥';
+  else if (days >= 1) $('streakText').textContent = 'Сьогодні є записи — тримайте темп!';
+  else $('streakText').textContent = 'Додайте запис щоб почати серію!';
 }
 
 function renderDailyChecklist() {
   var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
   var program = getProgramByAge(weeks);
-  var items = program.plan;
-  $('dailyItems').innerHTML = items.map(function(item, i) { return '<div class="daily-item" data-idx="' + i + '"><input type="checkbox" id="dc' + i + '"><span>' + item + '</span></div>'; }).join('');
-  $('dailyProgress').textContent = '0/' + items.length;
+  $('dailyItems').innerHTML = program.plan.map(function(item, i) { return '<div class="daily-item" data-idx="' + i + '"><input type="checkbox" id="dc' + i + '"><span>' + item + '</span></div>'; }).join('');
+  $('dailyProgress').textContent = '0/' + program.plan.length;
   $$('.daily-item input').forEach(function(cb) {
     cb.addEventListener('change', function() {
-      var parent = cb.closest('.daily-item');
-      parent.classList.toggle('done', cb.checked);
-      var checked = $$('.daily-item input:checked').length;
-      $('dailyProgress').textContent = checked + '/' + items.length;
-      if (checked === items.length) { confetti(); showToast('Всі завдання виконано! 🎉', 'success'); }
+      cb.closest('.daily-item').classList.toggle('done', cb.checked);
+      var c = $$('.daily-item input:checked').length;
+      var t = $$('.daily-item input').length;
+      $('dailyProgress').textContent = c + '/' + t;
+      if (c === t) { confetti(); showToast('Всі завдання виконано! 🎉', 'success'); }
       haptic();
     });
   });
@@ -156,58 +355,83 @@ function renderTip() {
   var program = getProgramByAge(weeks);
   var hour = new Date().getHours();
   var tip;
-  if (hour < 10) tip = 'Ранок — ідеальний час для туалету після сну. Ведіть одразу на місце!';
-  else if (hour < 14) tip = program.tip;
-  else if (hour < 18) { var k = KNOWLEDGE[Math.floor(Math.random() * KNOWLEDGE.length)]; tip = k.text.slice(0, 140) + (k.text.length > 140 ? '...' : ''); }
-  else tip = 'Вечір — коротка сесія на ім\'я (5–8 повторень) або нюхова гра перед сном.';
+  if (hour < 9) tip = 'Ранок! Після пробудження — одразу на місце для туалету. Не чекайте.';
+  else if (hour < 13) tip = program.priorities[0] || program.tip;
+  else if (hour < 17) { var k = KNOWLEDGE[Math.floor(Math.random() * KNOWLEDGE.length)]; tip = k.title + ': ' + k.text.slice(0, 100) + '...'; }
+  else if (hour < 20) tip = 'Вечір — час для нюхових ігор (10 хв = 30 хв прогулянки по навантаженню на мозок).';
+  else tip = 'Перед сном: спокійний вивід на місце, без гри і збудження.';
   $('tipText').textContent = tip;
 }
 
 function renderFeed() {
   var list = $('recentLogs');
-  if (!eventsState.length) { list.innerHTML = '<div class="empty"><span class="empty-illustration">🐾</span>Натисніть кнопку вище щоб почати</div>'; return; }
+  if (!eventsState.length) { list.innerHTML = '<div class="empty">🐾<br>Натисніть кнопку вище щоб почати</div>'; return; }
   var start = todayStart();
-  var todayEvents = eventsState.filter(function(x) { if (!x.createdAt) return false; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts >= start; });
-  var items = todayEvents.length ? todayEvents : eventsState.slice(0, 8);
-  list.innerHTML = items.map(function(item, i) {
+  var todayEv = eventsState.filter(function(x) { if (!x.createdAt) return false; var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt); return ts >= start; });
+  var items = todayEv.length ? todayEv : eventsState.slice(0, 10);
+  list.innerHTML = items.map(function(item) {
     var conf = TYPE_CONFIG[item.eventType] || { icon: '📌', label: item.eventType, tone: '' };
-    return '<div class="feed-item" style="animation-delay:' + (i * .05) + 's"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + (item.timeLabel || '') + (item.trigger ? ' · ' + item.trigger : '') + (item.note ? ' — ' + item.note : '') + '</div></div><span class="pill ' + conf.tone + '">' + (item.byName || '') + '</span></div>';
+    return '<div class="feed-item" data-id="' + item.id + '"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + (item.timeLabel || '') + (item.trigger ? ' · ' + item.trigger : '') + '</div></div><span class="pill ' + conf.tone + '">' + (item.byName || '') + '</span><div class="delete-bg">Видалити</div></div>';
   }).join('');
+  // Swipe to delete
+  $$('.feed-item').forEach(function(el) { initSwipe(el); });
 }
 
-/* ─── Render: Learn ─── */
+/* ═══ Swipe to delete ═══ */
+function initSwipe(el) {
+  var startX = 0, dx = 0, swiping = false;
+  el.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; swiping = true; }, { passive: true });
+  el.addEventListener('touchmove', function(e) {
+    if (!swiping) return;
+    dx = startX - e.touches[0].clientX;
+    if (dx > 10) { el.style.transform = 'translateX(' + Math.max(-80, -dx) + 'px)'; el.classList.add('swiping'); }
+  }, { passive: true });
+  el.addEventListener('touchend', function() {
+    swiping = false;
+    if (dx > 70) {
+      el.style.transform = 'translateX(-100%)';
+      el.style.opacity = '0';
+      setTimeout(function() { deleteEvent(el.dataset.id); }, 300);
+    } else {
+      el.style.transform = '';
+      el.classList.remove('swiping');
+    }
+    dx = 0;
+  }, { passive: true });
+}
+
+async function deleteEvent(id) {
+  if (!workspaceId || !id) return;
+  try {
+    await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
+    showToast('Видалено', 'success');
+  } catch (e) { showToast('Помилка', 'error'); }
+}
+
+/* ═══ Learn ═══ */
 function renderLearn() {
   var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
   var program = getProgramByAge(weeks);
-  $('ageSummaryBadge').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + program.stage : 'Вкажіть вік в профілі';
+  $('ageSummaryBadge').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + program.stage : 'Вкажіть вік';
   $('priorityTips').innerHTML = program.priorities.map(function(t) { return '<div class="plan-item">' + t + '</div>'; }).join('');
-
-  $('courseGrid').innerHTML = COURSES.map(function(c) {
-    return '<button type="button" class="course-btn ' + (c.id === currentCourseId ? 'selected' : '') + '" data-cid="' + c.id + '"><span class="c-badge">' + c.badge + '</span><strong>' + c.title + '</strong><div class="c-meta">' + c.description.slice(0, 70) + '...</div></button>';
-  }).join('');
+  $('courseGrid').innerHTML = COURSES.map(function(c) { return '<button type="button" class="course-btn ' + (c.id === currentCourseId ? 'selected' : '') + '" data-cid="' + c.id + '"><span class="c-badge">' + c.badge + '</span><strong>' + c.title + '</strong><div class="c-meta">' + c.description.slice(0, 65) + '...</div></button>'; }).join('');
   $$('[data-cid]').forEach(function(btn) { btn.addEventListener('click', function() { currentCourseId = btn.dataset.cid; renderLearn(); haptic(); }); });
-
   var course = COURSES.find(function(c) { return c.id === currentCourseId; }) || COURSES[0];
   $('selectedCourse').innerHTML = '<div class="course-detail"><h4>Кроки</h4><ul>' + course.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul><h4>Помилки</h4><ul class="mistakes">' + course.mistakes.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul><h4>Чекліст</h4><ul class="checks">' + course.checklist.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul></div>';
-
   $('knowledgeGrid').innerHTML = KNOWLEDGE.map(function(k) { return '<div class="k-card"><strong>' + k.title + '</strong><p>' + k.text + '</p><span class="k-tag">' + k.tag + '</span></div>'; }).join('');
-
-  var socialChecked = 0;
   $('socialChecklist').innerHTML = SOCIAL_ITEMS.map(function(s, i) { return '<div class="social-item"><input type="checkbox" id="sc' + i + '"><span>' + s + '</span></div>'; }).join('');
   $('socialProgress').textContent = '0/' + SOCIAL_ITEMS.length;
-  $$('.social-item input').forEach(function(cb) {
-    cb.addEventListener('change', function() { var c = $$('.social-item input:checked').length; $('socialProgress').textContent = c + '/' + SOCIAL_ITEMS.length; });
-  });
+  $$('.social-item input').forEach(function(cb) { cb.addEventListener('change', function() { $('socialProgress').textContent = $$('.social-item input:checked').length + '/' + SOCIAL_ITEMS.length; }); });
 }
 
-/* ─── Render: Profile ─── */
+/* ═══ Profile ═══ */
 function renderProfile() {
   fillPetForm();
   renderWorkspaceMeta();
-  var name = (currentPet && currentPet.name) || 'Мій песик';
+  var name = (currentPet && currentPet.name) || 'Песик';
   var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
   $('profileName').textContent = name;
-  $('profileMeta').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + ((currentPet && currentPet.breed) || 'Порода не вказана') : 'Заповніть дані нижче';
+  $('profileMeta').textContent = weeks != null ? getAgeLabel(weeks) + ' · ' + ((currentPet && currentPet.breed) || '') : '';
 }
 
 function fillPetForm() {
@@ -229,58 +453,44 @@ function renderWorkspaceMeta() {
 }
 
 function renderMembers(members) {
-  if (!members) members = [];
-  $('membersList').innerHTML = members.length ? members.map(function(m) {
-    return '<div class="member-chip">' + (m.photoURL ? '<img src="' + m.photoURL + '">' : '<div class="m-avatar">' + avatarText(m.displayName) + '</div>') + '<span>' + (m.displayName || 'User') + '</span></div>';
-  }).join('') : '<div class="empty">Тільки ви</div>';
+  $('membersList').innerHTML = (members || []).length ? (members || []).map(function(m) { return '<div class="member-chip">' + (m.photoURL ? '<img src="' + m.photoURL + '">' : '<div class="m-avatar">' + avatarText(m.displayName) + '</div>') + '<span>' + (m.displayName || 'User') + '</span></div>'; }).join('') : '';
 }
 
 function renderAll() { renderHome(); renderLearn(); renderProfile(); }
 
-/* ─── Firebase ─── */
+/* ═══ Firebase ═══ */
 async function ensureWorkspaceForUser(user) {
   var userDoc = await db.collection('users').doc(user.uid).get();
-  if (userDoc.exists && userDoc.data().workspaceId) {
-    workspaceId = userDoc.data().workspaceId;
-    var wsDoc = await db.collection('workspaces').doc(workspaceId).get();
-    workspaceData = wsDoc.exists ? wsDoc.data() : null;
-    return;
-  }
-  var newRef = db.collection('workspaces').doc();
-  workspaceId = newRef.id;
-  var inviteCode = createInviteCode();
-  var spaceName = (user.displayName || 'Мій').split(' ')[0] + ' простір';
+  if (userDoc.exists && userDoc.data().workspaceId) { workspaceId = userDoc.data().workspaceId; var wsDoc = await db.collection('workspaces').doc(workspaceId).get(); workspaceData = wsDoc.exists ? wsDoc.data() : null; return; }
+  var newRef = db.collection('workspaces').doc(); workspaceId = newRef.id;
+  var inviteCode = createInviteCode(); var spaceName = (user.displayName || 'Мій').split(' ')[0] + ' простір';
   await newRef.set({ name: spaceName, ownerId: user.uid, inviteCode: inviteCode, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   workspaceData = { name: spaceName, ownerId: user.uid, inviteCode: inviteCode };
   await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '', role: 'owner', workspaceId: workspaceId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   await db.collection('workspaces').doc(workspaceId).collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: '', breed: '', weight: '', homeDate: '', vaccination: 'не вказано', toiletMode: 'pad', notes: '', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-  confetti();
 }
 
 function subscribePet() { if (!workspaceId) return; if (unsubPet) unsubPet(); unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(s) { currentPet = s.exists ? s.data() : null; renderAll(); }); }
 function subscribeMembers() { if (!workspaceId) return; if (unsubMembers) unsubMembers(); unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members').onSnapshot(function(s) { var m = []; s.forEach(function(d) { m.push(d.data()); }); renderMembers(m); }); }
-function subscribeEvents() { if (!workspaceId) return; if (unsubEvents) unsubEvents(); unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(200).onSnapshot(function(s) { var r = []; s.forEach(function(d) { r.push(Object.assign({ id: d.id }, d.data())); }); eventsState = r; renderHome(); }); }
+function subscribeEvents() { if (!workspaceId) return; if (unsubEvents) unsubEvents(); unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(500).onSnapshot(function(s) { var r = []; s.forEach(function(d) { r.push(Object.assign({ id: d.id }, d.data())); }); eventsState = r; renderHome(); }); }
 
 async function savePetProfile(payload) {
-  if (!currentUser || !workspaceId) return showToast('Увійдіть спочатку', 'error');
+  if (!currentUser || !workspaceId) return showToast('Увійдіть', 'error');
   await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set(Object.assign({}, currentPet || {}, payload, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }), { merge: true });
-  petFormDirty = false;
-  showToast('Збережено ✓', 'success'); haptic();
+  petFormDirty = false; showToast('Збережено ✓', 'success'); haptic();
 }
 
 async function addEvent(payload) {
-  if (!currentUser || !workspaceId) return showToast('Увійдіть спочатку', 'error');
+  if (!currentUser || !workspaceId) return showToast('Увійдіть', 'error');
   await db.collection('workspaces').doc(workspaceId).collection('events').add({ eventType: payload.eventType, byUid: currentUser.uid, byName: payload.byName || currentUser.displayName || '', trigger: payload.trigger || '', note: payload.note || '', timeLabel: payload.timeLabel || nowTime(), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   showToast('Додано ✓', 'success'); haptic();
-  // Milestone confetti
-  if (eventsState.length === 9 || eventsState.length === 49 || eventsState.length === 99) { setTimeout(confetti, 500); showToast('🎉 ' + (eventsState.length + 1) + ' записів! Milestone!', 'success'); }
+  if (eventsState.length === 9 || eventsState.length === 49 || eventsState.length === 99) { setTimeout(confetti, 300); showToast('🎉 Milestone: ' + (eventsState.length + 1) + ' записів!', 'success'); }
 }
 
 async function joinWorkspaceByInvite(code) {
   if (!currentUser) return showToast('Увійдіть', 'error');
-  code = code.trim().toUpperCase();
-  if (!code) throw new Error('Введіть код');
+  code = code.trim().toUpperCase(); if (!code) throw new Error('Введіть код');
   var snap = await db.collection('workspaces').where('inviteCode', '==', code).limit(1).get();
   if (snap.empty) throw new Error('Код не знайдено');
   workspaceId = snap.docs[0].id; workspaceData = snap.docs[0].data();
@@ -289,7 +499,7 @@ async function joinWorkspaceByInvite(code) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll(); confetti();
 }
 
-/* ─── Auth ─── */
+/* ═══ Auth ═══ */
 function loginGoogle() { auth.signInWithRedirect(googleProvider); }
 
 async function logoutGoogle() {
@@ -298,7 +508,7 @@ async function logoutGoogle() {
   if (unsubPet) { unsubPet(); unsubPet = null; }
   await auth.signOut();
   currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
-  petFormDirty = false; showToast('До побачення 👋');
+  petFormDirty = false; showToast('До зустрічі 👋');
 }
 
 function bootAuth() {
@@ -311,15 +521,17 @@ function bootAuth() {
       await ensureWorkspaceForUser(currentUser);
       subscribePet(); subscribeMembers(); subscribeEvents();
       renderAll();
+      // Show onboarding if first time
+      if (!localStorage.getItem('ob_done') && (!currentPet || !currentPet.name)) { showOnboarding(); }
     } catch (e) { console.error('[Boot]', e); showToast('Помилка: ' + e.message, 'error'); }
     $('appLoader').classList.add('hidden');
   });
 }
 
-/* ─── Bindings ─── */
+/* ═══ Bindings ═══ */
 function bindEvents() {
-  $$('.nav-tab').forEach(function(b) { b.addEventListener('click', function() { setActiveTab(b.dataset.tab); haptic(); }); });
-  $$('[data-theme-toggle]').forEach(function(el) { el.addEventListener('click', function() { var n = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); }); });
+  $$('.nav-tab').forEach(function(b) { b.addEventListener('click', function() { setActiveTab(b.dataset.tab); }); });
+  $$('[data-theme-toggle]').forEach(function(el) { el.addEventListener('click', function() { var n = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); haptic(); }); });
   if (localStorage.getItem('theme')) document.documentElement.setAttribute('data-theme', localStorage.getItem('theme'));
 
   $('googleLoginBtn').addEventListener('click', loginGoogle);
@@ -353,12 +565,22 @@ function bindEvents() {
     showToast('Скопійовано ✓', 'success'); haptic();
   });
 
-   $('joinWorkspaceForm').addEventListener('submit', async function(e) {
+  $('joinWorkspaceForm').addEventListener('submit', async function(e) {
     e.preventDefault(); var btn = e.target.querySelector('[type="submit"]'); btn.disabled = true;
     try { await joinWorkspaceByInvite($('inviteCodeInput').value); $('inviteCodeInput').value = ''; showToast('Приєднано! 🎉', 'success'); } catch (err) { showToast(err.message, 'error'); }
     finally { btn.disabled = false; }
   });
+
+  $('dismissWeekly').addEventListener('click', function() {
+    $('weeklyCard').classList.add('hidden');
+    localStorage.setItem('weekly_dismissed_' + new Date().toISOString().slice(0, 10), '1');
+  });
+
+  // Resize chart
+  var resizeTimer;
+  window.addEventListener('resize', function() { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderChart, 200); });
 }
 
+bindOnboarding();
 bindEvents();
 bootAuth();

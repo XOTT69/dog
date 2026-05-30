@@ -1,21 +1,13 @@
 import { AGE_PROGRAMS, COURSES, KNOWLEDGE, SOCIAL_ITEMS, TOILET_GUIDE, TYPE_CONFIG } from './content.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js';
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  browserLocalPersistence,
-  setPersistence
-} from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js';
-import {
   initializeFirestore,
   persistentLocalCache,
   doc, getDoc, setDoc, updateDoc, addDoc, getDocs,
   collection, query, where, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js';
 
+/* ─── Firebase Init ─── */
 const firebaseConfig = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
   authDomain: 'dogs-55f5e.firebaseapp.com',
@@ -25,15 +17,17 @@ const firebaseConfig = {
   appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Compat SDK for auth (no iframe needed)
+firebase.initializeApp(firebaseConfig);
+const authCompat = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// Modular SDK for Firestore (with offline cache)
+const app = initializeApp(firebaseConfig, 'firestoreApp');
 const db = initializeFirestore(app, { localCache: persistentLocalCache() });
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'select_account' });
 
-// Set persistence explicitly
-setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistence:', e));
-
+/* ─── State ─── */
 let currentUser = null;
 let workspaceId = null;
 let workspaceData = null;
@@ -112,12 +106,12 @@ function renderProfileInsights() {
   const program = getProgramByAge(weeks);
   const mode = currentPet?.toiletMode || 'pad';
   const modeTexts = {
-    pad: 'Пелюшка вдома — типовий сценарій для щенят до завершення вакцинації. Фокус: стабільне місце, підведення після тригерів, миттєве підкріплення.',
-    mixed: 'Змішаний режим — пелюшка + вулиця. Важливо: не поспішати, переводити навичку поступово, не забирати пелюшку різко.',
-    outdoor: 'Вулиця — основний сценарій. Фокус: режим виходів, ритуал перед дверима, підкріплення на місці (не вдома).'
+    pad: 'Пелюшка вдома — типовий сценарій до завершення вакцинації. Фокус: стабільне місце, підведення після тригерів, миттєве підкріплення.',
+    mixed: 'Змішаний режим — пелюшка + вулиця. Не поспішати, переводити навичку поступово.',
+    outdoor: 'Вулиця — основний сценарій. Фокус: режим виходів, підкріплення на місці.'
   };
   const insights = [
-    { title: 'Вікова програма', text: `Етап: ${program.stage}. Від віку залежить складність завдань, тривалість сесій і пріоритети.` },
+    { title: 'Вікова програма', text: `Етап: ${program.stage}. Від віку залежить складність завдань і пріоритети.` },
     { title: 'Побутовий режим', text: modeTexts[mode] || modeTexts.pad },
     { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни: після чого промахи, які інтервали, хто частіше фіксує успіхи.' }
   ];
@@ -224,6 +218,7 @@ function renderWorkspaceMeta() {
 function renderAll() { fillPetForm(); renderWorkspaceMeta(); renderProfileInsights(); renderTodayPlan(); renderPriorityTips(); renderEvents(); renderKPIs(); }
 function renderStatic() { renderSocialChecklist(); renderCourses(); renderKnowledge(); renderToiletGuide(); }
 
+/* ─── Firestore Logic ─── */
 async function ensureWorkspaceForUser(user) {
   const userRef = doc(db, 'users', user.uid);
   const userSnap = await getDoc(userRef);
@@ -288,26 +283,22 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
-/* ─── AUTH: ONLY POPUP ─── */
+/* ─── AUTH via Compat SDK (NO IFRAME NEEDED) ─── */
 async function loginGoogle() {
   const btns = [$('googleLoginBtn'), $('googleLoginBtnTop')];
   btns.forEach(b => { if (b) b.disabled = true; });
 
   try {
-    console.log('[Auth] Starting signInWithPopup...');
-    const result = await signInWithPopup(auth, provider);
+    const result = await authCompat.signInWithPopup(googleProvider);
     console.log('[Auth] Success:', result.user.email);
   } catch (error) {
     console.error('[Auth] Error:', error.code, error.message);
-
-    if (error.code === 'auth/popup-blocked') {
-      showToast('Popup заблоковано. Дозвольте popup для цього сайту в налаштуваннях браузера.', 'error');
-    } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-      // user closed - ignore
+    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      // ignore
+    } else if (error.code === 'auth/popup-blocked') {
+      showToast('Дозвольте popup у браузері', 'error');
     } else if (error.code === 'auth/network-request-failed') {
       showToast('Немає інтернету', 'error');
-    } else if (error.code === 'auth/unauthorized-domain') {
-      showToast('Домен не авторизовано в Firebase. Додайте dogsbelli.vercel.app в Firebase Console → Auth → Settings → Authorized domains', 'error');
     } else {
       showToast('Помилка: ' + error.code, 'error');
     }
@@ -320,18 +311,15 @@ async function logoutGoogle() {
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubPet) { unsubPet(); unsubPet = null; }
-  await signOut(auth);
+  await authCompat.signOut();
   currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
   petFormDirty = false;
   showToast('Вихід виконано', 'success');
 }
 
 function bootAuth() {
-  console.log('[Auth] bootAuth started, waiting for onAuthStateChanged...');
-
-  onAuthStateChanged(auth, async user => {
-    console.log('[Auth] onAuthStateChanged:', user ? user.email : 'null');
-
+  authCompat.onAuthStateChanged(async user => {
+    console.log('[Auth] State:', user ? user.email : 'null');
     currentUser = user || null;
     updateAuthUI(!!currentUser);
 
@@ -347,13 +335,13 @@ function bootAuth() {
       renderAll();
     } catch (error) {
       console.error('[Auth] Boot error:', error);
-      showToast('Помилка завантаження: ' + error.message, 'error');
+      showToast('Помилка завантаження', 'error');
     }
     $('appLoader').classList.add('hidden');
   });
 }
 
-/* ─── BINDINGS ─── */
+/* ─── Bindings ─── */
 function bindEvents() {
   $$('[data-tab]').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
   $$('[data-theme-toggle]').forEach(el => el.addEventListener('click', () => {

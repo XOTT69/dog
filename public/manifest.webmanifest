@@ -1,34 +1,27 @@
 {
-  "name": "Doggo Coach",
-  "short_name": "Doggo",
-  "description": "PWA для домашнього тренування собаки, туалету, пелюшки, догляду, сімейного доступу і щоденного обліку.",
+  "name": "Doggo Coach UA",
+  "short_name": "Doggo Coach",
+  "description": "Сімейний застосунок для виховання собаки: профіль, курси, щоденник, туалет, пелюшка та спільний доступ.",
   "lang": "uk",
-  "dir": "ltr",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#f6f5f1",
   "theme_color": "#0e766e",
   "categories": ["lifestyle", "productivity", "education"],
   "icons": [
     {
-      "src": "./icons/icon-192.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='44' fill='%230e766e'/%3E%3Cpath d='M54 98c0-30 18-52 43-52 18 0 32 10 39 27l18-4-8 23c0 33-21 54-50 54s-42-19-42-48Z' fill='none' stroke='%23fff7ef' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M69 67 47 45M88 104h1M122 104h1M106 126c-6 4-16 4-22 0' fill='none' stroke='%23fff7ef' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     },
     {
-      "src": "./icons/icon-512.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%230e766e'/%3E%3Cpath d='M145 262c0-79 49-136 114-136 48 0 84 27 104 71l48-11-21 61c0 87-56 141-132 141s-113-50-113-126Z' fill='none' stroke='%23fff7ef' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M185 180 128 123M236 276h2M324 276h2M283 333c-15 10-40 10-55 0' fill='none' stroke='%23fff7ef' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/icon-512-maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }

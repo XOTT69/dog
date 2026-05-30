@@ -285,7 +285,6 @@ async function joinWorkspaceByInvite(codeRaw) {
 
 /* ─── AUTH via Compat SDK + Redirect ─── */
 function loginGoogle() {
-  // Redirect: page navigates to Google, then back
   authCompat.signInWithRedirect(googleProvider);
 }
 
@@ -300,16 +299,15 @@ async function logoutGoogle() {
 }
 
 function bootAuth() {
-  // Pick up credential after redirect return
-  authCompat.getRedirectResult().then(result => {
+  authCompat.getRedirectResult().then(function(result) {
     if (result && result.user) {
       console.log('[Auth] Redirect success:', result.user.email);
     }
-  }).catch(err => {
-    console.warn('[Auth] Redirect result error:', err.code);
+  }).catch(function(err) {
+    console.warn('[Auth] Redirect error:', err.code);
   });
 
-  authCompat.onAuthStateChanged(async user => {
+  authCompat.onAuthStateChanged(async function(user) {
     console.log('[Auth] State:', user ? user.email : 'null');
     currentUser = user || null;
     updateAuthUI(!!currentUser);
@@ -331,19 +329,6 @@ function bootAuth() {
     $('appLoader').classList.add('hidden');
   });
 }
-
-    try {
-      await ensureWorkspaceForUser(currentUser);
-      subscribePet(); subscribeMembers(); subscribeEvents();
-      renderAll();
-    } catch (error) {
-      console.error('[Auth] Boot error:', error);
-      showToast('Помилка завантаження', 'error');
-    }
-    $('appLoader').classList.add('hidden');
-  });
-}
-
 
 /* ─── Bindings ─── */
 function bindEvents() {

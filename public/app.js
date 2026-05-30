@@ -13,7 +13,6 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
-
 db.enablePersistence({ synchronizeTabs: true }).catch(function() {});
 
 let currentUser = null;
@@ -30,119 +29,73 @@ let petFormDirty = false;
 function $(id) { return document.getElementById(id); }
 function $$(sel) { return document.querySelectorAll(sel); }
 
-function showToast(message, type = 'info') {
-  const container = $('toastContainer');
-  const toast = document.createElement('div');
-  const icons = { error: '⚠️', success: '✅', info: 'ℹ️' };
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${icons[type] || icons.info}</span><span>${message}</span>`;
-  container.appendChild(toast);
-  requestAnimationFrame(function() { toast.classList.add('show'); });
-  setTimeout(function() { toast.classList.remove('show'); setTimeout(function() { toast.remove(); }, 300); }, 3500);
+function showToast(msg, type) {
+  type = type || 'info';
+  var c = $('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = '<span>' + msg + '</span>';
+  c.appendChild(t);
+  requestAnimationFrame(function() { t.classList.add('show'); });
+  setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 3000);
 }
 
 function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function createInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
-function avatarText(name) { return ((name || 'U').trim()[0] || 'U').toUpperCase(); }
+function avatarText(n) { return ((n || 'U').trim()[0] || 'U').toUpperCase(); }
 function todayStart() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 
-function getAgeInWeeks(birthDate) {
-  if (!birthDate) return null;
-  var diff = Date.now() - new Date(birthDate).getTime();
+function getAgeInWeeks(bd) {
+  if (!bd) return null;
+  var diff = Date.now() - new Date(bd).getTime();
   if (isNaN(diff) || diff < 0) return null;
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
+  return Math.floor(diff / 604800000);
 }
 
-function getAgeLabel(weeks) {
-  if (weeks == null) return 'не вказано';
-  if (weeks < 8) return weeks + ' тиж.';
-  if (weeks < 52) return Math.floor(weeks / 4.345) + ' міс.';
-  return (weeks / 52).toFixed(1) + ' р.';
+function getAgeLabel(w) {
+  if (w == null) return '';
+  if (w < 8) return w + ' тиж.';
+  if (w < 52) return Math.floor(w / 4.345) + ' міс.';
+  return (w / 52).toFixed(1) + ' р.';
 }
 
-function getProgramByAge(weeks) {
-  if (weeks == null) return AGE_PROGRAMS[1];
-  return AGE_PROGRAMS.find(function(p) { return weeks >= p.minWeeks && weeks < p.maxWeeks; }) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
+function getProgramByAge(w) {
+  if (w == null) return AGE_PROGRAMS[1];
+  return AGE_PROGRAMS.find(function(p) { return w >= p.minWeeks && w < p.maxWeeks; }) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
 }
 
-function updateAuthUI(isLoggedIn) {
-  var authScreen = $('authScreen');
-  var appContent = $('appContent');
-  var mobileTabsEl = document.querySelector('.mobile-tabs');
-  if (isLoggedIn) {
-    authScreen.classList.add('hidden');
-    appContent.classList.remove('hidden');
-    if (mobileTabsEl) mobileTabsEl.classList.remove('hidden');
+/* ─── Auth UI ─── */
+function updateAuthUI(loggedIn) {
+  var as = $('authScreen'), ac = $('appContent');
+  if (loggedIn) {
+    as.classList.add('hidden');
+    ac.classList.remove('hidden');
     $('logoutBtn').style.display = '';
-    $('googleLoginBtnTop').style.display = 'none';
   } else {
-    authScreen.classList.remove('hidden');
-    appContent.classList.add('hidden');
-    if (mobileTabsEl) mobileTabsEl.classList.add('hidden');
+    as.classList.remove('hidden');
+    ac.classList.add('hidden');
     $('logoutBtn').style.display = 'none';
-    $('googleLoginBtnTop').style.display = '';
   }
 }
 
+/* ─── Tabs ─── */
 function setActiveTab(id) {
-  $$('[data-tab]').forEach(function(btn) { btn.classList.toggle('active', btn.dataset.tab === id); });
-  $$('.tab-panel').forEach(function(panel) { panel.classList.toggle('active', panel.id === id); });
+  $$('.tab-panel').forEach(function(p) { p.classList.toggle('active', p.id === id); });
+  $$('.nav-tab').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
 }
 
-function renderProfileInsights() {
-  var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
-  var program = getProgramByAge(weeks);
-  var mode = (currentPet && currentPet.toiletMode) || 'pad';
-  var modeTexts = { pad: 'Пелюшка вдома.', mixed: 'Змішаний режим.', outdoor: 'Вулиця.' };
-  var insights = [
-    { title: 'Вікова програма', text: 'Етап: ' + program.stage },
-    { title: 'Побутовий режим', text: modeTexts[mode] || modeTexts.pad },
-    { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни.' }
-  ];
-  $('profileInsights').innerHTML = insights.map(function(x) { return '<div class="notice"><strong>' + x.title + '</strong><div class="helper">' + x.text + '</div></div>'; }).join('');
-}
+/* ─── Bottom Sheet ─── */
+function openSheet() { $('eventSheet').classList.remove('hidden'); $('eventTime').value = nowTime(); }
+function closeSheet() { $('eventSheet').classList.add('hidden'); }
 
-function renderTodayPlan() {
-  var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
-  var program = getProgramByAge(weeks);
-  $('todayPlan').innerHTML = program.plan.map(function(item) { return '<div class="item"><div><strong>' + item + '</strong><div class="meta">' + program.stage + '</div></div><span class="pill">сьогодні</span></div>'; }).join('');
-  $('ageSummaryBadge').textContent = getAgeLabel(weeks) + ' · ' + program.stage;
-  $('sidebarAgeStage').textContent = program.stage + ' · ' + getAgeLabel(weeks);
-  $('sidebarTip').textContent = program.tip;
-}
-
-function renderPriorityTips() {
-  var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
-  var program = getProgramByAge(weeks);
-  $('priorityTips').innerHTML = program.priorities.map(function(text, i) { return '<div class="tip-card"><strong>' + (i + 1) + '. ' + text + '</strong><div class="meta">' + program.tip + '</div></div>'; }).join('');
-}
-
-function renderSocialChecklist() {
-  $('socialChecklist').innerHTML = SOCIAL_ITEMS.map(function(label) { return '<label class="check-row"><input type="checkbox" /><div><strong>' + label + '</strong><div class="meta">Поступово, без примусу.</div></div></label>'; }).join('');
-}
-
-function renderCourses() {
-  $('courseGrid').innerHTML = COURSES.map(function(course) { return '<button type="button" class="course-card ' + (course.id === currentCourseId ? 'selected' : '') + '" data-course-id="' + course.id + '"><span class="pill">' + course.badge + '</span><strong>' + course.title + '</strong><div class="meta">' + course.description + '</div></button>'; }).join('');
-  var course = COURSES.find(function(c) { return c.id === currentCourseId; }) || COURSES[0];
-  $('selectedCourse').innerHTML = '<div class="notice"><strong>' + course.title + '</strong><div class="helper">' + course.description + '</div></div><div class="triple" style="margin-top:1rem"><div class="card" style="padding:1rem"><div class="section-title"><h3>Покроково</h3></div><div class="lesson-list">' + course.steps.map(function(x, i) { return '<div class="lesson"><strong>Крок ' + (i + 1) + '</strong><div class="meta">' + x + '</div></div>'; }).join('') + '</div></div><div class="card" style="padding:1rem"><div class="section-title"><h3>Помилки</h3></div><div class="lesson-list">' + course.mistakes.map(function(x) { return '<div class="lesson"><strong>⚠️</strong><div class="meta">' + x + '</div></div>'; }).join('') + '</div></div><div class="card" style="padding:1rem"><div class="section-title"><h3>Чекліст</h3></div><div class="lesson-list">' + course.checklist.map(function(x) { return '<div class="lesson"><strong>✓</strong><div class="meta">' + x + '</div></div>'; }).join('') + '</div></div></div>';
-  $$('[data-course-id]').forEach(function(btn) { btn.addEventListener('click', function() { currentCourseId = btn.dataset.courseId; renderCourses(); }); });
-}
-
-function renderKnowledge() {
-  $('knowledgeGrid').innerHTML = KNOWLEDGE.map(function(item) { return '<div class="card"><div class="section-title"><h3>' + item.title + '</h3><span class="pill blue">' + item.tag + '</span></div><div class="helper">' + item.text + '</div></div>'; }).join('');
-}
-
-function renderToiletGuide() {
-  $('toiletGuide').innerHTML = TOILET_GUIDE.map(function(x) { return '<div class="lesson"><strong>' + x.title + '</strong><div class="meta">' + x.text + '</div></div>'; }).join('');
-}
-
-function renderEvents() {
-  var list = $('recentLogs');
-  if (!eventsState.length) { list.innerHTML = '<div class="empty">Записів ще немає.</div>'; return; }
-  list.innerHTML = eventsState.slice(0, 30).map(function(item) {
-    var conf = TYPE_CONFIG[item.eventType] || { icon: '📌', label: item.eventType, tone: '' };
-    return '<div class="item"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + (item.timeLabel || '--:--') + ' · ' + (item.trigger || '') + '</div>' + (item.note ? '<div class="meta">' + item.note + '</div>' : '') + '</div><span class="pill ' + conf.tone + '">' + (item.byName || '') + '</span></div>';
-  }).join('');
+/* ─── Render: Home ─── */
+function renderHome() {
+  renderKPIs();
+  renderFeed();
+  renderTip();
+  if (currentPet && currentPet.name) {
+    $('petNameHeader').textContent = '🐶 ' + currentPet.name;
+  }
 }
 
 function renderKPIs() {
@@ -158,9 +111,61 @@ function renderKPIs() {
   $('kpiTotal').textContent = eventsState.length;
 }
 
-function renderMembers(members) {
-  if (!members) members = [];
-  $('membersList').innerHTML = members.length ? members.map(function(m) { return '<div class="person"><div class="avatar">' + (m.photoURL ? '<img src="' + m.photoURL + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover">' : avatarText(m.displayName || '')) + '</div><div><strong>' + (m.displayName || 'User') + '</strong><div class="helper">' + (m.role || 'member') + '</div></div></div>'; }).join('') : '<div class="empty">Немає учасників.</div>';
+function renderFeed() {
+  var list = $('recentLogs');
+  if (!eventsState.length) { list.innerHTML = '<div class="empty">Натисніть кнопку вище щоб додати першу подію</div>'; return; }
+  var start = todayStart();
+  var todayEvents = eventsState.filter(function(x) {
+    if (!x.createdAt) return false;
+    var ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt);
+    return ts >= start;
+  });
+  var items = todayEvents.length ? todayEvents : eventsState.slice(0, 10);
+  list.innerHTML = items.map(function(item) {
+    var conf = TYPE_CONFIG[item.eventType] || { icon: '📌', label: item.eventType, tone: '' };
+    return '<div class="feed-item"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + (item.timeLabel || '') + (item.trigger ? ' · ' + item.trigger : '') + '</div>' + (item.note ? '<div class="meta">' + item.note + '</div>' : '') + '</div><span class="pill ' + conf.tone + '">' + (item.byName || '') + '</span></div>';
+  }).join('');
+}
+
+function renderTip() {
+  var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
+  var program = getProgramByAge(weeks);
+  var tips = KNOWLEDGE;
+  var randomTip = tips[Math.floor(Math.random() * tips.length)];
+  $('tipEmoji').textContent = '💡';
+  $('tipText').textContent = randomTip ? randomTip.text.slice(0, 120) + (randomTip.text.length > 120 ? '...' : '') : program.tip;
+}
+
+/* ─── Render: Learn ─── */
+function renderLearn() {
+  var weeks = getAgeInWeeks(currentPet ? currentPet.birthDate : null);
+  var program = getProgramByAge(weeks);
+  $('ageSummaryBadge').textContent = getAgeLabel(weeks) + (weeks != null ? ' · ' + program.stage : '');
+
+  // Today plan
+  $('todayPlan').innerHTML = program.plan.map(function(item) { return '<div class="learn-item">' + item + '</div>'; }).join('');
+
+  // Courses
+  $('courseGrid').innerHTML = COURSES.map(function(c) {
+    return '<button type="button" class="course-btn ' + (c.id === currentCourseId ? 'selected' : '') + '" data-cid="' + c.id + '"><strong>' + c.title + '</strong><div class="meta">' + c.description.slice(0, 60) + '...</div></button>';
+  }).join('');
+  $$('[data-cid]').forEach(function(btn) { btn.addEventListener('click', function() { currentCourseId = btn.dataset.cid; renderLearn(); }); });
+
+  // Selected course detail
+  var course = COURSES.find(function(c) { return c.id === currentCourseId; }) || COURSES[0];
+  $('selectedCourse').innerHTML = '<div class="course-detail"><h4>Кроки</h4><ul>' + course.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul><h4>Помилки ⚠️</h4><ul>' + course.mistakes.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul><h4>Чекліст ✓</h4><ul>' + course.checklist.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul></div>';
+
+  // Knowledge
+  $('knowledgeGrid').innerHTML = KNOWLEDGE.map(function(k) { return '<div class="k-card"><strong>' + k.title + '</strong><p>' + k.text + '</p><span class="tag">' + k.tag + '</span></div>'; }).join('');
+
+  // Socialization
+  $('socialChecklist').innerHTML = SOCIAL_ITEMS.map(function(s) { return '<div class="check-item"><input type="checkbox"><span>' + s + '</span></div>'; }).join('');
+}
+
+/* ─── Render: Profile ─── */
+function renderProfile() {
+  fillPetForm();
+  renderWorkspaceMeta();
 }
 
 function fillPetForm() {
@@ -181,9 +186,21 @@ function renderWorkspaceMeta() {
   $('inviteCodeView').textContent = (workspaceData && workspaceData.inviteCode) || '—';
 }
 
-function renderAll() { fillPetForm(); renderWorkspaceMeta(); renderProfileInsights(); renderTodayPlan(); renderPriorityTips(); renderEvents(); renderKPIs(); }
-function renderStatic() { renderSocialChecklist(); renderCourses(); renderKnowledge(); renderToiletGuide(); }
+function renderMembers(members) {
+  if (!members) members = [];
+  $('membersList').innerHTML = members.length ? members.map(function(m) {
+    return '<div class="member-row"><div class="member-avatar">' + (m.photoURL ? '<img src="' + m.photoURL + '">' : avatarText(m.displayName)) + '</div><span class="member-name">' + (m.displayName || 'User') + '</span></div>';
+  }).join('') : '<div class="empty">Тільки ви</div>';
+}
 
+/* ─── Render All ─── */
+function renderAll() {
+  renderHome();
+  renderLearn();
+  renderProfile();
+}
+
+/* ─── Firebase Logic ─── */
 async function ensureWorkspaceForUser(user) {
   var userDoc = await db.collection('users').doc(user.uid).get();
   if (userDoc.exists && userDoc.data().workspaceId) {
@@ -196,8 +213,8 @@ async function ensureWorkspaceForUser(user) {
   workspaceId = newRef.id;
   var inviteCode = createInviteCode();
   var spaceName = (user.displayName || 'Мій').split(' ')[0] + ' простір';
-  await newRef.set({ name: spaceName, ownerId: user.uid, inviteCode, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-  workspaceData = { name: spaceName, ownerId: user.uid, inviteCode };
+  await newRef.set({ name: spaceName, ownerId: user.uid, inviteCode: inviteCode, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  workspaceData = { name: spaceName, ownerId: user.uid, inviteCode: inviteCode };
   await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '', role: 'owner', workspaceId: workspaceId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   await db.collection('workspaces').doc(workspaceId).collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: '', breed: '', weight: '', homeDate: '', vaccination: 'не вказано', toiletMode: 'pad', notes: '', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -206,19 +223,26 @@ async function ensureWorkspaceForUser(user) {
 function subscribePet() {
   if (!workspaceId) return;
   if (unsubPet) unsubPet();
-  unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(snap) { currentPet = snap.exists ? snap.data() : null; renderAll(); }, function(err) { console.error('Pet err:', err); });
+  unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(snap) {
+    currentPet = snap.exists ? snap.data() : null;
+    renderAll();
+  });
 }
 
 function subscribeMembers() {
   if (!workspaceId) return;
   if (unsubMembers) unsubMembers();
-  unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members').onSnapshot(function(snap) { var m = []; snap.forEach(function(d) { m.push(d.data()); }); renderMembers(m); }, function(err) { console.error('Members err:', err); });
+  unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members').onSnapshot(function(snap) {
+    var m = []; snap.forEach(function(d) { m.push(d.data()); }); renderMembers(m);
+  });
 }
 
 function subscribeEvents() {
   if (!workspaceId) return;
   if (unsubEvents) unsubEvents();
-  unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(100).onSnapshot(function(snap) { var r = []; snap.forEach(function(d) { r.push(Object.assign({ id: d.id }, d.data())); }); eventsState = r; renderEvents(); renderKPIs(); }, function(err) { console.error('Events err:', err); });
+  unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(100).onSnapshot(function(snap) {
+    var r = []; snap.forEach(function(d) { r.push(Object.assign({ id: d.id }, d.data())); }); eventsState = r; renderHome();
+  });
 }
 
 async function savePetProfile(payload) {
@@ -230,12 +254,20 @@ async function savePetProfile(payload) {
 
 async function addEvent(payload) {
   if (!currentUser || !workspaceId) return showToast('Спочатку увійди', 'error');
-  await db.collection('workspaces').doc(workspaceId).collection('events').add({ eventType: payload.eventType, byUid: currentUser.uid, byName: payload.byName || currentUser.displayName || '', trigger: payload.trigger || '', note: payload.note || '', timeLabel: payload.timeLabel || nowTime(), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  await db.collection('workspaces').doc(workspaceId).collection('events').add({
+    eventType: payload.eventType,
+    byUid: currentUser.uid,
+    byName: payload.byName || currentUser.displayName || '',
+    trigger: payload.trigger || '',
+    note: payload.note || '',
+    timeLabel: payload.timeLabel || nowTime(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
   showToast('Додано ✓', 'success');
 }
 
 async function joinWorkspaceByInvite(codeRaw) {
-  if (!currentUser) return showToast('Увійди через Google', 'error');
+  if (!currentUser) return showToast('Увійди', 'error');
   var code = codeRaw.trim().toUpperCase();
   if (!code) throw new Error('Введіть код');
   var snap = await db.collection('workspaces').where('inviteCode', '==', code).limit(1).get();
@@ -247,9 +279,8 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
-function loginGoogle() {
-  auth.signInWithRedirect(googleProvider);
-}
+/* ─── Auth ─── */
+function loginGoogle() { auth.signInWithRedirect(googleProvider); }
 
 async function logoutGoogle() {
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
@@ -258,43 +289,43 @@ async function logoutGoogle() {
   await auth.signOut();
   currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
   petFormDirty = false;
-  showToast('Вихід виконано', 'success');
+  showToast('Вихід', 'success');
 }
 
 function bootAuth() {
   auth.getRedirectResult().then(function(result) {
-    if (result && result.user) {
-      console.log('[Auth] Redirect success:', result.user.email);
-    }
+    if (result && result.user) console.log('[Auth] Redirect OK:', result.user.email);
   }).catch(function(err) {
-    console.warn('[Auth] Redirect error:', err.code);
+    console.warn('[Auth] Redirect err:', err.code);
   });
 
   auth.onAuthStateChanged(async function(user) {
     console.log('[Auth] State:', user ? user.email : 'null');
     currentUser = user || null;
     updateAuthUI(!!currentUser);
-
     if (!currentUser) {
       workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
       $('appLoader').classList.add('hidden');
       return;
     }
-
     try {
       await ensureWorkspaceForUser(currentUser);
       subscribePet(); subscribeMembers(); subscribeEvents();
       renderAll();
     } catch (error) {
       console.error('[Auth] Boot error:', error);
-      showToast('Помилка завантаження', 'error');
+      showToast('Помилка: ' + error.message, 'error');
     }
     $('appLoader').classList.add('hidden');
   });
 }
 
+/* ─── Bindings ─── */
 function bindEvents() {
-  $$('[data-tab]').forEach(function(btn) { btn.addEventListener('click', function() { setActiveTab(btn.dataset.tab); }); });
+  // Tabs
+  $$('.nav-tab').forEach(function(btn) { btn.addEventListener('click', function() { setActiveTab(btn.dataset.tab); }); });
+
+  // Theme
   $$('[data-theme-toggle]').forEach(function(el) { el.addEventListener('click', function() {
     var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
@@ -303,22 +334,37 @@ function bindEvents() {
   var saved = localStorage.getItem('theme');
   if (saved) document.documentElement.setAttribute('data-theme', saved);
 
+  // Auth
   $('googleLoginBtn').addEventListener('click', loginGoogle);
-  $('googleLoginBtnTop').addEventListener('click', loginGoogle);
   $('logoutBtn').addEventListener('click', logoutGoogle);
 
-  $('eventTime').value = nowTime();
+  // Quick events
+  $$('[data-quick-event]').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      btn.disabled = true;
+      try { await addEvent({ eventType: btn.dataset.quickEvent, byName: currentUser ? currentUser.displayName || '' : '', timeLabel: nowTime(), trigger: '', note: '' }); }
+      catch (err) { showToast(err.message, 'error'); }
+      finally { btn.disabled = false; }
+    });
+  });
+
+  // Open full form
+  $('openFullForm').addEventListener('click', openSheet);
+  $('sheetBackdrop').addEventListener('click', closeSheet);
+
+  // Event form
   $('eventForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     var btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true;
     try {
       await addEvent({ eventType: $('eventType').value, byName: $('eventBy').value.trim(), timeLabel: $('eventTime').value || nowTime(), trigger: $('eventTrigger').value, note: $('eventNote').value.trim() });
-      e.target.reset(); $('eventTime').value = nowTime(); setActiveTab('dashboard');
+      e.target.reset(); closeSheet();
     } catch (err) { showToast(err.message, 'error'); }
     finally { btn.disabled = false; }
   });
 
+  // Pet form
   var petForm = $('petProfileForm');
   petForm.addEventListener('input', function() { petFormDirty = true; });
   petForm.addEventListener('change', function() { petFormDirty = true; });
@@ -332,15 +378,7 @@ function bindEvents() {
     finally { btn.disabled = false; }
   });
 
-  $$('[data-quick-event]').forEach(function(btn) {
-    btn.addEventListener('click', async function() {
-      btn.disabled = true;
-      try { await addEvent({ eventType: btn.dataset.quickEvent, byName: currentUser ? currentUser.displayName || '' : '', timeLabel: nowTime(), trigger: '', note: '' }); }
-      catch (err) { showToast(err.message, 'error'); }
-      finally { btn.disabled = false; }
-    });
-  });
-
+  // Copy invite
   $('copyInviteBtn').addEventListener('click', async function() {
     if (!workspaceData || !workspaceData.inviteCode) return showToast('Код недоступний', 'error');
     try { await navigator.clipboard.writeText(workspaceData.inviteCode); }
@@ -348,6 +386,7 @@ function bindEvents() {
     showToast('Скопійовано ✓', 'success');
   });
 
+  // Join workspace
   $('joinWorkspaceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     var btn = e.target.querySelector('[type="submit"]');
@@ -358,6 +397,6 @@ function bindEvents() {
   });
 }
 
-renderStatic();
+/* ─── Init ─── */
 bindEvents();
 bootAuth();

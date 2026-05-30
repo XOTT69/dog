@@ -4,21 +4,5 @@
       "source": "/__/auth/:match*",
       "destination": "https://dogs-55f5e.firebaseapp.com/__/auth/:match*"
     }
-  ],
-  "headers": [
-    {
-      "source": "/__/auth/:match*",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
-      ]
-    },
-    {
-      "source": "/((?!__/auth).*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-      ]
-    }
   ]
 }

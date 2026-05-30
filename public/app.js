@@ -16,12 +16,12 @@ const firebaseConfig = {
   appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
 };
 
-firebase.initializeApp(firebaseConfig);
+firebase.);
 const authCompat = firebase.auth();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-const app = initializeApp(firebaseConfig, 'firestoreApp');
+const app = initializeApp(firebaseConfig);
 const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 
 let currentUser = null;

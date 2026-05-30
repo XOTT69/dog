@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0e766e" />
   <meta name="description" content="Doggo Coach UA — сімейний застосунок для виховання собаки." />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Doggo Coach UA" />
   <title>Doggo Coach UA</title>
@@ -130,17 +130,11 @@
           </div>
           <div class="split">
             <article class="card">
-              <div class="section-title">
-                <h3>Останні записи</h3>
-                <span class="subtle">щоденник</span>
-              </div>
+              <div class="section-title"><h3>Останні записи</h3><span class="subtle">щоденник</span></div>
               <div class="list" id="recentLogs"></div>
             </article>
             <article class="card">
-              <div class="section-title">
-                <h3>Чекліст соціалізації</h3>
-                <span class="subtle">відзначайте поступово</span>
-              </div>
+              <div class="section-title"><h3>Чекліст соціалізації</h3><span class="subtle">відзначайте поступово</span></div>
               <div class="check-grid" id="socialChecklist"></div>
             </article>
           </div>
@@ -150,70 +144,22 @@
         <section class="tab-panel" id="pet">
           <div class="split">
             <article class="card card-form">
-              <div class="section-title">
-                <h3>Профіль тварини</h3>
-                <span class="subtle">основа рекомендацій</span>
-              </div>
+              <div class="section-title"><h3>Профіль тварини</h3><span class="subtle">основа рекомендацій</span></div>
               <form id="petProfileForm" class="form-grid">
-                <div class="field">
-                  <label for="petName">Ім'я собаки</label>
-                  <input id="petName" type="text" placeholder="Наприклад: Беллі" />
-                </div>
-                <div class="field">
-                  <label for="petBirthDate">Дата народження</label>
-                  <input id="petBirthDate" type="date" />
-                </div>
-                <div class="field">
-                  <label for="petSex">Стать</label>
-                  <select id="petSex">
-                    <option value="">Оберіть</option>
-                    <option value="дівчинка">Дівчинка</option>
-                    <option value="хлопчик">Хлопчик</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="petBreed">Порода / мікс</label>
-                  <input id="petBreed" type="text" placeholder="Наприклад: метис" />
-                </div>
-                <div class="field">
-                  <label for="petWeight">Вага, кг</label>
-                  <input id="petWeight" type="number" step="0.1" placeholder="5.3" />
-                </div>
-                <div class="field">
-                  <label for="petHomeDate">Дата появи вдома</label>
-                  <input id="petHomeDate" type="date" />
-                </div>
-                <div class="field">
-                  <label for="petVaccination">Вакцинація</label>
-                  <select id="petVaccination">
-                    <option value="не вказано">Не вказано</option>
-                    <option value="ще не завершена">Ще не завершена</option>
-                    <option value="частково завершена">Частково завершена</option>
-                    <option value="завершена">Завершена</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="petToiletMode">Побутовий сценарій</label>
-                  <select id="petToiletMode">
-                    <option value="pad">Пелюшка вдома</option>
-                    <option value="mixed">Змішаний: пелюшка + вулиця</option>
-                    <option value="outdoor">Переважно вулиця</option>
-                  </select>
-                </div>
-                <div class="field full">
-                  <label for="petNotes">Особливості, страхи, чутливості</label>
-                  <textarea id="petNotes" placeholder="Наприклад: боїться пилососа"></textarea>
-                </div>
-                <div class="field full form-submit-sticky">
-                  <button class="btn btn-primary btn-save" type="submit">💾 Зберегти профіль</button>
-                </div>
+                <div class="field"><label for="petName">Ім'я собаки</label><input id="petName" type="text" placeholder="Наприклад: Беллі" /></div>
+                <div class="field"><label for="petBirthDate">Дата народження</label><input id="petBirthDate" type="date" /></div>
+                <div class="field"><label for="petSex">Стать</label><select id="petSex"><option value="">Оберіть</option><option value="дівчинка">Дівчинка</option><option value="хлопчик">Хлопчик</option></select></div>
+                <div class="field"><label for="petBreed">Порода / мікс</label><input id="petBreed" type="text" placeholder="Наприклад: метис" /></div>
+                <div class="field"><label for="petWeight">Вага, кг</label><input id="petWeight" type="number" step="0.1" placeholder="5.3" /></div>
+                <div class="field"><label for="petHomeDate">Дата появи вдома</label><input id="petHomeDate" type="date" /></div>
+                <div class="field"><label for="petVaccination">Вакцинація</label><select id="petVaccination"><option value="не вказано">Не вказано</option><option value="ще не завершена">Ще не завершена</option><option value="частково завершена">Частково завершена</option><option value="завершена">Завершена</option></select></div>
+                <div class="field"><label for="petToiletMode">Побутовий сценарій</label><select id="petToiletMode"><option value="pad">Пелюшка вдома</option><option value="mixed">Змішаний: пелюшка + вулиця</option><option value="outdoor">Переважно вулиця</option></select></div>
+                <div class="field full"><label for="petNotes">Особливості, страхи, чутливості</label><textarea id="petNotes" placeholder="Наприклад: боїться пилососа"></textarea></div>
+                <div class="field full form-submit-sticky"><button class="btn btn-primary btn-save" type="submit">💾 Зберегти профіль</button></div>
               </form>
             </article>
             <article class="card">
-              <div class="section-title">
-                <h3>Пояснення</h3>
-                <span class="subtle">навіщо це</span>
-              </div>
+              <div class="section-title"><h3>Пояснення</h3><span class="subtle">навіщо це</span></div>
               <div class="stack" id="profileInsights"></div>
             </article>
           </div>
@@ -223,10 +169,7 @@
         <section class="tab-panel" id="courses">
           <div class="triple" id="courseGrid"></div>
           <article class="card mt-4">
-            <div class="section-title">
-              <h3>Обраний курс</h3>
-              <span class="subtle">покрокова структура</span>
-            </div>
+            <div class="section-title"><h3>Обраний курс</h3><span class="subtle">покрокова структура</span></div>
             <div id="selectedCourse"></div>
           </article>
         </section>
@@ -235,59 +178,18 @@
         <section class="tab-panel" id="toilet">
           <div class="split">
             <article class="card card-form">
-              <div class="section-title">
-                <h3>Додати подію</h3>
-                <span class="subtle">щоб бачити закономірності</span>
-              </div>
+              <div class="section-title"><h3>Додати подію</h3><span class="subtle">щоб бачити закономірності</span></div>
               <form id="eventForm" class="form-grid">
-                <div class="field">
-                  <label for="eventType">Що сталося?</label>
-                  <select id="eventType">
-                    <option value="pad">🧻 На пелюшку (успіх)</option>
-                    <option value="outdoor">🌳 На вулиці (успіх)</option>
-                    <option value="miss">❌ Промах</option>
-                    <option value="feed">🍖 Годування</option>
-                    <option value="water">💧 Вода</option>
-                    <option value="sleep">😴 Сон / прокинувся</option>
-                    <option value="walk">🚶 Прогулянка</option>
-                    <option value="training">🎓 Тренування</option>
-                    <option value="note">📝 Нотатка</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="eventBy">Хто був поруч?</label>
-                  <input id="eventBy" type="text" placeholder="Твоє ім'я" />
-                </div>
-                <div class="field">
-                  <label for="eventTime">Час</label>
-                  <input id="eventTime" type="time" />
-                </div>
-                <div class="field">
-                  <label for="eventTrigger">Що було до цього?</label>
-                  <select id="eventTrigger">
-                    <option>Після сну</option>
-                    <option>Після їжі</option>
-                    <option>Після активної гри</option>
-                    <option>Перед сном</option>
-                    <option>Після прогулянки</option>
-                    <option>Після збудження / гостей</option>
-                    <option>Без конкретної причини</option>
-                  </select>
-                </div>
-                <div class="field full">
-                  <label for="eventNote">Деталі</label>
-                  <textarea id="eventNote" placeholder="Що спрацювало, де був промах"></textarea>
-                </div>
-                <div class="field full form-submit-sticky">
-                  <button class="btn btn-primary btn-save" type="submit">💾 Зберегти подію</button>
-                </div>
+                <div class="field"><label for="eventType">Що сталося?</label><select id="eventType"><option value="pad">🧻 На пелюшку (успіх)</option><option value="outdoor">🌳 На вулиці (успіх)</option><option value="miss">❌ Промах</option><option value="feed">🍖 Годування</option><option value="water">💧 Вода</option><option value="sleep">😴 Сон / прокинувся</option><option value="walk">🚶 Прогулянка</option><option value="training">🎓 Тренування</option><option value="note">📝 Нотатка</option></select></div>
+                <div class="field"><label for="eventBy">Хто був поруч?</label><input id="eventBy" type="text" placeholder="Твоє ім'я" /></div>
+                <div class="field"><label for="eventTime">Час</label><input id="eventTime" type="time" /></div>
+                <div class="field"><label for="eventTrigger">Що було до цього?</label><select id="eventTrigger"><option>Після сну</option><option>Після їжі</option><option>Після активної гри</option><option>Перед сном</option><option>Після прогулянки</option><option>Після збудження / гостей</option><option>Без конкретної причини</option></select></div>
+                <div class="field full"><label for="eventNote">Деталі</label><textarea id="eventNote" placeholder="Що спрацювало, де був промах"></textarea></div>
+                <div class="field full form-submit-sticky"><button class="btn btn-primary btn-save" type="submit">💾 Зберегти подію</button></div>
               </form>
             </article>
             <article class="card">
-              <div class="section-title">
-                <h3>Інструкція: туалет і пелюшка</h3>
-                <span class="subtle">коротко і практично</span>
-              </div>
+              <div class="section-title"><h3>Інструкція: туалет і пелюшка</h3><span class="subtle">коротко і практично</span></div>
               <div class="lesson-list" id="toiletGuide"></div>
             </article>
           </div>
@@ -309,10 +211,7 @@
               </div>
               <div class="mt-4 helper">Надішли код іншому члену сім'ї. Вони входять через Google й приєднуються.</div>
               <form id="joinWorkspaceForm" class="stack mt-5">
-                <div class="field">
-                  <label for="inviteCodeInput">Приєднатись до простору</label>
-                  <input id="inviteCodeInput" type="text" placeholder="Наприклад: A1B2C3" autocapitalize="characters" />
-                </div>
+                <div class="field"><label for="inviteCodeInput">Приєднатись до простору</label><input id="inviteCodeInput" type="text" placeholder="Наприклад: A1B2C3" autocapitalize="characters" /></div>
                 <button class="btn btn-primary" type="submit">Приєднатись</button>
               </form>
             </article>
@@ -336,10 +235,11 @@
       <button class="mobile-tab" data-tab="family">👥<span>Сім'я</span></button>
     </div>
   </div>
+
   <!-- Firebase Compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

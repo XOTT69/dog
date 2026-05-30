@@ -4,8 +4,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js';
@@ -18,7 +16,7 @@ import {
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: 'dogsbelli.vercel.app',
+  authDomain: 'dogs-55f5e.firebaseapp.com',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: '1053489833652',
@@ -149,8 +147,7 @@ function renderCourses() {
       <strong>${course.title}</strong>
       <div class="meta">${course.description}</div>
     </button>
-  `).join('');
-  const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
+  `).join('');const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
   $('selectedCourse').innerHTML = `
     <div class="notice"><strong>${course.title}</strong><div class="helper">${course.description}</div></div>
     <div class="triple" style="margin-top:1rem">
@@ -158,8 +155,7 @@ function renderCourses() {
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Помилки</h3></div><div class="lesson-list">${course.mistakes.map(x => `<div class="lesson"><strong>⚠️</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Чекліст</h3></div><div class="lesson-list">${course.checklist.map(x => `<div class="lesson"><strong>✓</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
     </div>
-  `;
-  $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => { currentCourseId = btn.dataset.courseId; renderCourses(); }));
+  `;$$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => { currentCourseId = btn.dataset.courseId; renderCourses(); }));
 }
 
 function renderKnowledge() {
@@ -261,7 +257,7 @@ async function savePetProfile(payload) {
   if (!currentUser || !workspaceId) return showToast('Спочатку увійди', 'error');
   await setDoc(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), { ...(currentPet || {}), ...payload, updatedAt: serverTimestamp() }, { merge: true });
   petFormDirty = false;
-  showToast('Збережено ✓', 'success');
+  showToast('Збережено✓', 'success');
 }
 
 async function addEvent(payload) {
@@ -283,29 +279,21 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
-/* ─── AUTH (FIXED) ─── */
 async function loginGoogle() {
   const btns = [$('googleLoginBtn'), $('googleLoginBtnTop')];
   btns.forEach(b => { if (b) b.disabled = true; });
-
   try {
     await signInWithPopup(auth, provider);
   } catch (error) {
     console.error('Auth error:', error.code, error.message);
-    if (error.code === 'auth/popup-blocked' ||
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/cancelled-popup-request') {
-      try {
-        showToast('Перенаправляємо на Google...', 'info');
-        await signInWithRedirect(auth, provider);
-      } catch (redirectErr) {
-        console.error('Redirect error:', redirectErr);
-        showToast('Помилка авторизації', 'error');
-      }
+    if (error.code === 'auth/popup-blocked') {
+      showToast('Дозвольте popup у браузері', 'error');
+    } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      // user closed popup - do nothing
     } else if (error.code === 'auth/network-request-failed') {
       showToast('Немає інтернету', 'error');
     } else {
-      showToast('Помилка: ' + (error.message || error.code), 'error');
+      showToast('Помилка: ' + error.code, 'error');
     }
   } finally {
     btns.forEach(b => { if (b) b.disabled = false; });
@@ -322,16 +310,7 @@ async function logoutGoogle() {
   showToast('Вихід виконано', 'success');
 }
 
-async function bootAuth() {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result?.user) {
-      console.log('Redirect login success:', result.user.email);
-    }
-  } catch (e) {
-    console.warn('Redirect result error:', e.code, e.message);
-  }
-
+function bootAuth() {
   onAuthStateChanged(auth, async user => {
     currentUser = user || null;
     updateAuthUI(!!currentUser);
@@ -352,7 +331,6 @@ async function bootAuth() {
   });
 }
 
-/* ─── BINDINGS ─── */
 function bindEvents() {
   $$('[data-tab]').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
   $$('[data-theme-toggle]').forEach(el => el.addEventListener('click', () => {

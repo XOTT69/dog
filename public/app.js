@@ -4,6 +4,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js';
@@ -58,6 +60,10 @@ function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function createInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
 function avatarText(name = 'U') { return (name.trim()[0] || 'U').toUpperCase(); }
 function todayStart() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+
+function isMobile() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
 
 function getAgeInWeeks(birthDate) {
   if (!birthDate) return null;
@@ -147,7 +153,8 @@ function renderCourses() {
       <strong>${course.title}</strong>
       <div class="meta">${course.description}</div>
     </button>
-  `).join('');const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
+  `).join('');
+  const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
   $('selectedCourse').innerHTML = `
     <div class="notice"><strong>${course.title}</strong><div class="helper">${course.description}</div></div>
     <div class="triple" style="margin-top:1rem">
@@ -155,7 +162,8 @@ function renderCourses() {
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Помилки</h3></div><div class="lesson-list">${course.mistakes.map(x => `<div class="lesson"><strong>⚠️</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Чекліст</h3></div><div class="lesson-list">${course.checklist.map(x => `<div class="lesson"><strong>✓</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
     </div>
-  `;$$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => { currentCourseId = btn.dataset.courseId; renderCourses(); }));
+  `;
+  $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => { currentCourseId = btn.dataset.courseId; renderCourses(); }));
 }
 
 function renderKnowledge() {
@@ -242,11 +250,13 @@ function subscribePet() {
   if (unsubPet) unsubPet();
   unsubPet = onSnapshot(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), snap => { currentPet = snap.exists() ? snap.data() : null; renderAll(); }, err => console.error('Pet err:', err));
 }
+
 function subscribeMembers() {
   if (!workspaceId) return;
   if (unsubMembers) unsubMembers();
   unsubMembers = onSnapshot(collection(db, 'workspaces', workspaceId, 'members'), snap => { const m = []; snap.forEach(d => m.push(d.data())); renderMembers(m); }, err => console.error('Members err:', err));
 }
+
 function subscribeEvents() {
   if (!workspaceId) return;
   if (unsubEvents) unsubEvents();
@@ -257,7 +267,7 @@ async function savePetProfile(payload) {
   if (!currentUser || !workspaceId) return showToast('Спочатку увійди', 'error');
   await setDoc(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), { ...(currentPet || {}), ...payload, updatedAt: serverTimestamp() }, { merge: true });
   petFormDirty = false;
-  showToast('Збережено✓', 'success');
+  showToast('Збережено ✓', 'success');
 }
 
 async function addEvent(payload) {
@@ -282,14 +292,24 @@ async function joinWorkspaceByInvite(codeRaw) {
 async function loginGoogle() {
   const btns = [$('googleLoginBtn'), $('googleLoginBtnTop')];
   btns.forEach(b => { if (b) b.disabled = true; });
+
   try {
+    if (isMobile()) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     await signInWithPopup(auth, provider);
   } catch (error) {
     console.error('Auth error:', error.code, error.message);
     if (error.code === 'auth/popup-blocked') {
-      showToast('Дозвольте popup у браузері', 'error');
+      try {
+        showToast('Перенаправляємо...', 'info');
+        await signInWithRedirect(auth, provider);
+      } catch (e) {
+        showToast('Помилка авторизації', 'error');
+      }
     } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-      // user closed popup - do nothing
+      // user closed - ignore
     } else if (error.code === 'auth/network-request-failed') {
       showToast('Немає інтернету', 'error');
     } else {
@@ -310,7 +330,16 @@ async function logoutGoogle() {
   showToast('Вихід виконано', 'success');
 }
 
-function bootAuth() {
+async function bootAuth() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      console.log('Redirect login success:', result.user.email);
+    }
+  } catch (e) {
+    console.warn('Redirect result check:', e.code || e.message);
+  }
+
   onAuthStateChanged(auth, async user => {
     currentUser = user || null;
     updateAuthUI(!!currentUser);

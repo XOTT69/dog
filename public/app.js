@@ -283,28 +283,10 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
-/* ─── AUTH via Compat SDK (NO IFRAME NEEDED) ─── */
-async function loginGoogle() {
-  const btns = [$('googleLoginBtn'), $('googleLoginBtnTop')];
-  btns.forEach(b => { if (b) b.disabled = true; });
-
-  try {
-    const result = await authCompat.signInWithPopup(googleProvider);
-    console.log('[Auth] Success:', result.user.email);
-  } catch (error) {
-    console.error('[Auth] Error:', error.code, error.message);
-    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-      // ignore
-    } else if (error.code === 'auth/popup-blocked') {
-      showToast('Дозвольте popup у браузері', 'error');
-    } else if (error.code === 'auth/network-request-failed') {
-      showToast('Немає інтернету', 'error');
-    } else {
-      showToast('Помилка: ' + error.code, 'error');
-    }
-  } finally {
-    btns.forEach(b => { if (b) b.disabled = false; });
-  }
+/* ─── AUTH via Compat SDK + Redirect ─── */
+function loginGoogle() {
+  // Redirect: page navigates to Google, then back
+  authCompat.signInWithRedirect(googleProvider);
 }
 
 async function logoutGoogle() {
@@ -318,6 +300,7 @@ async function logoutGoogle() {
 }
 
 function bootAuth() {
+  // onAuthStateChanged catches BOTH: existing session AND redirect return
   authCompat.onAuthStateChanged(async user => {
     console.log('[Auth] State:', user ? user.email : 'null');
     currentUser = user || null;
@@ -340,6 +323,7 @@ function bootAuth() {
     $('appLoader').classList.add('hidden');
   });
 }
+
 
 /* ─── Bindings ─── */
 function bindEvents() {

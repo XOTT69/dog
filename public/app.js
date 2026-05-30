@@ -300,7 +300,15 @@ async function logoutGoogle() {
 }
 
 function bootAuth() {
-  // onAuthStateChanged catches BOTH: existing session AND redirect return
+  // Pick up credential after redirect return
+  authCompat.getRedirectResult().then(result => {
+    if (result && result.user) {
+      console.log('[Auth] Redirect success:', result.user.email);
+    }
+  }).catch(err => {
+    console.warn('[Auth] Redirect result error:', err.code);
+  });
+
   authCompat.onAuthStateChanged(async user => {
     console.log('[Auth] State:', user ? user.email : 'null');
     currentUser = user || null;
@@ -311,6 +319,18 @@ function bootAuth() {
       $('appLoader').classList.add('hidden');
       return;
     }
+
+    try {
+      await ensureWorkspaceForUser(currentUser);
+      subscribePet(); subscribeMembers(); subscribeEvents();
+      renderAll();
+    } catch (error) {
+      console.error('[Auth] Boot error:', error);
+      showToast('Помилка завантаження', 'error');
+    }
+    $('appLoader').classList.add('hidden');
+  });
+}
 
     try {
       await ensureWorkspaceForUser(currentUser);

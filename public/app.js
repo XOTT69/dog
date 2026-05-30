@@ -13,7 +13,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   doc, getDoc, setDoc, updateDoc, addDoc, getDocs,
-  collection, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp
+  collection, query, where, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js';
 
 /* ─── Firebase Init ─── */
@@ -41,7 +41,7 @@ let eventsState = [];
 let unsubEvents = null;
 let unsubMembers = null;
 let unsubPet = null;
-let petFormDirty = false; // prevents snapshot from overwriting active form edits
+let petFormDirty = false;
 
 /* ─── Helpers ─── */
 function $(id) { return document.getElementById(id); }
@@ -87,7 +87,7 @@ function getProgramByAge(weeks) {
   return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
 }
 
-/* ─── Auth UI Gate ─── */
+/* ─── Auth UI ─── */
 function updateAuthUI(isLoggedIn) {
   const authScreen = $('authScreen');
   const appContent = $('appContent');
@@ -108,13 +108,13 @@ function updateAuthUI(isLoggedIn) {
   }
 }
 
-/* ─── Tab Navigation ─── */
+/* ─── Tabs ─── */
 function setActiveTab(id) {
   $$('[data-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === id));
   $$('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === id));
 }
 
-/* ─── Render Functions ─── */
+/* ─── Renders ─── */
 function renderProfileInsights() {
   const weeks = getAgeInWeeks(currentPet?.birthDate);
   const program = getProgramByAge(weeks);
@@ -135,8 +135,7 @@ function renderProfileInsights() {
 function renderTodayPlan() {
   const weeks = getAgeInWeeks(currentPet?.birthDate);
   const program = getProgramByAge(weeks);
-  const plan = program.plan.map(item => `<div class="item"><div><strong>${item}</strong><div class="meta">${program.stage}</div></div><span class="pill">сьогодні</span></div>`).join('');
-  $('todayPlan').innerHTML = plan;
+  $('todayPlan').innerHTML = program.plan.map(item => `<div class="item"><div><strong>${item}</strong><div class="meta">${program.stage}</div></div><span class="pill">сьогодні</span></div>`).join('');
   $('ageSummaryBadge').textContent = `Вік: ${getAgeLabel(weeks)} · ${program.stage}`;
   $('sidebarAgeStage').textContent = `${program.stage} · ${getAgeLabel(weeks)}`;
   $('sidebarTip').textContent = program.tip;
@@ -152,7 +151,7 @@ function renderSocialChecklist() {
   $('socialChecklist').innerHTML = SOCIAL_ITEMS.map(label => `
     <label class="check-row">
       <input type="checkbox" />
-      <div><strong>${label}</strong><div class="meta">Знайомити спокійно, без примусу, маленькими дозами.</div></div>
+      <div><strong>${label}</strong><div class="meta">Знайомити спокійно, без примусу.</div></div>
     </label>
   `).join('');
 }
@@ -168,8 +167,8 @@ function renderCourses() {
 
   const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
   $('selectedCourse').innerHTML = `
-    <div class="notice" style="margin-bottom:1rem"><strong>${course.title}</strong><div class="helper">${course.description}</div></div>
-    <div class="triple">
+    <div class="notice"><strong>${course.title}</strong><div class="helper">${course.description}</div></div>
+    <div class="triple" style="margin-top:1rem">
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Покроково</h3></div><div class="lesson-list">${course.steps.map((x, i) => `<div class="lesson"><strong>Крок ${i + 1}</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Часті помилки</h3></div><div class="lesson-list">${course.mistakes.map(x => `<div class="lesson"><strong>⚠️ Уникайте</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
       <div class="card" style="padding:1rem"><div class="section-title"><h3>Чекліст</h3></div><div class="lesson-list">${course.checklist.map(x => `<div class="lesson"><strong>✓ Перевірка</strong><div class="meta">${x}</div></div>`).join('')}</div></div>
@@ -198,12 +197,12 @@ function renderToiletGuide() {
 function renderEvents() {
   const list = $('recentLogs');
   if (!eventsState.length) {
-    list.innerHTML = `<div class="empty">Записів ще немає.<br>Додайте першу подію, щоб бачити прогрес.</div>`;
+    list.innerHTML = `<div class="empty">Записів ще немає.<br>Додайте першу подію.</div>`;
     return;
   }
   list.innerHTML = eventsState.slice(0, 30).map(item => {
     const conf = TYPE_CONFIG[item.eventType] || { icon: '📌', label: item.eventType, tone: '' };
-    return `<div class="item"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${item.timeLabel || '--:--'} · ${item.trigger || ''}</div>${item.note ? `<div class="meta" style="margin-top:4px;color:var(--text);opacity:.8">${item.note}</div>` : ''}</div><span class="pill ${conf.tone}">${item.byName || 'user'}</span></div>`;
+    return `<div class="item"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${item.timeLabel || '--:--'} · ${item.trigger || ''}</div>${item.note ? `<div class="meta" style="margin-top:4px;opacity:.8">${item.note}</div>` : ''}</div><span class="pill ${conf.tone}">${item.byName || 'user'}</span></div>`;
   }).join('');
 }
 
@@ -214,7 +213,6 @@ function renderKPIs() {
     const ts = x.createdAt.toDate ? x.createdAt.toDate() : new Date(x.createdAt);
     return ts >= start;
   });
-
   $('kpiPad').textContent = todayEvents.filter(x => x.eventType === 'pad').length;
   $('kpiOutdoor').textContent = todayEvents.filter(x => x.eventType === 'outdoor').length;
   $('kpiMiss').textContent = todayEvents.filter(x => x.eventType === 'miss').length;
@@ -222,17 +220,16 @@ function renderKPIs() {
 }
 
 function renderMembers(members = []) {
-  const html = members.length ? members.map(member => `
+  $('membersList').innerHTML = members.length ? members.map(member => `
     <div class="person">
       <div class="avatar">${member.photoURL ? `<img src="${member.photoURL}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : avatarText(member.displayName || member.email || 'U')}</div>
       <div><strong>${member.displayName || 'User'}</strong><div class="helper">${member.role || 'member'}</div></div>
     </div>
   `).join('') : `<div class="empty">Немає учасників.</div>`;
-  $('membersList').innerHTML = html;
 }
 
 function fillPetForm() {
-  if (petFormDirty) return; // don't overwrite active edits
+  if (petFormDirty) return;
   $('petName').value = currentPet?.name || '';
   $('petBirthDate').value = currentPet?.birthDate || '';
   $('petSex').value = currentPet?.sex || '';
@@ -259,7 +256,6 @@ function renderAll() {
   renderKPIs();
 }
 
-// These only need to render once (or on course change)
 function renderStatic() {
   renderSocialChecklist();
   renderCourses();
@@ -309,7 +305,7 @@ function subscribePet() {
   unsubPet = onSnapshot(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), snap => {
     currentPet = snap.exists() ? snap.data() : null;
     renderAll();
-  }, err => console.error('Pet subscription error:', err));
+  }, err => console.error('Pet sub error:', err));
 }
 
 function subscribeMembers() {
@@ -319,7 +315,7 @@ function subscribeMembers() {
     const members = [];
     snap.forEach(d => members.push(d.data()));
     renderMembers(members);
-  }, err => console.error('Members subscription error:', err));
+  }, err => console.error('Members sub error:', err));
 }
 
 function subscribeEvents() {
@@ -334,27 +330,25 @@ function subscribeEvents() {
       renderEvents();
       renderKPIs();
     },
-    err => console.error('Events subscription error:', err)
+    err => console.error('Events sub error:', err)
   );
 }
 
 async function savePetProfile(payload) {
-  if (!currentUser || !workspaceId) return showToast('Спочатку увійди через Google', 'error');
+  if (!currentUser || !workspaceId) return showToast('Спочатку увійди', 'error');
   try {
     await setDoc(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), {
-      ...(currentPet || {}),
-      ...payload,
-      updatedAt: serverTimestamp()
+      ...(currentPet || {}), ...payload, updatedAt: serverTimestamp()
     }, { merge: true });
     petFormDirty = false;
     showToast('Профіль збережено ✓', 'success');
   } catch (error) {
-    showToast('Помилка збереження: ' + error.message, 'error');
+    showToast('Помилка: ' + error.message, 'error');
   }
 }
 
 async function addEvent(payload) {
-  if (!currentUser || !workspaceId) return showToast('Спочатку увійди через Google', 'error');
+  if (!currentUser || !workspaceId) return showToast('Спочатку увійди', 'error');
   await addDoc(collection(db, 'workspaces', workspaceId, 'events'), {
     eventType: payload.eventType,
     byUid: currentUser.uid,
@@ -368,7 +362,7 @@ async function addEvent(payload) {
 }
 
 async function joinWorkspaceByInvite(codeRaw) {
-  if (!currentUser) return showToast('Увійди через Google для приєднання', 'error');
+  if (!currentUser) return showToast('Увійди через Google', 'error');
   const code = codeRaw.trim().toUpperCase();
   if (!code) throw new Error('Введіть код');
   const snap = await getDocs(query(collection(db, 'workspaces'), where('inviteCode', '==', code), limit(1)));
@@ -390,21 +384,20 @@ async function joinWorkspaceByInvite(codeRaw) {
 async function loginGoogle() {
   const btn = $('googleLoginBtn');
   const btnTop = $('googleLoginBtnTop');
-  btn && (btn.disabled = true);
-  btnTop && (btnTop.disabled = true);
-
+  if (btn) btn.disabled = true;
+  if (btnTop) btnTop.disabled = true;
   try {
     await signInWithPopup(auth, provider);
   } catch (error) {
     if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-      showToast('Перенаправляємо на Google...', 'info');
+      showToast('Перенаправляємо...', 'info');
       await signInWithRedirect(auth, provider);
     } else if (error.code !== 'auth/cancelled-popup-request') {
-      showToast('Помилка входу: ' + error.message, 'error');
+      showToast('Помилка: ' + error.message, 'error');
     }
   } finally {
-    btn && (btn.disabled = false);
-    btnTop && (btnTop.disabled = false);
+    if (btn) btn.disabled = false;
+    if (btnTop) btnTop.disabled = false;
   }
 }
 
@@ -417,12 +410,12 @@ async function logoutGoogle() {
     currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
     showToast('Вихід виконано', 'success');
   } catch (error) {
-    showToast('Помилка виходу: ' + error.message, 'error');
+    showToast('Помилка: ' + error.message, 'error');
   }
 }
 
 async function bootAuth() {
-  try { await getRedirectResult(auth); } catch (error) { console.warn('Redirect result error:', error); }
+  try { await getRedirectResult(auth); } catch (e) { console.warn('Redirect error:', e); }
 
   onAuthStateChanged(auth, async user => {
     currentUser = user || null;
@@ -442,35 +435,28 @@ async function bootAuth() {
       renderAll();
     } catch (error) {
       console.error('Boot error:', error);
-      showToast('Помилка завантаження: ' + error.message, 'error');
+      showToast('Помилка завантаження', 'error');
     }
     $('appLoader').classList.add('hidden');
   });
 }
 
-/* ─── Event Bindings ─── */
+/* ─── Bindings ─── */
 function bindEvents() {
-  // Tabs
   $$('[data-tab]').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
-  // Theme toggle
   $$('[data-theme-toggle]').forEach(el => el.addEventListener('click', () => {
-    const root = document.documentElement;
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', next);
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
   }));
-
-  // Restore theme
   const saved = localStorage.getItem('theme');
   if (saved) document.documentElement.setAttribute('data-theme', saved);
 
-  // Auth buttons
   $('googleLoginBtn').addEventListener('click', loginGoogle);
   $('googleLoginBtnTop').addEventListener('click', loginGoogle);
   $('logoutBtn').addEventListener('click', logoutGoogle);
 
-  // Event form
   $('eventTime').value = nowTime();
   $('eventForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -494,7 +480,6 @@ function bindEvents() {
     }
   });
 
-  // Pet profile form — track dirty state
   const petForm = $('petProfileForm');
   petForm.addEventListener('input', () => { petFormDirty = true; });
   petForm.addEventListener('change', () => { petFormDirty = true; });
@@ -521,7 +506,6 @@ function bindEvents() {
     }
   });
 
-  // Quick event buttons (mobile)
   $$('[data-quick-event]').forEach(btn => {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
@@ -541,14 +525,12 @@ function bindEvents() {
     });
   });
 
-  // Invite copy
   $('copyInviteBtn').addEventListener('click', async () => {
-    if (!workspaceData?.inviteCode) return showToast('Код ще недоступний', 'error');
+    if (!workspaceData?.inviteCode) return showToast('Код недоступний', 'error');
     try {
       await navigator.clipboard.writeText(workspaceData.inviteCode);
       showToast('Код скопійовано ✓', 'success');
     } catch {
-      // Fallback
       const input = document.createElement('input');
       input.value = workspaceData.inviteCode;
       document.body.appendChild(input);
@@ -559,7 +541,6 @@ function bindEvents() {
     }
   });
 
-  // Join workspace
   $('joinWorkspaceForm').addEventListener('submit', async e => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -567,9 +548,9 @@ function bindEvents() {
     try {
       await joinWorkspaceByInvite($('inviteCodeInput').value);
       $('inviteCodeInput').value = '';
-      showToast('Приєднано до простору ✓', 'success');
+      showToast('Приєднано ✓', 'success');
     } catch (error) {
-      showToast(error.message || 'Не вдалося приєднатись', 'error');
+      showToast(error.message || 'Не вдалося', 'error');
     } finally {
       btn.disabled = false;
     }

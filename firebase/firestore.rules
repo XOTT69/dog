@@ -1,50 +1,107 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function userDoc(uid) {
-      return get(/databases/$(database)/documents/users/$(uid));
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
 
-    function householdId() {
-      return userDoc(request.auth.uid).data.householdId;
+    function workspaceDoc(workspaceId) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId));
     }
 
-    function sameHousehold(targetHouseholdId) {
-      return signedIn() && householdId() == targetHouseholdId;
+    function memberDoc(workspaceId, uid) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid));
+    }
+
+    function isWorkspaceMember(workspaceId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+
+    function isWorkspaceOwner(workspaceId) {
+      return isSignedIn() &&
+        workspaceDoc(workspaceId).data.ownerId == request.auth.uid;
+    }
+
+    function validUserDoc(uid) {
+      return request.resource.data.uid == uid;
+    }
+
+    function validMemberDoc(uid) {
+      return request.resource.data.uid == uid;
     }
 
     match /users/{uid} {
-      allow read, update, delete: if signedIn() && request.auth.uid == uid;
-      allow create: if signedIn() && request.auth.uid == uid;
+      allow read: if isSelf(uid);
+
+      allow create: if isSelf(uid) &&
+        validUserDoc(uid);
+
+      allow update: if isSelf(uid) &&
+        resource.data.uid == uid &&
+        request.resource.data.uid == uid;
+
+      allow delete: if false;
     }
 
-    match /households/{householdId} {
-      allow read: if sameHousehold(householdId);
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if sameHousehold(householdId);
+    match /workspaces/{workspaceId} {
+      allow read: if isWorkspaceMember(workspaceId);
+
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if isWorkspaceOwner(workspaceId);
+
+      allow delete: if isWorkspaceOwner(workspaceId);
+
+      match /members/{memberUid} {
+        allow read: if isWorkspaceMember(workspaceId);
+
+        allow create: if isSignedIn() &&
+          (
+            isWorkspaceOwner(workspaceId) ||
+            memberUid == request.auth.uid
+          ) &&
+          validMemberDoc(memberUid);
+
+        allow update: if isSignedIn() &&
+          (
+            isWorkspaceOwner(workspaceId) ||
+            memberUid == request.auth.uid
+          ) &&
+          resource.data.uid == memberUid &&
+          request.resource.data.uid == memberUid;
+
+        allow delete: if isWorkspaceOwner(workspaceId);
+      }
 
       match /dogs/{dogId} {
-        allow read, write: if sameHousehold(householdId);
+        allow read: if isWorkspaceMember(workspaceId);
+
+        allow create: if isWorkspaceMember(workspaceId);
+
+        allow update: if isWorkspaceMember(workspaceId);
+
+        allow delete: if isWorkspaceOwner(workspaceId);
       }
 
       match /events/{eventId} {
-        allow read, write: if sameHousehold(householdId);
-      }
+        allow read: if isWorkspaceMember(workspaceId);
 
-      match /routines/{routineId} {
-        allow read, write: if sameHousehold(householdId);
-      }
+        allow create: if isWorkspaceMember(workspaceId) &&
+          request.resource.data.byUid == request.auth.uid;
 
-      match /reminders/{reminderId} {
-        allow read, write: if sameHousehold(householdId);
-      }
+        allow update: if isWorkspaceMember(workspaceId) &&
+          resource.data.byUid == request.auth.uid &&
+          request.resource.data.byUid == request.auth.uid;
 
-      match /notes/{noteId} {
-        allow read, write: if sameHousehold(householdId);
+        allow delete: if isWorkspaceOwner(workspaceId) ||
+          (isWorkspaceMember(workspaceId) && resource.data.byUid == request.auth.uid);
       }
     }
   }

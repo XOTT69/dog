@@ -18,7 +18,7 @@ import {
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: 'dogs-55f5e.firebaseapp.com',
+  authDomain: 'dogsbelli.vercel.app',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: '1053489833652',

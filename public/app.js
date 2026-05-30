@@ -4,10 +4,10 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  browserLocalPersistence,
+  setPersistence
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js';
 import {
   initializeFirestore,
@@ -30,6 +30,9 @@ const auth = getAuth(app);
 const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
+
+// Set persistence explicitly
+setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistence:', e));
 
 let currentUser = null;
 let workspaceId = null;
@@ -60,10 +63,6 @@ function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function createInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
 function avatarText(name = 'U') { return (name.trim()[0] || 'U').toUpperCase(); }
 function todayStart() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
-
-function isMobile() {
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-}
 
 function getAgeInWeeks(birthDate) {
   if (!birthDate) return null;
@@ -118,9 +117,9 @@ function renderProfileInsights() {
     outdoor: 'Вулиця — основний сценарій. Фокус: режим виходів, ритуал перед дверима, підкріплення на місці (не вдома).'
   };
   const insights = [
-    { title: 'Вікова програма', text: `Етап: ${program.stage}. Від віку залежить складність завдань, тривалість сесій і пріоритети на кожен день.` },
+    { title: 'Вікова програма', text: `Етап: ${program.stage}. Від віку залежить складність завдань, тривалість сесій і пріоритети.` },
     { title: 'Побутовий режим', text: modeTexts[mode] || modeTexts.pad },
-    { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни: після чого найчастіше промахи, які інтервали між туалетом, хто з сім\'ї частіше фіксує успіхи.' }
+    { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни: після чого промахи, які інтервали, хто частіше фіксує успіхи.' }
   ];
   $('profileInsights').innerHTML = insights.map(x => `<div class="notice"><strong>${x.title}</strong><div class="helper">${x.text}</div></div>`).join('');
 }
@@ -289,29 +288,26 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
+/* ─── AUTH: ONLY POPUP ─── */
 async function loginGoogle() {
   const btns = [$('googleLoginBtn'), $('googleLoginBtnTop')];
   btns.forEach(b => { if (b) b.disabled = true; });
 
   try {
-    if (isMobile()) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
-    await signInWithPopup(auth, provider);
+    console.log('[Auth] Starting signInWithPopup...');
+    const result = await signInWithPopup(auth, provider);
+    console.log('[Auth] Success:', result.user.email);
   } catch (error) {
-    console.error('Auth error:', error.code, error.message);
+    console.error('[Auth] Error:', error.code, error.message);
+
     if (error.code === 'auth/popup-blocked') {
-      try {
-        showToast('Перенаправляємо...', 'info');
-        await signInWithRedirect(auth, provider);
-      } catch (e) {
-        showToast('Помилка авторизації', 'error');
-      }
+      showToast('Popup заблоковано. Дозвольте popup для цього сайту в налаштуваннях браузера.', 'error');
     } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
       // user closed - ignore
     } else if (error.code === 'auth/network-request-failed') {
       showToast('Немає інтернету', 'error');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      showToast('Домен не авторизовано в Firebase. Додайте dogsbelli.vercel.app в Firebase Console → Auth → Settings → Authorized domains', 'error');
     } else {
       showToast('Помилка: ' + error.code, 'error');
     }
@@ -330,36 +326,34 @@ async function logoutGoogle() {
   showToast('Вихід виконано', 'success');
 }
 
-async function bootAuth() {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result && result.user) {
-      console.log('Redirect login success:', result.user.email);
-    }
-  } catch (e) {
-    console.warn('Redirect result check:', e.code || e.message);
-  }
+function bootAuth() {
+  console.log('[Auth] bootAuth started, waiting for onAuthStateChanged...');
 
   onAuthStateChanged(auth, async user => {
+    console.log('[Auth] onAuthStateChanged:', user ? user.email : 'null');
+
     currentUser = user || null;
     updateAuthUI(!!currentUser);
+
     if (!currentUser) {
       workspaceId = null; workspaceData = null; currentPet = null; eventsState = [];
       $('appLoader').classList.add('hidden');
       return;
     }
+
     try {
       await ensureWorkspaceForUser(currentUser);
       subscribePet(); subscribeMembers(); subscribeEvents();
       renderAll();
     } catch (error) {
-      console.error('Boot error:', error);
-      showToast('Помилка завантаження', 'error');
+      console.error('[Auth] Boot error:', error);
+      showToast('Помилка завантаження: ' + error.message, 'error');
     }
     $('appLoader').classList.add('hidden');
   });
 }
 
+/* ─── BINDINGS ─── */
 function bindEvents() {
   $$('[data-tab]').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
   $$('[data-theme-toggle]').forEach(el => el.addEventListener('click', () => {

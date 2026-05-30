@@ -145,6 +145,14 @@
         <button class="btn btn-primary" id="installBtn">Встановити</button>
       </div>
 
+      <div class="card" id="authCard" style="display:none">
+        <div class="section-title">
+          <h3>Акаунт</h3>
+          <span class="mini" id="authStatus">Не авторизований</span>
+        </div>
+        <div class="family" id="authUserBox"></div>
+      </div>
+
       <section class="topbar">
         <div class="page-title">
           <div class="pill">Песик: Боня · 11 тижнів</div>
@@ -153,6 +161,8 @@
         </div>
         <div class="actions">
           <button class="toggle" data-theme-toggle aria-label="Перемкнути тему">🌙</button>
+          <button class="btn btn-secondary" id="googleLoginBtn">Увійти через Google</button>
+          <button class="btn btn-secondary" id="logoutBtn" style="display:none">Вийти</button>
           <button class="btn btn-secondary" id="seedDemo">Заповнити демо</button>
           <button class="btn btn-primary" id="exportBtn">Експорт JSON</button>
         </div>
@@ -170,15 +180,15 @@
             <div class="person"><div class="avatar">Д</div><div><strong>Дружина</strong><div class="mini">co-owner</div></div></div>
           </div>
           <div style="height:1rem"></div>
-          <div class="pill success">Останній запис: 12 хв тому</div>
+          <div class="pill success">Останній запис: щойно або з Firestore</div>
           <p class="muted" style="margin-top:1rem">Кожен запис показує, хто додав подію. Це зручно, коли ви чергуєте вигул, годування чи туалетні паузи.</p>
         </article>
 
         <div class="grid kpis" style="grid-column:1/-1">
-          <article class="card kpi"><div class="label">Успішно на пелюшку</div><div class="value" id="kpiPad">4</div><div class="hint success">+1 за останні 6 год</div></article>
-          <article class="card kpi"><div class="label">Успішно на вулиці</div><div class="value" id="kpiOutdoor">2</div><div class="hint success">стабільно</div></article>
-          <article class="card kpi"><div class="label">Промахи</div><div class="value" id="kpiMiss">1</div><div class="hint warning">пік після активної гри</div></article>
-          <article class="card kpi"><div class="label">Середній інтервал</div><div class="value" id="kpiInterval">2г 05хв</div><div class="hint">між туалетними подіями</div></article>
+          <article class="card kpi"><div class="label">Успішно на пелюшку</div><div class="value" id="kpiPad">0</div><div class="hint success">оновлюється автоматично</div></article>
+          <article class="card kpi"><div class="label">Успішно на вулиці</div><div class="value" id="kpiOutdoor">0</div><div class="hint success">оновлюється автоматично</div></article>
+          <article class="card kpi"><div class="label">Промахи</div><div class="value" id="kpiMiss">0</div><div class="hint warning">відстежуй пікові години</div></article>
+          <article class="card kpi"><div class="label">Середній інтервал</div><div class="value" id="kpiInterval">—</div><div class="hint">між туалетними подіями</div></article>
         </div>
 
         <div class="split" style="grid-column:1/-1">
@@ -198,14 +208,47 @@
           <article class="card">
             <div class="section-title"><h3>Швидкий запис події</h3><span class="mini">для двох користувачів</span></div>
             <form id="eventForm" class="form-grid">
-              <div class="field"><label for="eventType">Тип</label><select id="eventType"><option value="pad">На пелюшку</option><option value="outdoor">На вулиці</option><option value="miss">Промах</option><option value="pee">Попісяв</option><option value="poo">Покакала</option></select></div>
-              <div class="field"><label for="eventBy">Хто відмітив</label><select id="eventBy"><option>Антон</option><option>Дружина</option></select></div>
-              <div class="field"><label for="eventTime">Час</label><input id="eventTime" type="time" /></div>
-              <div class="field"><label for="trigger">Тригер</label><select id="trigger"><option>Після сну</option><option>Після їжі</option><option>Після гри</option><option>Перед сном</option><option>Без тригера</option></select></div>
-              <div class="field full"><label for="note">Нотатка</label><textarea id="note" placeholder="Наприклад: покрутилась, понюхала підлогу, встигли посадити на пелюшку"></textarea></div>
-              <div class="field full"><button class="btn btn-primary" type="submit">Додати запис</button></div>
+              <div class="field">
+                <label for="eventType">Тип</label>
+                <select id="eventType">
+                  <option value="pad">На пелюшку</option>
+                  <option value="outdoor">На вулиці</option>
+                  <option value="miss">Промах</option>
+                  <option value="pee">Попісяв</option>
+                  <option value="poo">Покакала</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="eventBy">Хто відмітив</label>
+                <select id="eventBy">
+                  <option>Антон</option>
+                  <option>Дружина</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="eventTime">Час</label>
+                <input id="eventTime" type="time" />
+              </div>
+              <div class="field">
+                <label for="trigger">Тригер</label>
+                <select id="trigger">
+                  <option>Після сну</option>
+                  <option>Після їжі</option>
+                  <option>Після гри</option>
+                  <option>Перед сном</option>
+                  <option>Без тригера</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="note">Нотатка</label>
+                <textarea id="note" placeholder="Наприклад: покрутилась, понюхала підлогу, встигли посадити на пелюшку"></textarea>
+              </div>
+              <div class="field full">
+                <button class="btn btn-primary" type="submit">Додати запис</button>
+              </div>
             </form>
           </article>
+
           <article class="card">
             <div class="section-title"><h3>Поради режиму</h3><span class="mini">для маленького щеняти</span></div>
             <div class="timeline">
@@ -256,7 +299,7 @@
             <div class="section-title"><h3>Нотатки про стан</h3><span class="mini">поведінка і самопочуття</span></div>
             <textarea placeholder="Сюди можна писати: апетит, настрій, реакція на нових людей, стул, сон, підозрілі симптоми"></textarea>
             <div style="height:1rem"></div>
-            <button class="btn btn-primary">Зберегти нотатку</button>
+            <button class="btn btn-primary" type="button">Зберегти нотатку</button>
           </article>
         </div>
       </section>
@@ -267,158 +310,397 @@
             <div class="section-title"><h3>Realtime і хмара</h3><span class="mini">під production</span></div>
             <div class="timeline">
               <div class="timeline-item"><div><strong>Firestore колекції</strong><div class="mini">dogs, households, events, routines, reminders, users</div></div><span class="pill">schema</span></div>
-              <div class="timeline-item"><div><strong>Offline черга</strong><div class="mini">кожен запис має localId, synced, updatedAt, createdBy</div></div><span class="pill success">sync</span></div>
-              <div class="timeline-item"><div><strong>Спільний доступ</strong><div class="mini">owner/co-owner, інвайт по email або magic link</div></div><span class="pill">family</span></div>
-              <div class="timeline-item"><div><strong>Push-нагадування</strong><div class="mini">після сну, після їжі, вакцина, вода, тренування</div></div><span class="pill warning">next step</span></div>
+              <div class="timeline-item"><div><strong>Offline черга</strong><div class="mini">локальний fallback + cloud sync</div></div><span class="pill success">sync</span></div>
+              <div class="timeline-item"><div><strong>Спільний доступ</strong><div class="mini">owner/co-owner у межах одного household</div></div><span class="pill">family</span></div>
+              <div class="timeline-item"><div><strong>Push-нагадування</strong><div class="mini">можна додати наступним етапом</div></div><span class="pill warning">next step</span></div>
             </div>
           </article>
           <article class="card">
-            <div class="section-title"><h3>Що вже працює в прототипі</h3><span class="mini">local-first</span></div>
+            <div class="section-title"><h3>Що вже працює</h3><span class="mini">firebase-ready</span></div>
             <div class="checklist">
-              <div class="check-item"><div><strong>PWA-структура</strong><div class="mini">готовий manifest + install prompt hooks</div></div><span class="pill success">готово</span></div>
-              <div class="check-item"><div><strong>Локальні дані</strong><div class="mini">зберігання в browser storage для демо</div></div><span class="pill success">готово</span></div>
-              <div class="check-item"><div><strong>UI під мобільний</strong><div class="mini">можна ставити на домашній екран</div></div><span class="pill success">готово</span></div>
-              <div class="check-item"><div><strong>Firebase hooks</strong><div class="mini">потрібно лише вставити ваш config і правила</div></div><span class="pill">підключити</span></div>
+              <div class="check-item"><div><strong>PWA-структура</strong><div class="mini">manifest + service worker</div></div><span class="pill success">готово</span></div>
+              <div class="check-item"><div><strong>Google login</strong><div class="mini">через Firebase Auth popup</div></div><span class="pill success">готово</span></div>
+              <div class="check-item"><div><strong>Realtime events</strong><div class="mini">через Firestore onSnapshot</div></div><span class="pill success">готово</span></div>
+              <div class="check-item"><div><strong>Household модель</strong><div class="mini">users → households → events</div></div><span class="pill">активно</span></div>
             </div>
           </article>
         </div>
       </section>
 
-      <div class="footer-note">Прототип зроблений як single-file PWA demo. Для production я б виніс manifest/service worker/icon assets окремо та підключив Firestore realtime sync.</div>
+      <div class="footer-note">Ця версія вже підключена до Firebase config та готова до деплою через GitHub + Vercel.</div>
     </main>
   </div>
 
-  <script>
-    const STORAGE_KEY = 'doggo-coach-state-v1';
-    const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      setDoc,
+      addDoc,
+      collection,
+      serverTimestamp,
+      onSnapshot,
+      query,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI",
+      authDomain: "dogs-55f5e.firebaseapp.com",
+      projectId: "dogs-55f5e",
+      storageBucket: "dogs-55f5e.firebasestorage.app",
+      messagingSenderId: "1053489833652",
+      appId: "1:1053489833652:web:ddf53d87b0a4af4207d9e1",
+      measurementId: "G-2M9G6V5WBB"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    provider.addScope("profile");
+    provider.addScope("email");
+
+    const STORAGE_KEY = "doggo-coach-state-v2";
+    let currentUser = null;
+    let currentHouseholdId = null;
+    let unsubscribeEvents = null;
+
+    const localState = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
       logs: [
-        { type:'pad', by:'Антон', time:'07:10', trigger:'Після сну', note:'Швидко посадили на пелюшку', status:'success' },
-        { type:'feed', by:'Дружина', time:'08:00', trigger:'Годування', note:'З\'їла все', status:'info' },
-        { type:'miss', by:'Антон', time:'09:35', trigger:'Після гри', note:'Не встигли після біганини', status:'warning' },
-        { type:'outdoor', by:'Дружина', time:'11:20', trigger:'Після сну', note:'Успішно на вулиці', status:'success' }
+        { type:"pad", by:"Антон", time:"07:10", trigger:"Після сну", note:"Швидко посадили на пелюшку", status:"success" },
+        { type:"feed", by:"Дружина", time:"08:00", trigger:"Годування", note:"З'їла все", status:"info" },
+        { type:"miss", by:"Антон", time:"09:35", trigger:"Після гри", note:"Не встигли після біганини", status:"warning" },
+        { type:"outdoor", by:"Дружина", time:"11:20", trigger:"Після сну", note:"Успішно на вулиці", status:"success" }
       ],
       social: [
-        { label:'Нові звуки вдома', grade:'Loved it' },
-        { label:'Плитка / ламінат / килим', grade:'Meh' },
-        { label:'Люди в кепках та з пакетами', grade:'Loved it' },
-        { label:'Дзвінок у двері', grade:'Need work' }
+        { label:"Нові звуки вдома", grade:"Loved it" },
+        { label:"Плитка / ламінат / килим", grade:"Meh" },
+        { label:"Люди в кепках та з пакетами", grade:"Loved it" },
+        { label:"Дзвінок у двері", grade:"Need work" }
       ]
     };
 
-    const typeLabel = { pad:'На пелюшку', outdoor:'На вулиці', miss:'Промах', pee:'Попісяв', poo:'Покакала', feed:'Годування' };
-    const typeClass = { pad:'success', outdoor:'success', miss:'warning', pee:'', poo:'', feed:'' };
+    const state = structuredClone(localState);
 
-    function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    const typeLabel = {
+      pad:"На пелюшку",
+      outdoor:"На вулиці",
+      miss:"Промах",
+      pee:"Попісяв",
+      poo:"Покакала",
+      feed:"Годування"
+    };
 
-    function render(){
-      const focus = [
-        ['07:00–09:00','сон → туалет → їжа → туалет'],
-        ['11:00–13:00','коротке тренування + спокій + туалет'],
-        ['16:00–18:00','соціалізація low and slow + пелюшка/вулиця'],
-        ['21:00','тихий вечірній цикл і остання туалетна пауза']
-      ];
-      document.getElementById('todayFocus').innerHTML = focus.map(([time,text]) => `<div class="timeline-item"><div><strong>${time}</strong><div class="mini">${text}</div></div><span class="pill">план</span></div>`).join('');
+    const typeClass = {
+      pad:"success",
+      outdoor:"success",
+      miss:"warning",
+      pee:"",
+      poo:"",
+      feed:""
+    };
 
-      document.getElementById('recentLogs').innerHTML = state.logs.slice().reverse().slice(0,6).map(log => `
-        <div class="log-item">
-          <div><strong>${typeLabel[log.type] || log.type}</strong><div class="mini">${log.time} · ${log.by} · ${log.trigger}</div><div class="mini">${log.note || ''}</div></div>
-          <span class="pill ${typeClass[log.type] || ''}">${log.by}</span>
-        </div>`).join('');
-
-      document.getElementById('socialChecklist').innerHTML = state.social.map(item => `
-        <div class="check-item"><div><strong>${item.label}</strong><div class="mini">Оцінка реакції</div></div><span class="pill ${item.grade === 'Loved it' ? 'success' : item.grade === 'Need work' ? 'warning' : ''}">${item.grade}</span></div>`).join('');
-
-      const counts = {
-        pad: state.logs.filter(x => x.type === 'pad').length,
-        outdoor: state.logs.filter(x => x.type === 'outdoor').length,
-        miss: state.logs.filter(x => x.type === 'miss').length
-      };
-      document.getElementById('kpiPad').textContent = counts.pad;
-      document.getElementById('kpiOutdoor').textContent = counts.outdoor;
-      document.getElementById('kpiMiss').textContent = counts.miss;
-      document.getElementById('kpiInterval').textContent = '2г 05хв';
-      document.getElementById('syncStatus').textContent = navigator.onLine
-        ? 'Онлайн. Локальні дані готові до синхронізації з Firebase/Firestore.'
-        : 'Офлайн. Нові події зберігаються локально і можуть синхронізуватись пізніше.';
+    function saveLocal() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
-    document.querySelectorAll('[data-tab]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
-        document.getElementById(btn.dataset.tab).classList.add('active');
+    function timeNow() {
+      return new Date().toTimeString().slice(0, 5);
+    }
+
+    function render() {
+      const focus = [
+        ["07:00–09:00","сон → туалет → їжа → туалет"],
+        ["11:00–13:00","коротке тренування + спокій + туалет"],
+        ["16:00–18:00","соціалізація low and slow + пелюшка/вулиця"],
+        ["21:00","тихий вечірній цикл і остання туалетна пауза"]
+      ];
+
+      document.getElementById("todayFocus").innerHTML = focus.map(([time, text]) => `
+        <div class="timeline-item">
+          <div><strong>${time}</strong><div class="mini">${text}</div></div>
+          <span class="pill">план</span>
+        </div>
+      `).join("");
+
+      document.getElementById("recentLogs").innerHTML = state.logs.slice().reverse().slice(0, 6).map(log => `
+        <div class="log-item">
+          <div>
+            <strong>${typeLabel[log.type] || log.type}</strong>
+            <div class="mini">${log.time} · ${log.by} · ${log.trigger || "Без тригера"}</div>
+            <div class="mini">${log.note || ""}</div>
+          </div>
+          <span class="pill ${typeClass[log.type] || ""}">${log.by}</span>
+        </div>
+      `).join("");
+
+      document.getElementById("socialChecklist").innerHTML = state.social.map(item => `
+        <div class="check-item">
+          <div><strong>${item.label}</strong><div class="mini">Оцінка реакції</div></div>
+          <span class="pill ${item.grade === "Loved it" ? "success" : item.grade === "Need work" ? "warning" : ""}">
+            ${item.grade}
+          </span>
+        </div>
+      `).join("");
+
+      const counts = {
+        pad: state.logs.filter(x => x.type === "pad").length,
+        outdoor: state.logs.filter(x => x.type === "outdoor").length,
+        miss: state.logs.filter(x => x.type === "miss").length
+      };
+
+      document.getElementById("kpiPad").textContent = counts.pad;
+      document.getElementById("kpiOutdoor").textContent = counts.outdoor;
+      document.getElementById("kpiMiss").textContent = counts.miss;
+      document.getElementById("kpiInterval").textContent = "—";
+
+      document.getElementById("syncStatus").textContent = navigator.onLine
+        ? "Онлайн. Дані можуть синхронізуватись з Firestore."
+        : "Офлайн. Нові події лишаються локально до повернення мережі.";
+    }
+
+    function setAuthUI(user) {
+      const loginBtn = document.getElementById("googleLoginBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const authCard = document.getElementById("authCard");
+      const authStatus = document.getElementById("authStatus");
+      const authUserBox = document.getElementById("authUserBox");
+
+      if (!user) {
+        loginBtn.style.display = "";
+        logoutBtn.style.display = "none";
+        authCard.style.display = "none";
+        authStatus.textContent = "Не авторизований";
+        authUserBox.innerHTML = "";
+        return;
+      }
+
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "";
+      authCard.style.display = "block";
+      authStatus.textContent = "Google підключено";
+      authUserBox.innerHTML = `
+        <div class="person">
+          <div class="avatar">${(user.displayName || user.email || "U").slice(0,1).toUpperCase()}</div>
+          <div>
+            <strong>${user.displayName || "User"}</strong>
+            <div class="mini">${user.email || ""}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function ensureUserProfile(user) {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        currentHouseholdId = userSnap.data().householdId;
+        return;
+      }
+
+      const householdRef = doc(collection(db, "households"));
+      currentHouseholdId = householdRef.id;
+
+      await setDoc(householdRef, {
+        ownerId: user.uid,
+        title: "Doggo Coach Family",
+        createdAt: serverTimestamp()
+      });
+
+      await setDoc(doc(db, "households", currentHouseholdId, "dogs", "primary"), {
+        name: "Боня",
+        ageLabel: "11 тижнів",
+        createdAt: serverTimestamp()
+      });
+
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email || "",
+        displayName: user.displayName || "",
+        photoURL: user.photoURL || "",
+        role: "owner",
+        householdId: currentHouseholdId,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    async function loadEventsRealtime() {
+      if (!currentHouseholdId) return;
+      if (unsubscribeEvents) unsubscribeEvents();
+
+      const eventsRef = collection(db, "households", currentHouseholdId, "events");
+      const q = query(eventsRef, orderBy("createdAt", "desc"));
+
+      unsubscribeEvents = onSnapshot(q, snapshot => {
+        const rows = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          rows.push({
+            type: data.eventType || "pad",
+            by: data.byName || "Користувач",
+            time: data.timeLabel || "--:--",
+            trigger: data.trigger || "Без тригера",
+            note: data.note || "",
+            status: "info"
+          });
+        });
+
+        if (rows.length) {
+          state.logs = rows;
+          saveLocal();
+        }
+        render();
+      });
+    }
+
+    async function loginWithGoogle() {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        alert("Помилка входу через Google: " + error.message);
+      }
+    }
+
+    async function logoutUser() {
+      if (unsubscribeEvents) unsubscribeEvents();
+      await signOut(auth);
+      currentUser = null;
+      currentHouseholdId = null;
+      setAuthUI(null);
+      render();
+    }
+
+    async function addEventToFirestore(payload) {
+      if (!currentUser || !currentHouseholdId) return;
+
+      await addDoc(collection(db, "households", currentHouseholdId, "events"), {
+        dogId: "primary",
+        eventType: payload.type,
+        byUid: currentUser.uid,
+        byName: payload.by,
+        trigger: payload.trigger,
+        note: payload.note,
+        timeLabel: payload.time,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    document.querySelectorAll("[data-tab]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-tab]").forEach(x => x.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+        document.getElementById(btn.dataset.tab).classList.add("active");
       });
     });
 
-    document.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+    document.querySelector("[data-theme-toggle]").addEventListener("click", () => {
       const root = document.documentElement;
-      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
     });
 
-    document.getElementById('eventTime').value = new Date().toTimeString().slice(0,5);
-    document.getElementById('eventForm').addEventListener('submit', (e) => {
+    document.getElementById("googleLoginBtn").addEventListener("click", loginWithGoogle);
+    document.getElementById("logoutBtn").addEventListener("click", logoutUser);
+
+    document.getElementById("eventTime").value = timeNow();
+
+    document.getElementById("eventForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      state.logs.push({
-        type: document.getElementById('eventType').value,
-        by: document.getElementById('eventBy').value,
-        time: document.getElementById('eventTime').value,
-        trigger: document.getElementById('trigger').value,
-        note: document.getElementById('note').value.trim(),
-        status: 'info'
-      });
-      saveState();
+
+      const payload = {
+        type: document.getElementById("eventType").value,
+        by: document.getElementById("eventBy").value,
+        time: document.getElementById("eventTime").value,
+        trigger: document.getElementById("trigger").value,
+        note: document.getElementById("note").value.trim()
+      };
+
+      state.logs.push({ ...payload, status: "info" });
+      saveLocal();
       render();
+
+      if (currentUser && currentHouseholdId) {
+        try {
+          await addEventToFirestore(payload);
+        } catch (error) {
+          alert("Подію збережено локально, але не вдалося записати в Firestore: " + error.message);
+        }
+      }
+
       e.target.reset();
-      document.getElementById('eventTime').value = new Date().toTimeString().slice(0,5);
-      alert('Подію додано локально. У production її можна одразу синкати в Firestore.');
+      document.getElementById("eventTime").value = timeNow();
     });
 
-    document.getElementById('seedDemo').addEventListener('click', () => {
+    document.getElementById("seedDemo").addEventListener("click", () => {
       state.logs.push(
-        { type:'pad', by:'Дружина', time:'13:10', trigger:'Після їжі', note:'Успішно без промахів', status:'success' },
-        { type:'outdoor', by:'Антон', time:'15:45', trigger:'Після сну', note:'Швидка успішна пауза на вулиці', status:'success' }
+        { type:"pad", by:"Дружина", time:"13:10", trigger:"Після їжі", note:"Успішно без промахів", status:"success" },
+        { type:"outdoor", by:"Антон", time:"15:45", trigger:"Після сну", note:"Швидка успішна пауза на вулиці", status:"success" }
       );
-      saveState();
+      saveLocal();
       render();
     });
 
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = 'doggo-coach-export.json';
+      a.download = "doggo-coach-export.json";
       a.click();
       URL.revokeObjectURL(a.href);
     });
 
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
+    window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      document.getElementById('installBanner').classList.add('show');
+      document.getElementById("installBanner").classList.add("show");
     });
 
-    document.getElementById('installBtn').addEventListener('click', async () => {
+    document.getElementById("installBtn").addEventListener("click", async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
       deferredPrompt = null;
-      document.getElementById('installBanner').classList.remove('show');
+      document.getElementById("installBanner").classList.remove("show");
     });
 
-    window.addEventListener('online', render);
-    window.addEventListener('offline', render);
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user || null;
+      setAuthUI(currentUser);
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-    }
+      if (!currentUser) {
+        render();
+        return;
+      }
+
+      try {
+        await ensureUserProfile(currentUser);
+        await loadEventsRealtime();
+        render();
+      } catch (error) {
+        console.error(error);
+        alert("Помилка ініціалізації Firebase: " + error.message);
+      }
+    });
 
     render();
 
-    // Firebase production hook example:
-    // import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js'
-    // import { getFirestore, enableIndexedDbPersistence, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js'
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>

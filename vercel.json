@@ -1,10 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/__/auth/:match*",
-      "destination": "https://dogs-55f5e.firebaseapp.com/__/auth/:match*"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",

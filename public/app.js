@@ -7,27 +7,23 @@ import {
   collection, query, where, orderBy, limit, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js';
 
-/* ─── Firebase Init ─── */
 const firebaseConfig = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: 'dogs-55f5e.firebaseapp.com',
+  authDomain: 'dogsbelli.vercel.app',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: '1053489833652',
   appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
 };
 
-// Compat SDK for auth (no iframe needed)
 firebase.initializeApp(firebaseConfig);
 const authCompat = firebase.auth();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Modular SDK for Firestore (with offline cache)
 const app = initializeApp(firebaseConfig, 'firestoreApp');
 const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 
-/* ─── State ─── */
 let currentUser = null;
 let workspaceId = null;
 let workspaceData = null;
@@ -106,14 +102,14 @@ function renderProfileInsights() {
   const program = getProgramByAge(weeks);
   const mode = currentPet?.toiletMode || 'pad';
   const modeTexts = {
-    pad: 'Пелюшка вдома — типовий сценарій до завершення вакцинації. Фокус: стабільне місце, підведення після тригерів, миттєве підкріплення.',
-    mixed: 'Змішаний режим — пелюшка + вулиця. Не поспішати, переводити навичку поступово.',
-    outdoor: 'Вулиця — основний сценарій. Фокус: режим виходів, підкріплення на місці.'
+    pad: 'Пелюшка вдома — типовий сценарій до завершення вакцинації.',
+    mixed: 'Змішаний режим — пелюшка + вулиця.',
+    outdoor: 'Вулиця — основний сценарій.'
   };
   const insights = [
-    { title: 'Вікова програма', text: `Етап: ${program.stage}. Від віку залежить складність завдань і пріоритети.` },
+    { title: 'Вікова програма', text: `Етап: ${program.stage}.` },
     { title: 'Побутовий режим', text: modeTexts[mode] || modeTexts.pad },
-    { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни: після чого промахи, які інтервали, хто частіше фіксує успіхи.' }
+    { title: 'Навіщо записи', text: 'Щоденник дозволяє бачити патерни.' }
   ];
   $('profileInsights').innerHTML = insights.map(x => `<div class="notice"><strong>${x.title}</strong><div class="helper">${x.text}</div></div>`).join('');
 }
@@ -135,7 +131,7 @@ function renderPriorityTips() {
 
 function renderSocialChecklist() {
   $('socialChecklist').innerHTML = SOCIAL_ITEMS.map(label => `
-    <label class="check-row"><input type="checkbox" /><div><strong>${label}</strong><div class="meta">Поступово, без примусу, з підкріпленням спокою.</div></div></label>
+    <label class="check-row"><input type="checkbox" /><div><strong>${label}</strong><div class="meta">Поступово, без примусу.</div></div></label>
   `).join('');
 }
 
@@ -171,10 +167,10 @@ function renderToiletGuide() {
 
 function renderEvents() {
   const list = $('recentLogs');
-  if (!eventsState.length) { list.innerHTML = `<div class="empty">Записів ще немає. Додайте першу подію.</div>`; return; }
+  if (!eventsState.length) { list.innerHTML = `<div class="empty">Записів ще немає.</div>`; return; }
   list.innerHTML = eventsState.slice(0, 30).map(item => {
     const conf = TYPE_CONFIG[item.eventType] || { icon: '📌', label: item.eventType, tone: '' };
-    return `<div class="item"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${item.timeLabel || '--:--'} · ${item.trigger || ''}</div>${item.note ? `<div class="meta" style="margin-top:3px">${item.note}</div>` : ''}</div><span class="pill ${conf.tone}">${item.byName || ''}</span></div>`;
+    return `<div class="item"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${item.timeLabel || '--:--'} · ${item.trigger || ''}</div>${item.note ? `<div class="meta">${item.note}</div>` : ''}</div><span class="pill ${conf.tone}">${item.byName || ''}</span></div>`;
   }).join('');
 }
 
@@ -218,7 +214,6 @@ function renderWorkspaceMeta() {
 function renderAll() { fillPetForm(); renderWorkspaceMeta(); renderProfileInsights(); renderTodayPlan(); renderPriorityTips(); renderEvents(); renderKPIs(); }
 function renderStatic() { renderSocialChecklist(); renderCourses(); renderKnowledge(); renderToiletGuide(); }
 
-/* ─── Firestore Logic ─── */
 async function ensureWorkspaceForUser(user) {
   const userRef = doc(db, 'users', user.uid);
   const userSnap = await getDoc(userRef);
@@ -242,19 +237,19 @@ async function ensureWorkspaceForUser(user) {
 function subscribePet() {
   if (!workspaceId) return;
   if (unsubPet) unsubPet();
-  unsubPet = onSnapshot(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), snap => { currentPet = snap.exists() ? snap.data() : null; renderAll(); }, err => console.error('Pet err:', err));
+  unsubPet = onSnapshot(doc(db, 'workspaces', workspaceId, 'dogs', 'primary'), function(snap) { currentPet = snap.exists() ? snap.data() : null; renderAll(); }, function(err) { console.error('Pet err:', err); });
 }
 
 function subscribeMembers() {
   if (!workspaceId) return;
   if (unsubMembers) unsubMembers();
-  unsubMembers = onSnapshot(collection(db, 'workspaces', workspaceId, 'members'), snap => { const m = []; snap.forEach(d => m.push(d.data())); renderMembers(m); }, err => console.error('Members err:', err));
+  unsubMembers = onSnapshot(collection(db, 'workspaces', workspaceId, 'members'), function(snap) { const m = []; snap.forEach(function(d) { m.push(d.data()); }); renderMembers(m); }, function(err) { console.error('Members err:', err); });
 }
 
 function subscribeEvents() {
   if (!workspaceId) return;
   if (unsubEvents) unsubEvents();
-  unsubEvents = onSnapshot(query(collection(db, 'workspaces', workspaceId, 'events'), orderBy('createdAt', 'desc'), limit(100)), snap => { const r = []; snap.forEach(d => r.push({ id: d.id, ...d.data() })); eventsState = r; renderEvents(); renderKPIs(); }, err => console.error('Events err:', err));
+  unsubEvents = onSnapshot(query(collection(db, 'workspaces', workspaceId, 'events'), orderBy('createdAt', 'desc'), limit(100)), function(snap) { const r = []; snap.forEach(function(d) { r.push({ id: d.id, ...d.data() }); }); eventsState = r; renderEvents(); renderKPIs(); }, function(err) { console.error('Events err:', err); });
 }
 
 async function savePetProfile(payload) {
@@ -283,7 +278,6 @@ async function joinWorkspaceByInvite(codeRaw) {
   subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
 }
 
-/* ─── AUTH via Compat SDK + Redirect ─── */
 function loginGoogle() {
   authCompat.signInWithRedirect(googleProvider);
 }
@@ -330,14 +324,13 @@ function bootAuth() {
   });
 }
 
-/* ─── Bindings ─── */
 function bindEvents() {
-  $$('[data-tab]').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
-  $$('[data-theme-toggle]').forEach(el => el.addEventListener('click', () => {
+  $$('[data-tab]').forEach(function(btn) { btn.addEventListener('click', function() { setActiveTab(btn.dataset.tab); }); });
+  $$('[data-theme-toggle]').forEach(function(el) { el.addEventListener('click', function() {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
-  }));
+  }); });
   const saved = localStorage.getItem('theme');
   if (saved) document.documentElement.setAttribute('data-theme', saved);
 
@@ -346,7 +339,7 @@ function bindEvents() {
   $('logoutBtn').addEventListener('click', logoutGoogle);
 
   $('eventTime').value = nowTime();
-  $('eventForm').addEventListener('submit', async e => {
+  $('eventForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true;
@@ -358,9 +351,9 @@ function bindEvents() {
   });
 
   const petForm = $('petProfileForm');
-  petForm.addEventListener('input', () => { petFormDirty = true; });
-  petForm.addEventListener('change', () => { petFormDirty = true; });
-  petForm.addEventListener('submit', async e => {
+  petForm.addEventListener('input', function() { petFormDirty = true; });
+  petForm.addEventListener('change', function() { petFormDirty = true; });
+  petForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true;
@@ -370,8 +363,8 @@ function bindEvents() {
     finally { btn.disabled = false; }
   });
 
-  $$('[data-quick-event]').forEach(btn => {
-    btn.addEventListener('click', async () => {
+  $$('[data-quick-event]').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
       btn.disabled = true;
       try { await addEvent({ eventType: btn.dataset.quickEvent, byName: currentUser?.displayName || '', timeLabel: nowTime(), trigger: '', note: '' }); }
       catch (err) { showToast(err.message, 'error'); }
@@ -379,14 +372,14 @@ function bindEvents() {
     });
   });
 
-  $('copyInviteBtn').addEventListener('click', async () => {
+  $('copyInviteBtn').addEventListener('click', async function() {
     if (!workspaceData?.inviteCode) return showToast('Код недоступний', 'error');
     try { await navigator.clipboard.writeText(workspaceData.inviteCode); }
-    catch { const i = document.createElement('input'); i.value = workspaceData.inviteCode; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
+    catch (e) { const i = document.createElement('input'); i.value = workspaceData.inviteCode; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
     showToast('Скопійовано ✓', 'success');
   });
 
-  $('joinWorkspaceForm').addEventListener('submit', async e => {
+  $('joinWorkspaceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true;

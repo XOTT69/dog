@@ -371,34 +371,22 @@
     import {
       getAuth,
       GoogleAuthProvider,
+      signInWithPopup,
       signInWithRedirect,
       getRedirectResult,
       signOut,
-      onAuthStateChanged,
-      setPersistence,
-      browserLocalPersistence
+      onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
     import {
       initializeFirestore,
       persistentLocalCache,
-      doc,
-      getDoc,
-      setDoc,
-      updateDoc,
-      addDoc,
-      getDocs,
-      collection,
-      query,
-      where,
-      orderBy,
-      limit,
-      onSnapshot,
-      serverTimestamp
+      doc, getDoc, setDoc, updateDoc, addDoc, getDocs, collection, query, where, orderBy, limit, onSnapshot, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI",
-      authDomain: "dogs-55f5e.firebaseapp.com",
+      // 🔥 ЗМІНЕНО: Тепер тут твій домен Vercel! Це виправить авторизацію.
+      authDomain: "dogsbelli.vercel.app",
       projectId: "dogs-55f5e",
       storageBucket: "dogs-55f5e.firebasestorage.app",
       messagingSenderId: "1053489833652",
@@ -407,7 +395,6 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    // 🔥 ОСЬ ВОНО: Офлайн-кеш Firestore замість звичайного getFirestore(app)
     const db = initializeFirestore(app, { localCache: persistentLocalCache() });
     
     const provider = new GoogleAuthProvider();
@@ -441,25 +428,14 @@
       note: { icon: "📝", label: "Нотатка", tone: "" }
     };
 
-    // 🍞 Кастомні Toasts замість alert()
     function showToast(message, type = 'info') {
       const container = document.getElementById("toastContainer");
       const toast = document.createElement("div");
       toast.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
-      toast.innerHTML = `
-        <span>${type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️'}</span>
-        <span>${message}</span>
-      `;
+      toast.innerHTML = `<span>${type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️'}</span><span>${message}</span>`;
       container.appendChild(toast);
-      
-      // Анімація появи
       setTimeout(() => toast.classList.add("show"), 10);
-      
-      // Анімація зникнення
-      setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => toast.remove(), 300);
-      }, 3500);
+      setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 3500);
     }
 
     function nowTime() { return new Date().toTimeString().slice(0, 5); }
@@ -467,12 +443,8 @@
     function avatarText(name = "U") { return (name.trim()[0] || "U").toUpperCase(); }
 
     function setActiveTab(id) {
-      document.querySelectorAll("[data-tab]").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.tab === id);
-      });
-      document.querySelectorAll(".tab-panel").forEach(panel => {
-        panel.classList.toggle("active", panel.id === id);
-      });
+      document.querySelectorAll("[data-tab]").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === id));
+      document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.id === id));
     }
 
     function renderFocus() {
@@ -482,39 +454,20 @@
         ["Після гри", "часта зона ризику для промаху"],
         ["Перед сном", "закривати вечірній цикл спокійно"]
       ];
-      document.getElementById("todayFocus").innerHTML = items.map(([title, text]) => `
-        <div class="item"><div><strong>${title}</strong><div class="meta">${text}</div></div><span class="pill">фокус</span></div>
-      `).join("");
+      document.getElementById("todayFocus").innerHTML = items.map(([title, text]) => `<div class="item"><div><strong>${title}</strong><div class="meta">${text}</div></div><span class="pill">фокус</span></div>`).join("");
     }
 
     function renderSocial() {
-      document.getElementById("socialChecklist").innerHTML = state.social.map(item => `
-        <div class="item">
-          <div><strong>${item.label}</strong><div class="meta">Реакція</div></div>
-          <span class="pill ${item.grade === 'Спокійно' ? 'success' : ''}">${item.grade}</span>
-        </div>
-      `).join("");
+      document.getElementById("socialChecklist").innerHTML = state.social.map(item => `<div class="item"><div><strong>${item.label}</strong><div class="meta">Реакція</div></div><span class="pill ${item.grade === 'Спокійно' ? 'success' : ''}">${item.grade}</span></div>`).join("");
     }
 
     function renderEvents() {
       const list = document.getElementById("recentLogs");
-      if (!eventsState.length) {
-        list.innerHTML = `<div class="helper" style="padding:1rem;text-align:center">Записів ще немає.</div>`;
-        return;
-      }
-
+      if (!eventsState.length) { list.innerHTML = `<div class="helper" style="padding:1rem;text-align:center">Записів ще немає.</div>`; return; }
       list.innerHTML = eventsState.map(item => {
         const conf = typeConfig[item.eventType] || { icon: "📌", label: item.eventType, tone: "" };
-        return `
-        <div class="item">
-          <div>
-            <strong>${conf.icon} ${conf.label}</strong>
-            <div class="meta">${item.timeLabel || "--:--"} · ${item.trigger || "Без тригера"}</div>
-            ${item.note ? `<div class="meta" style="margin-top:6px;color:var(--text)">${item.note}</div>` : ''}
-          </div>
-          <span class="pill ${conf.tone}">${item.byName || "user"}</span>
-        </div>
-      `}).join("");
+        return `<div class="item"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${item.timeLabel || "--:--"} · ${item.trigger || "Без тригера"}</div>${item.note ? `<div class="meta" style="margin-top:6px;color:var(--text)">${item.note}</div>` : ''}</div><span class="pill ${conf.tone}">${item.byName || "user"}</span></div>`
+      }).join("");
     }
 
     function renderKPIs() {
@@ -533,26 +486,12 @@
     }
 
     function renderMembers(members = []) {
-      const html = members.length
-        ? members.map(member => `
-          <div class="person">
-            <div class="avatar">${avatarText(member.displayName || member.email || "U")}</div>
-            <div><strong>${member.displayName || "User"}</strong><div class="helper">${member.role || "member"}</div></div>
-          </div>
-        `).join("")
-        : `<div class="helper" style="padding:1rem">Немає учасників.</div>`;
-
+      const html = members.length ? members.map(member => `<div class="person"><div class="avatar">${avatarText(member.displayName || member.email || "U")}</div><div><strong>${member.displayName || "User"}</strong><div class="helper">${member.role || "member"}</div></div></div>`).join("") : `<div class="helper" style="padding:1rem">Немає учасників.</div>`;
       document.getElementById("membersList").innerHTML = html;
       document.getElementById("workspaceMembers").innerHTML = html;
     }
 
-    function renderAll() {
-      renderFocus();
-      renderSocial();
-      renderEvents();
-      renderKPIs();
-      renderWorkspaceMeta();
-    }
+    function renderAll() { renderFocus(); renderSocial(); renderEvents(); renderKPIs(); renderWorkspaceMeta(); }
 
     async function ensureWorkspaceForUser(user) {
       const userRef = doc(db, "users", user.uid);
@@ -569,136 +508,86 @@
       workspaceId = newWorkspaceRef.id;
       const inviteCode = createInviteCode();
 
-      await setDoc(newWorkspaceRef, {
-        name: `${(user.displayName || "Мій").split(" ")[0]} простір`,
-        ownerId: user.uid,
-        inviteCode,
-        createdAt: serverTimestamp()
-      });
-
+      await setDoc(newWorkspaceRef, { name: `${(user.displayName || "Мій").split(" ")[0]} простір`, ownerId: user.uid, inviteCode, createdAt: serverTimestamp() });
       workspaceData = { name: `${(user.displayName || "Мій").split(" ")[0]} простір`, ownerId: user.uid, inviteCode };
 
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid, email: user.email || "", displayName: user.displayName || "", photoURL: user.photoURL || "",
-        role: "owner", workspaceId, createdAt: serverTimestamp()
-      });
-
-      await setDoc(doc(db, "workspaces", workspaceId, "members", user.uid), {
-        uid: user.uid, email: user.email || "", displayName: user.displayName || "", photoURL: user.photoURL || "",
-        role: "owner", createdAt: serverTimestamp()
-      });
-
-      await setDoc(doc(db, "workspaces", workspaceId, "dogs", "primary"), {
-        name: state.dog.name, ageLabel: state.dog.ageLabel, createdAt: serverTimestamp()
-      });
+      await setDoc(userRef, { uid: user.uid, email: user.email || "", displayName: user.displayName || "", photoURL: user.photoURL || "", role: "owner", workspaceId, createdAt: serverTimestamp() });
+      await setDoc(doc(db, "workspaces", workspaceId, "members", user.uid), { uid: user.uid, email: user.email || "", displayName: user.displayName || "", photoURL: user.photoURL || "", role: "owner", createdAt: serverTimestamp() });
+      await setDoc(doc(db, "workspaces", workspaceId, "dogs", "primary"), { name: state.dog.name, ageLabel: state.dog.ageLabel, createdAt: serverTimestamp() });
     }
 
     async function subscribeMembers() {
       if (!workspaceId) return;
       if (unsubMembers) unsubMembers();
       unsubMembers = onSnapshot(query(collection(db, "workspaces", workspaceId, "members")), snap => {
-        const members = [];
-        snap.forEach(d => members.push(d.data()));
-        renderMembers(members);
+        const members = []; snap.forEach(d => members.push(d.data())); renderMembers(members);
       });
     }
 
     async function subscribeEvents() {
       if (!workspaceId) return;
       if (unsubEvents) unsubEvents();
-      unsubEvents = onSnapshot(
-        query(collection(db, "workspaces", workspaceId, "events"), orderBy("createdAt", "desc"), limit(50)),
-        snap => {
-          const rows = [];
-          snap.forEach(d => rows.push(d.data()));
-          eventsState = rows;
-          renderAll();
-        }
-      );
+      unsubEvents = onSnapshot(query(collection(db, "workspaces", workspaceId, "events"), orderBy("createdAt", "desc"), limit(50)), snap => {
+        const rows = []; snap.forEach(d => rows.push(d.data())); eventsState = rows; renderAll();
+      });
     }
 
     async function addEvent(payload) {
-      if (!currentUser || !workspaceId) {
-        showToast("Спочатку увійди через Google", "error");
-        return;
-      }
+      if (!currentUser || !workspaceId) return showToast("Спочатку увійди через Google", "error");
       await addDoc(collection(db, "workspaces", workspaceId, "events"), {
-        eventType: payload.eventType,
-        byUid: currentUser.uid,
-        byName: payload.byName || currentUser.displayName || "Юзер",
-        trigger: payload.trigger || "Без тригера",
-        note: payload.note || "",
-        timeLabel: payload.timeLabel || nowTime(),
-        createdAt: serverTimestamp()
+        eventType: payload.eventType, byUid: currentUser.uid, byName: payload.byName || currentUser.displayName || "Юзер",
+        trigger: payload.trigger || "Без тригера", note: payload.note || "", timeLabel: payload.timeLabel || nowTime(), createdAt: serverTimestamp()
       });
       showToast("Запис додано!", "success");
     }
 
     async function joinWorkspaceByInvite(codeRaw) {
-      if (!currentUser) {
-        showToast("Увійди через Google для приєднання", "error");
-        return;
-      }
+      if (!currentUser) return showToast("Увійди через Google для приєднання", "error");
       const code = codeRaw.trim().toUpperCase();
-      const q = query(collection(db, "workspaces"), where("inviteCode", "==", code), limit(1));
-      const snap = await getDocs(q);
-
+      const snap = await getDocs(query(collection(db, "workspaces"), where("inviteCode", "==", code), limit(1)));
       if (snap.empty) throw new Error("Код не знайдено");
 
-      const wsDoc = snap.docs[0];
-      workspaceId = wsDoc.id;
-      workspaceData = wsDoc.data();
+      workspaceId = snap.docs[0].id;
+      workspaceData = snap.docs[0].data();
 
       await updateDoc(doc(db, "users", currentUser.uid), { workspaceId, role: "member" });
-      await setDoc(doc(db, "workspaces", workspaceId, "members", currentUser.uid), {
-        uid: currentUser.uid, email: currentUser.email || "", displayName: currentUser.displayName || "",
-        photoURL: currentUser.photoURL || "", role: "member", createdAt: serverTimestamp()
-      });
-
-      await subscribeMembers();
-      await subscribeEvents();
-      renderAll();
+      await setDoc(doc(db, "workspaces", workspaceId, "members", currentUser.uid), { uid: currentUser.uid, email: currentUser.email || "", displayName: currentUser.displayName || "", photoURL: currentUser.photoURL || "", role: "member", createdAt: serverTimestamp() });
+      await subscribeMembers(); await subscribeEvents(); renderAll();
     }
 
     async function loginGoogle() {
       try {
-        await setPersistence(auth, browserLocalPersistence);
-        await signInWithRedirect(auth, provider);
+        await signInWithPopup(auth, provider);
       } catch (error) {
-        showToast("Помилка входу: " + error.message, "error");
+        if (error.code === 'auth/popup-blocked') {
+          showToast("Перенаправляємо на Google...", "info");
+          await signInWithRedirect(auth, provider);
+        } else {
+          showToast("Помилка входу: " + error.message, "error");
+        }
       }
     }
 
     async function logoutGoogle() {
       try {
-        if (unsubEvents) unsubEvents();
-        if (unsubMembers) unsubMembers();
+        if (unsubEvents) unsubEvents(); if (unsubMembers) unsubMembers();
         await signOut(auth);
         currentUser = null; workspaceId = null; workspaceData = null; eventsState = [];
-        renderMembers([]); renderAll();
-        showToast("Вихід виконано", "success");
-      } catch (error) {
-        showToast("Помилка виходу: " + error.message, "error");
-      }
+        renderMembers([]); renderAll(); showToast("Вихід виконано", "success");
+      } catch (error) { showToast("Помилка виходу: " + error.message, "error"); }
     }
 
     async function bootAuth() {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        await getRedirectResult(auth);
-      } catch (error) {
-        console.error("Redirect Error:", error);
-      }
+      try { await getRedirectResult(auth); } catch (error) { console.error("Redirect Error:", error); }
 
       onAuthStateChanged(auth, async user => {
         currentUser = user || null;
-
         if (!currentUser) {
           workspaceId = null; workspaceData = null; eventsState = [];
           renderMembers([]); renderAll();
           document.getElementById("googleLoginBtn").style.display = "";
           document.getElementById("logoutBtn").style.display = "none";
-          document.getElementById("appLoader").classList.add("hidden"); // Ховаємо лоадер для гостя
+          document.getElementById("appLoader").classList.add("hidden");
           return;
         }
 
@@ -710,22 +599,13 @@
           await subscribeMembers();
           await subscribeEvents();
           renderAll();
-        } catch (error) {
-          showToast("Помилка завантаження даних", "error");
-        }
-        
-        // Ховаємо лоадер, коли все завантажилось
+        } catch (error) { showToast("Помилка завантаження даних", "error"); }
         document.getElementById("appLoader").classList.add("hidden");
       });
     }
 
-    // Event Listeners
     document.querySelectorAll("[data-tab]").forEach(btn => btn.addEventListener("click", () => setActiveTab(btn.dataset.tab)));
-    document.querySelector("[data-theme-toggle]").addEventListener("click", () => {
-      const root = document.documentElement;
-      root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
-    });
-    
+    document.querySelector("[data-theme-toggle]").addEventListener("click", () => { const root = document.documentElement; root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark"); });
     document.getElementById("googleLoginBtn").addEventListener("click", loginGoogle);
     document.getElementById("logoutBtn").addEventListener("click", logoutGoogle);
     document.getElementById("eventTime").value = nowTime();
@@ -733,42 +613,22 @@
     document.getElementById("eventForm").addEventListener("submit", async e => {
       e.preventDefault();
       try {
-        await addEvent({
-          eventType: document.getElementById("eventType").value,
-          byName: document.getElementById("eventBy").value.trim(),
-          timeLabel: document.getElementById("eventTime").value || nowTime(),
-          trigger: document.getElementById("eventTrigger").value,
-          note: document.getElementById("eventNote").value.trim()
-        });
-        e.target.reset();
-        document.getElementById("eventTime").value = nowTime();
-        // Відправляємо юзера на дашборд подивитись запис
-        setActiveTab('dashboard');
-      } catch (error) {
-        showToast(error.message, "error");
-      }
+        await addEvent({ eventType: document.getElementById("eventType").value, byName: document.getElementById("eventBy").value.trim(), timeLabel: document.getElementById("eventTime").value || nowTime(), trigger: document.getElementById("eventTrigger").value, note: document.getElementById("eventNote").value.trim() });
+        e.target.reset(); document.getElementById("eventTime").value = nowTime(); setActiveTab('dashboard');
+      } catch (error) { showToast(error.message, "error"); }
     });
 
     document.getElementById("copyInviteBtn").addEventListener("click", async () => {
       if (!workspaceData?.inviteCode) return showToast("Код ще недоступний", "error");
-      await navigator.clipboard.writeText(workspaceData.inviteCode);
-      showToast("Код скопійовано!", "success");
+      await navigator.clipboard.writeText(workspaceData.inviteCode); showToast("Код скопійовано!", "success");
     });
 
     document.getElementById("joinWorkspaceForm").addEventListener("submit", async e => {
       e.preventDefault();
-      try {
-        await joinWorkspaceByInvite(document.getElementById("inviteCodeInput").value);
-        document.getElementById("inviteCodeInput").value = "";
-        showToast("Успішно приєднано до простору!", "success");
-      } catch (error) {
-        showToast(error.message || "Не вдалося приєднатись", "error");
-      }
+      try { await joinWorkspaceByInvite(document.getElementById("inviteCodeInput").value); document.getElementById("inviteCodeInput").value = ""; showToast("Успішно приєднано до простору!", "success"); } catch (error) { showToast(error.message || "Не вдалося приєднатись", "error"); }
     });
 
-    // Стартуємо логіку
-    renderAll();
-    bootAuth();
+    renderAll(); bootAuth();
   </script>
 </body>
 </html>

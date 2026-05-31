@@ -7,26 +7,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Doggo Coach">
-  <meta name="mobile-web-app-capable" content="yes">
   <title>Doggo Coach</title>
-  <link rel="manifest" href="./manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css">
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script type="module" defer src="./app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="appLoader">
-    <div class="loader-wrap">
-      <div class="loader-dot"></div>
-      <p>Запускаємо Doggo Coach…</p>
-    </div>
-  </div>
-
   <div id="toastContainer"></div>
   <div id="confettiCanvas"></div>
 
@@ -35,327 +24,184 @@
       <div class="auth-illustration">🐶</div>
       <h1 class="auth-title">Doggo Coach</h1>
       <p class="auth-subtitle">Розумний щоденник виховання собаки</p>
-      <div class="auth-pills">
-        <span>Безкоштовно</span>
-        <span>Синхронізація</span>
-        <span>Офлайн потім</span>
-      </div>
+      <div class="auth-pills"><span>Безкоштовно</span><span>Синхронізація</span><span>Офлайн</span></div>
       <button id="googleLoginBtn" class="btn-google" type="button">Увійти через Google</button>
-      <p class="auth-hint">Один сімейний простір для всіх записів, прогресу й навчання.</p>
+      <p class="auth-hint">Для родини, навчання і щоденних записів</p>
     </div>
   </section>
 
   <section id="onboarding" class="hidden">
     <div id="ob1" class="ob-screen active">
-      <div class="ob-illustration">👋</div>
-      <h2>Давайте налаштуємо Doggo Coach</h2>
-      <p>Кілька коротких кроків — і застосунок одразу підлаштується під вашого песика.</p>
-      <button id="obNext1" class="btn-primary" type="button">Почати</button>
-    </div>
-
-    <div id="ob2" class="ob-screen">
       <div class="ob-illustration">🐾</div>
-      <h2>Розкажіть про собаку</h2>
-      <input id="obName" class="ob-input" type="text" placeholder="Ім'я собаки">
+      <h2>Давайте налаштуємо Doggo Coach</h2>
+      <p>Ми підберемо базовий режим під вік і формат туалету.</p>
+      <button id="obNext1" class="btn-primary" type="button">Далі</button>
+    </div>
+    <div id="ob2" class="ob-screen">
+      <div class="ob-illustration">📅</div>
+      <h2>Коли народився песик?</h2>
       <input id="obBirth" class="ob-input" type="date">
       <button id="obNext2" class="btn-primary" type="button">Далі</button>
     </div>
-
     <div id="ob3" class="ob-screen">
-      <div class="ob-illustration">🚽</div>
-      <h2>Який зараз режим туалету?</h2>
+      <div class="ob-illustration">🧻</div>
+      <h2>Як зараз із туалетом?</h2>
       <div class="ob-options">
-        <button class="ob-option active" type="button" data-mode="pad">🧻 Пелюшка</button>
-        <button class="ob-option" type="button" data-mode="outdoor">🌳 Вулиця</button>
-        <button class="ob-option" type="button" data-mode="mix">🔁 Змішаний</button>
+        <button type="button" class="ob-option active" data-mode="pad">Пелюшка</button>
+        <button type="button" class="ob-option" data-mode="outdoor">Вулиця</button>
       </div>
-      <button id="obFinish" class="btn-primary" type="button">Готово</button>
+      <input id="obName" class="ob-input" type="text" placeholder="Ім'я песика">
+      <button id="obFinish" class="btn-primary" type="button">Почати</button>
     </div>
-
-    <div class="ob-dots">
-      <span class="ob-dot active"></span>
-      <span class="ob-dot"></span>
-      <span class="ob-dot"></span>
-    </div>
+    <div class="ob-dots"><span class="ob-dot active"></span><span class="ob-dot"></span><span class="ob-dot"></span></div>
   </section>
 
-  <div id="appContent" class="app-shell hidden">
+  <section id="appContent" class="hidden">
     <header class="app-header">
       <div class="header-user">
-        <div id="userAvatar" class="user-avatar">П</div>
+        <div id="userAvatar" class="user-avatar"></div>
         <div class="header-info">
           <strong id="petNameHeader">Песик</strong>
-          <div id="headerSub" class="header-sub">Вік не вказаний · Режим дня</div>
+          <span id="headerSub" class="header-sub">—</span>
         </div>
       </div>
       <div class="header-actions">
-        <button class="header-btn" type="button" data-theme-toggle aria-label="Змінити тему">◐</button>
-        <button id="logoutBtn" class="header-btn hidden" type="button" aria-label="Вийти">↗</button>
+        <button class="header-btn" type="button" data-theme-toggle aria-label="Theme">🌓</button>
+        <button id="logoutBtn" class="header-btn hidden" type="button" aria-label="Logout">↩</button>
       </div>
     </header>
 
     <main class="app-main">
+      <section class="streak-bar"><span class="streak-fire">🔥</span><span class="streak-text">Сьогодні активних дій: <strong id="streakValue">0</strong></span></section>
+
       <section id="tabToday" class="tab-panel active">
-        <div id="weekCalendar" class="week-strip"></div>
-
-        <div class="hero-card">
-          <div>
-            <span class="hero-kicker">Сьогодні</span>
-            <h2>Короткий контроль дня</h2>
-            <p>Швидко додавай події, дивись підказки і тримай рутину під контролем.</p>
+        <div class="progress-section">
+          <div class="progress-ring-wrap">
+            <svg viewBox="0 0 100 100" class="progress-ring"><circle cx="50" cy="50" r="42" class="ring-bg"></circle><circle cx="50" cy="50" r="42" class="ring-fill"></circle></svg>
+            <div class="ring-center"><span id="ageSummaryBadge" class="ring-pct">—</span><span class="ring-label">вік</span></div>
           </div>
-          <div class="hero-badge">🐶</div>
+          <div class="progress-stats">
+            <div class="p-stat s-success"><span class="p-lbl">Пелюшка</span><strong id="kpiPad" class="p-val">0</strong></div>
+            <div class="p-stat s-success"><span class="p-lbl">Вулиця</span><strong id="kpiOutdoor" class="p-val">0</strong></div>
+            <div class="p-stat s-danger"><span class="p-lbl">Промах</span><strong id="kpiMiss" class="p-val">0</strong></div>
+          </div>
         </div>
 
-        <section id="suggestionCard" class="suggestion-card hidden">
-          <div class="suggestion-icon">💡</div>
-          <div>
-            <span class="suggestion-badge">Розумна порада</span>
-            <p id="suggestionText"></p>
-          </div>
-        </section>
+        <div id="suggestionCard" class="suggestion-card"><div class="suggestion-icon">💡</div><div><span class="suggestion-badge">Порада</span><p id="suggestionText">—</p></div></div>
 
-        <section class="kpi-grid">
-          <article class="kpi-card success">
-            <strong id="kpiPad">0</strong>
-            <span>🧻 Пелюшка</span>
-          </article>
-          <article class="kpi-card primary">
-            <strong id="kpiOutdoor">0</strong>
-            <span>🌳 Вулиця</span>
-          </article>
-          <article class="kpi-card danger">
-            <strong id="kpiMiss">0</strong>
-            <span>❌ Промах</span>
-          </article>
-          <article class="kpi-card">
-            <strong id="kpiTotal">0</strong>
-            <span>Усі записи</span>
-          </article>
-        </section>
+        <div class="quick-grid">
+          <button class="q-btn q-success" data-quick-event="pad" type="button"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
+          <button class="q-btn q-success" data-quick-event="outdoor" type="button"><span class="q-icon">🌳</span><span>Вулиця</span></button>
+          <button class="q-btn q-danger" data-quick-event="miss" type="button"><span class="q-icon">❌</span><span>Промах</span></button>
+          <button class="q-btn q-neutral" data-quick-event="feed" type="button"><span class="q-icon">🍖</span><span>Їжа</span></button>
+          <button class="q-btn q-neutral" data-quick-event="sleep" type="button"><span class="q-icon">😴</span><span>Сон</span></button>
+          <button class="q-btn q-accent" data-quick-event="training" type="button"><span class="q-icon">🎓</span><span>Тренування</span></button>
+        </div>
 
-        <section class="card daily-card">
-          <div class="daily-header">
-            <h3>📋 План на сьогодні</h3>
-            <span id="dailyProgressBadge" class="daily-badge">0/3</span>
-          </div>
+        <div class="daily-card">
+          <div class="daily-header"><h3>Сьогодні</h3><span id="dailyProgressBadge" class="daily-badge">0/3</span></div>
           <div id="dailyItems"></div>
-        </section>
-
-        <section>
-          <div class="section-header">
-            <h2>Швидкі дії</h2>
-            <span class="subtle">Одним тапом</span>
-          </div>
-          <div class="quick-grid">
-            <button class="q-btn q-success" type="button" data-quick-event="pad"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
-            <button class="q-btn q-accent" type="button" data-quick-event="outdoor"><span class="q-icon">🌳</span><span>Вулиця</span></button>
-            <button class="q-btn q-danger" type="button" data-quick-event="miss"><span class="q-icon">❌</span><span>Промах</span></button>
-            <button class="q-btn q-neutral" type="button" data-quick-event="feed"><span class="q-icon">🍖</span><span>Їжа</span></button>
-            <button class="q-btn q-neutral" type="button" data-quick-event="sleep"><span class="q-icon">😴</span><span>Сон</span></button>
-            <button class="q-btn q-neutral" type="button" data-quick-event="training"><span class="q-icon">🎓</span><span>Тренування</span></button>
-          </div>
-        </section>
-      </section>
-
-      <section id="tabLearn" class="tab-panel">
-        <div class="hero-card hero-card-learn">
-          <div>
-            <span class="hero-kicker">Навчання</span>
-            <h2>Що зараз найважливіше</h2>
-            <p>Фокус на віковому етапі, конкретні курси і коротка база знань без води.</p>
-          </div>
-          <span id="ageSummaryBadge" class="badge badge-purple">Етап</span>
         </div>
 
-        <div class="section-header">
-          <h2>Курси</h2>
-          <span class="subtle">Обери тему</span>
-        </div>
-        <div id="courseGrid" class="course-grid"></div>
-        <div id="selectedCourse" class="selected-course hidden"></div>
-
-        <div class="section-header mt-4">
-          <h2>База знань</h2>
-          <span class="subtle">Коротко і по суті</span>
-        </div>
-        <div id="knowledgeGrid" class="knowledge-grid"></div>
-      </section>
-
-      <section id="tabDiary" class="tab-panel">
-        <div class="hero-card hero-card-diary">
-          <div>
-            <span class="hero-kicker">Щоденник</span>
-            <h2>Динаміка і записи</h2>
-            <p>Дивись прогрес за 14 днів і швидко знаходь, що саме відбувалося протягом дня.</p>
-          </div>
-          <div class="hero-badge">📈</div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Прогрес за 14 днів</h3><span class="subtle">успіх / промах</span></div>
+          <canvas id="progressChart" height="140"></canvas>
         </div>
 
-        <section class="card chart-card">
-          <div class="chart-header">
-            <h3>Прогрес за 14 днів</h3>
-            <span class="subtle">успіх vs промахи</span>
-          </div>
-          <canvas id="progressChart" height="180"></canvas>
-        </section>
+        <div class="weekly-card hidden" id="weeklyCard"><div class="weekly-header"><h3>Щотижневий звіт</h3><button class="btn-icon" type="button">×</button></div><div id="weeklyContent"></div></div>
 
-        <div class="section-header">
-          <h2>Активність</h2>
-          <span class="subtle">Останні записи</span>
-        </div>
+        <div class="section-header"><h2>Активність</h2><span class="subtle" id="kpiTotal">0</span></div>
         <div id="recentLogs" class="feed"></div>
       </section>
 
-      <section id="tabProfile" class="tab-panel">
-        <section class="profile-hero">
-          <div id="profileAvatarBig" class="profile-avatar-big">🐶</div>
-          <h3 id="profileName">Песик</h3>
-          <p id="profileMeta" class="profile-meta">Порода не вказана · Вік не вказаний</p>
-        </section>
+      <section id="tabLearn" class="tab-panel">
+        <div class="section-header"><h2>Навчання</h2><span id="ageSummaryBadge2" class="age-pill">—</span></div>
+        <div class="plan-card"><h3>Фокус періоду</h3><div id="periodFocus"></div></div>
+        <div class="section-header"><h2>Курси</h2></div>
+        <div id="courseGrid" class="course-list"></div>
+        <div id="selectedCourse"></div>
+        <div class="section-header"><h2>База знань</h2></div>
+        <div id="knowledgeGrid" class="knowledge-list"></div>
+        <div class="section-header"><h2>Соціалізація</h2></div>
+        <div id="socialGrid" class="social-list"></div>
+        <div class="section-header"><h2>Туалет</h2></div>
+        <div id="toiletGuide" class="knowledge-list"></div>
+      </section>
 
-        <section class="card card-form">
-          <div class="section-header">
-            <h2>Профіль собаки</h2>
-            <span class="subtle">Основні дані</span>
-          </div>
-          <form id="petProfileForm" class="form-stack">
-            <div class="field full">
-              <label for="petName">Ім'я</label>
-              <input id="petName" type="text" placeholder="Наприклад, Белла">
+      <section id="tabDiary" class="tab-panel">
+        <div class="section-header"><h2>Щоденник</h2><span class="subtle">лог подій</span></div>
+        <div class="chart-card"><div class="chart-header"><h3>Прогрес за 14 днів</h3><span class="subtle">відкривається швидко</span></div><canvas id="progressChartDiary" height="140"></canvas></div>
+        <div id="recentLogsDiary" class="feed"></div>
+      </section>
+
+      <section id="tabProfile" class="tab-panel">
+        <div class="profile-hero"><div class="profile-avatar-big">🐶</div><h3 id="profileName">Песик</h3><p id="profileMeta" class="profile-meta">—</p></div>
+        <div class="card-elevated">
+          <form id="petProfileForm">
+            <div class="form-row">
+              <div class="field"><label for="petName">Ім'я</label><input id="petName" type="text" placeholder="Мій песик"></div>
+              <div class="field"><label for="petBirthDate">Дата народження</label><input id="petBirthDate" type="date"></div>
             </div>
             <div class="form-row">
-              <div class="field">
-                <label for="petBirthDate">Дата народження</label>
-                <input id="petBirthDate" type="date">
-              </div>
-              <div class="field">
-                <label for="petSex">Стать</label>
-                <select id="petSex">
-                  <option value="хлопчик">Хлопчик</option>
-                  <option value="дівчинка">Дівчинка</option>
-                </select>
-              </div>
+              <div class="field"><label for="petSex">Стать</label><select id="petSex"><option value="хлопчик">Хлопчик</option><option value="дівчинка">Дівчинка</option></select></div>
+              <div class="field"><label for="petBreed">Порода</label><input id="petBreed" type="text" placeholder="Мікс / порода"></div>
             </div>
-            <div class="field full">
-              <label for="petBreed">Порода</label>
-              <input id="petBreed" type="text" placeholder="Наприклад, коргі">
-            </div>
-            <div class="field full">
-              <label for="petToiletMode">Режим туалету</label>
-              <select id="petToiletMode">
-                <option value="pad">Пелюшка</option>
-                <option value="outdoor">Вулиця</option>
-                <option value="mix">Змішаний</option>
-              </select>
-            </div>
-            <button class="btn-primary" type="submit">Зберегти профіль</button>
+            <div class="field full"><label for="petToiletMode">Туалет</label><select id="petToiletMode"><option value="pad">Пелюшка</option><option value="outdoor">Вулиця</option></select></div>
+            <button class="btn-primary" type="submit">Зберегти</button>
           </form>
-        </section>
+        </div>
 
-        <section class="card">
-          <div class="section-header">
-            <h2>Сімейний простір</h2>
-            <span class="subtle">Синхронізація</span>
+        <div class="card-elevated">
+          <div class="section-header"><h2>Простір</h2><span class="subtle">код запрошення</span></div>
+          <div class="family-row"><span>Простір:</span><strong id="workspaceName">—</strong></div>
+          <div class="family-row"><span>Код:</span><code id="inviteCodeView">—</code></div>
+          <button id="copyInviteBtn" class="btn-sm" type="button">Скопіювати код</button>
+          <div class="join-row">
+            <form id="joinWorkspaceForm" style="display:flex;gap:.4rem;width:100%">
+              <input id="inviteCodeInput" type="text" placeholder="Ввести код">
+              <button class="btn-sm" type="submit">Приєднатись</button>
+            </form>
           </div>
-          <div class="info-stack">
-            <div class="info-row">
-              <span>Простір</span>
-              <strong id="workspaceName">—</strong>
-            </div>
-            <div class="code-box">
-              <div>
-                <div class="meta">Код запрошення</div>
-                <code id="inviteCodeView">—</code>
-              </div>
-              <button id="copyInviteBtn" class="btn-secondary btn-inline" type="button">Копіювати</button>
-            </div>
-          </div>
-        </section>
+        </div>
 
-        <section class="card">
-          <div class="section-header">
-            <h2>Учасники</h2>
-            <span class="subtle">Хто має доступ</span>
-          </div>
-          <div id="membersList" class="members-list"></div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h2>Приєднатися за кодом</h2>
-            <span class="subtle">Інший простір</span>
-          </div>
-          <form id="joinWorkspaceForm" class="join-form">
-            <input id="inviteCodeInput" type="text" placeholder="Введіть код запрошення" autocomplete="off">
-            <button class="btn-primary" type="submit">Приєднатися</button>
-          </form>
-        </section>
+        <div class="card-elevated"><div class="section-header"><h2>Сім'я</h2></div><div id="membersList" class="members-grid"></div></div>
       </section>
     </main>
 
-    <button id="fabAddEvent" class="fab" type="button" aria-label="Додати подію">＋</button>
-
-    <nav class="bottom-nav" aria-label="Основна навігація">
-      <button class="nav-tab active" type="button" data-tab="tabToday">
-        <span>☀️</span>
-        <span>Сьогодні</span>
-      </button>
-      <button class="nav-tab" type="button" data-tab="tabLearn">
-        <span>🎓</span>
-        <span>Навчання</span>
-      </button>
-      <button class="nav-tab" type="button" data-tab="tabDiary">
-        <span>📈</span>
-        <span>Щоденник</span>
-      </button>
-      <button class="nav-tab" type="button" data-tab="tabProfile">
-        <span>👤</span>
-        <span>Профіль</span>
-      </button>
+    <nav class="bottom-nav">
+      <button class="nav-tab active" data-tab="tabToday" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10.5V20h14v-9.5"></path></svg><span>Сьогодні</span></button>
+      <button class="nav-tab" data-tab="tabLearn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 4 2 9l10 5 10-5-10-5Z"></path><path d="M6 11v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"></path></svg><span>Навчання</span></button>
+      <button class="nav-tab" data-tab="tabDiary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 2v4M16 2v4M4 10h16"></path></svg><span>Щоденник</span></button>
+      <button class="nav-tab" data-tab="tabProfile" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"></path><path d="M4 20a8 8 0 0 1 16 0"></path></svg><span>Профіль</span></button>
     </nav>
-  </div>
 
-  <section id="eventSheet" class="sheet-overlay hidden" aria-hidden="true">
+    <button id="fabAddEvent" type="button" class="btn-primary" style="position:fixed;right:16px;bottom:92px;width:auto;padding:.85rem 1rem;z-index:150;box-shadow:var(--shadow-lg)">＋ Подія</button>
+  </section>
+
+  <div id="eventSheet" class="sheet-overlay hidden">
     <div id="sheetBackdrop" class="sheet-backdrop"></div>
     <div class="sheet-panel">
       <div class="sheet-handle"></div>
       <h3>Додати подію</h3>
-
-      <div class="sheet-grid">
-        <button class="q-btn q-success" type="button" data-quick-event="pad"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
-        <button class="q-btn q-accent" type="button" data-quick-event="outdoor"><span class="q-icon">🌳</span><span>Вулиця</span></button>
-        <button class="q-btn q-danger" type="button" data-quick-event="miss"><span class="q-icon">❌</span><span>Промах</span></button>
-        <button class="q-btn q-neutral" type="button" data-quick-event="feed"><span class="q-icon">🍖</span><span>Їжа</span></button>
-        <button class="q-btn q-neutral" type="button" data-quick-event="sleep"><span class="q-icon">😴</span><span>Сон</span></button>
-        <button class="q-btn q-neutral" type="button" data-quick-event="training"><span class="q-icon">🎓</span><span>Тренування</span></button>
+      <div class="quick-grid" style="margin-bottom:.8rem">
+        <button class="q-btn q-success" data-quick-event="pad" type="button"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
+        <button class="q-btn q-success" data-quick-event="outdoor" type="button"><span class="q-icon">🌳</span><span>Вулиця</span></button>
+        <button class="q-btn q-danger" data-quick-event="miss" type="button"><span class="q-icon">❌</span><span>Промах</span></button>
       </div>
-
-      <form id="eventForm" class="form-stack mt-3">
-        <div class="field full">
-          <label for="eventType">Тип події</label>
-          <select id="eventType">
-            <option value="pad">Пелюшка</option>
-            <option value="outdoor">Вулиця</option>
-            <option value="miss">Промах</option>
-            <option value="feed">Їжа</option>
-            <option value="sleep">Сон</option>
-            <option value="training">Тренування</option>
-            <option value="walk">Прогулянка</option>
-            <option value="note">Нотатка</option>
-          </select>
+      <form id="eventForm">
+        <div class="form-row">
+          <div class="field"><label for="eventType">Тип</label><select id="eventType"><option value="note">Нотатка</option><option value="feed">Їжа</option><option value="water">Вода</option><option value="sleep">Сон</option><option value="walk">Прогулянка</option><option value="training">Тренування</option></select></div>
+          <div class="field"><label for="eventTime">Час</label><input id="eventTime" type="time"></div>
         </div>
-        <div class="field full">
-          <label for="eventTime">Час</label>
-          <input id="eventTime" type="time">
-        </div>
-        <div class="field full">
-          <label for="eventNote">Нотатка</label>
-          <textarea id="eventNote" placeholder="Наприклад: після сну, одразу на вулицю — успіх"></textarea>
-        </div>
-        <button class="btn-primary" type="submit">Зберегти подію</button>
+        <div class="field full"><label for="eventNote">Нотатка</label><textarea id="eventNote" rows="3" placeholder="Що сталося?"></textarea></div>
+        <button class="btn-primary" type="submit">Зберегти</button>
       </form>
     </div>
-  </section>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

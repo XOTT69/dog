@@ -155,7 +155,7 @@ textarea{resize:vertical}
 .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.8rem;margin-bottom:.8rem;box-shadow:var(--shadow-sm)}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
 .chart-header h3{font-size:.82rem;font-weight:800}
-#progressChart{width:100%;display:block}
+#progressChart,#progressChartDiary{width:100%;display:block;max-width:100%}
 
 .suggestion-card{display:flex;gap:.8rem;padding:.9rem;background:linear-gradient(135deg,var(--primary-soft),var(--surface));border:1px solid var(--primary);border-radius:var(--radius);margin-bottom:.8rem;position:relative;overflow:hidden}
 .suggestion-icon{font-size:1.5rem;flex-shrink:0}
@@ -282,6 +282,14 @@ textarea{resize:vertical}
 .sheet-panel h3{font-size:.95rem;font-weight:800;margin-bottom:.8rem}
 
 .mt-6{margin-top:1.2rem}
+
+.day-pill{display:flex;flex-direction:column;align-items:center;gap:.15rem;padding:.45rem .35rem;border-radius:12px;background:var(--surface2);border:1px solid var(--line);min-width:38px}
+.day-pill.active{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+.day-name{font-size:.58rem;font-weight:800;color:var(--muted)}
+.day-num{font-size:.78rem;font-weight:900}
+.plan-item strong{display:block;margin-bottom:.15rem;color:var(--text)}
+.plan-item{font-size:.76rem;line-height:1.5}
+.chart-card canvas{max-width:100%}
 
 @media(min-width:768px){
   .app-main{max-width:560px;padding:1.2rem 1.2rem calc(var(--nav-h) + 1.5rem)}

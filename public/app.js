@@ -67,14 +67,13 @@ function renderHeader() {
   $('ageSummaryBadge').textContent = program.stage;
   $('ageSummaryBadge2').textContent = program.stage;
   const avatar = $('userAvatar');
-  avatar.innerHTML = currentUser?.photoURL ? `<img src="${currentUser.photoURL}" alt="user">` : avatarLetter(currentUser?.displayName || petName);
+  if (avatar) avatar.innerHTML = currentUser?.photoURL ? `<img src="${currentUser.photoURL}" alt="user">` : avatarLetter(currentUser?.displayName || petName);
 }
 
 function renderAgeFocus() {
   const weeks = getAgeInWeeks(currentPet?.birthDate);
   const program = getProgramByAge(weeks);
-  const box = $('periodFocus');
-  if (!box) return;
+  const box = $('periodFocus'); if (!box) return;
   box.innerHTML = `
     <div class="plan-item"><strong>Пріоритети</strong><br>${program.priorities.map(x => `• ${x}`).join('<br>')}</div>
     <div class="plan-item"><strong>План на зараз</strong><br>${program.plan.map(x => `• ${x}`).join('<br>')}</div>
@@ -114,6 +113,11 @@ function renderKpis() {
   $('kpiMiss').textContent = todayEvents.filter(e => e.eventType === 'miss').length;
   $('kpiTotal').textContent = eventsState.length;
   $('streakValue').textContent = todayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
+  const total = Math.max(1, todayEvents.filter(e => ['pad', 'outdoor', 'miss'].includes(e.eventType)).length);
+  const success = todayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
+  const pct = Math.round(success / total * 100);
+  $('ringPct').textContent = `${pct}%`;
+  const ring = $('ringFill'); if (ring) ring.style.strokeDashoffset = String(264 - (264 * pct / 100));
 }
 
 function renderSuggestion() {
@@ -205,7 +209,11 @@ function renderFeed(targetId = 'recentLogs') {
   $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => { if (!confirm('Видалити запис?')) return; await deleteEvent(btn.dataset.deleteEvent); }));
 }
 
-function renderAll() { renderHeader(); renderAgeFocus(); renderWeekCalendar(); renderDailyPlan(); renderKpis(); renderSuggestion(); renderFeed('recentLogs'); renderFeed('recentLogsDiary'); renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide(); renderMembers(); renderWorkspaceMeta(); fillPetForm(); requestAnimationFrame(() => { renderChart('progressChart'); renderChart('progressChartDiary'); }); }
+function renderAll() {
+  renderHeader(); renderAgeFocus(); renderWeekCalendar(); renderDailyPlan(); renderKpis(); renderSuggestion(); renderFeed('recentLogs'); renderFeed('recentLogsDiary'); renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide(); renderMembers(); renderWorkspaceMeta(); fillPetForm();
+  requestAnimationFrame(() => { renderChart('progressChart'); renderChart('progressChartDiary'); });
+}
+
 function setActiveTab(id) { $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === id)); $$('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id)); setVisible($('fabAddEvent'), id !== 'tabProfile'); if (id === 'tabDiary') requestAnimationFrame(() => renderChart('progressChartDiary')); }
 function openSheet() { setVisible($('eventSheet'), true); $('eventTime').value = nowTime(); }
 function closeSheet() { setVisible($('eventSheet'), false); }

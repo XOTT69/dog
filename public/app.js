@@ -20,12 +20,21 @@ const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
+db.enablePersistence({ synchronizeTabs: true }).catch(function () {});
+
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-let currentUser = null, workspaceId = null, workspaceData = null, currentPet = null;
-let eventsState = [], membersState = [], currentCourseId = 'pee-pad';
-let unsubEvents = null, unsubMembers = null, unsubPet = null;
+let currentUser = null;
+let workspaceId = null;
+let workspaceData = null;
+let currentPet = null;
+let eventsState = [];
+let membersState = [];
+let currentCourseId = 'pee-pad';
+let unsubEvents = null;
+let unsubMembers = null;
+let unsubPet = null;
 let themeMode = localStorage.getItem('doggo_theme') || 'light';
 let dailyDone = JSON.parse(localStorage.getItem('doggo_daily_done') || '{}');
 
@@ -38,13 +47,17 @@ const avatarLetter = (name = 'П') => ((name.trim()[0] || 'П').toUpperCase());
 const createdToDate = (ts) => ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
 
 function toast(msg, type = '') {
-  const box = $('toastContainer'); if (!box) return;
+  const box = $('toastContainer');
+  if (!box) return;
   const el = document.createElement('div');
   el.className = `toast ${type}`.trim();
   el.textContent = msg;
   box.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); }, 2600);
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 2600);
 }
 
 function setTheme(mode) {
@@ -106,7 +119,7 @@ function renderDailyPlan() {
   $$('[data-daily-index]').forEach(cb => cb.addEventListener('change', () => {
     const key = todayKey();
     dailyDone[key] = dailyDone[key] || {};
-    dailyDone[key][cb.dataset.dailyIndex] = cb.checked;
+    dailyDone[key][cb.dataset.dailymarker || cb.dataset.dailyIndex] = cb.checked;
     localStorage.setItem('doggo_daily_done', JSON.stringify(dailyDone));
     renderDailyPlan();
   }));
@@ -153,7 +166,11 @@ function renderCourses() {
       <strong>${course.title}</strong>
       <div class="c-meta">${course.description}</div>
     </button>`).join('');
-  $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => { currentCourseId = btn.dataset.courseId; renderCourses(); haptic(); }));
+  $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => {
+    currentCourseId = btn.dataset.courseId;
+    renderCourses();
+    haptic();
+  }));
   const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
   viewer.innerHTML = `<div class="course-detail"><h3>${course.title}</h3><p class="mt-6">${course.description}</p><h4>Кроки</h4><ul>${course.steps.map(s => `<li>${s}</li>`).join('')}</ul><h4>Не робити</h4><ul class="mistakes">${course.mistakes.map(s => `<li>${s}</li>`).join('')}</ul><h4>Чекліст</h4><ul class="checks">${course.checklist.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
 }
@@ -176,22 +193,38 @@ function renderToiletGuide() {
 function renderMembers() {
   const list = $('membersList');
   if (!list) return;
-  list.innerHTML = membersState.length ? membersState.map(m => `<div class="member-chip"><div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="user">` : avatarLetter(m.displayName)}</div><span>${m.displayName || 'Учасник'}</span></div>`).join('') : '<div class="empty">Поки що тут тільки ви.</div>';
+  list.innerHTML = membersState.length
+    ? membersState.map(m => `<div class="member-chip"><div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="user">` : avatarLetter(m.displayName)}</div><span>${m.displayName || 'Учасник'}</span></div>`).join('')
+    : '<div class="empty">Поки що тут тільки ви.</div>';
 }
 
-function renderWorkspaceMeta() { $('inviteCodeView').textContent = workspaceData?.inviteCode || '—'; }
-function fillPetForm() { $('petName').value = currentPet?.name || ''; $('petBirthDate').value = currentPet?.birthDate || ''; $('petSex').value = currentPet?.sex || 'хлопчик'; $('petBreed').value = currentPet?.breed || ''; $('petToiletMode').value = currentPet?.toiletMode || 'pad'; }
+function renderWorkspaceMeta() {
+  $('inviteCodeView').textContent = workspaceData?.inviteCode || '—';
+}
+function fillPetForm() {
+  $('petName').value = currentPet?.name || '';
+  $('petBirthDate').value = currentPet?.birthDate || '';
+  $('petSex').value = currentPet?.sex || 'хлопчик';
+  $('petBreed').value = currentPet?.breed || '';
+  $('petToiletMode').value = currentPet?.toiletMode || 'pad';
+}
 
 function renderFeed(targetId = 'recentLogs') {
   const list = $(targetId);
   if (!list) return;
-  if (!eventsState.length) { list.innerHTML = '<div class="empty">Поки що немає записів. Натисни + і додай першу подію.</div>'; return; }
+  if (!eventsState.length) {
+    list.innerHTML = '<div class="empty">Поки що немає записів. Натисни + і додай першу подію.</div>';
+    return;
+  }
   list.innerHTML = eventsState.slice(0, 20).map(item => {
     const conf = TYPE_CONFIG[item.eventType] || { icon: '•', label: 'Подія', tone: '' };
     const d = createdToDate(item.createdAt);
     return `<div class="feed-item" data-event-id="${item.id}"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${d ? d.toLocaleString('uk') : ''}${item.note ? ` · ${item.note}` : ''}</div></div><button type="button" class="btn-sm" data-delete-event="${item.id}">Видалити</button></div>`;
   }).join('');
-  $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => { if (!confirm('Видалити запис?')) return; await deleteEvent(btn.dataset.deleteEvent); }));
+  $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Видалити запис?')) return;
+    await deleteEvent(btn.dataset.deleteEvent);
+  }));
 }
 
 function renderChart(canvasId) {
@@ -301,10 +334,16 @@ function setActiveTab(id) {
 
 function openSheet() { setVisible($('eventSheet'), true); $('eventTime').value = nowTime(); }
 function closeSheet() { setVisible($('eventSheet'), false); }
+
 function savePetProfile(payload) {
   if (!currentUser || !workspaceId) return;
-  return db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ ...(currentPet || {}), ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  return db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({
+    ...(currentPet || {}),
+    ...payload,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
 }
+
 function addEvent(payload) {
   if (!currentUser || !workspaceId) return;
   return db.collection('workspaces').doc(workspaceId).collection('events').add({
@@ -317,7 +356,11 @@ function addEvent(payload) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 }
-function deleteEvent(id) { if (!workspaceId || !id) return Promise.resolve(); return db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete(); }
+
+function deleteEvent(id) {
+  if (!workspaceId || !id) return Promise.resolve();
+  return db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
+}
 
 async function ensureWorkspaceForUser(user) {
   const udoc = await db.collection('users').doc(user.uid).get();
@@ -345,6 +388,7 @@ function subscribePet() {
     renderAll();
   });
 }
+
 function subscribeMembers() {
   if (!workspaceId) return;
   unsubMembers?.();
@@ -354,6 +398,7 @@ function subscribeMembers() {
     renderMembers();
   });
 }
+
 function subscribeEvents() {
   if (!workspaceId) return;
   unsubEvents?.();
@@ -373,22 +418,36 @@ async function joinWorkspaceByInvite(code) {
   workspaceData = snap.docs[0].data();
   await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', workspaceId }, { merge: true });
   await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-  subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
+  subscribePet();
+  subscribeMembers();
+  subscribeEvents();
+  renderAll();
 }
 
 async function loginGoogle() {
   try {
     await auth.signInWithPopup(googleProvider);
   } catch (e) {
-    try { await auth.signInWithRedirect(googleProvider); } catch (err) { toast(err.message || 'Login error', 'error'); }
+    try {
+      await auth.signInWithRedirect(googleProvider);
+    } catch (err) {
+      toast(err.message || 'Login error', 'error');
+    }
   }
 }
 
 async function logoutGoogle() {
-  unsubEvents?.(); unsubMembers?.(); unsubPet?.();
+  unsubEvents?.();
+  unsubMembers?.();
+  unsubPet?.();
   unsubEvents = unsubMembers = unsubPet = null;
   await auth.signOut();
-  currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = []; membersState = [];
+  currentUser = null;
+  workspaceId = null;
+  workspaceData = null;
+  currentPet = null;
+  eventsState = [];
+  membersState = [];
   setVisible($('appContent'), false);
   setVisible($('authScreen'), true);
 }
@@ -401,7 +460,10 @@ function bindEvents() {
   $('fabAddEvent')?.addEventListener('click', openSheet);
   $('sheetBackdrop')?.addEventListener('click', closeSheet);
   $$('.nav-tab').forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
-  $$('[data-quick-event]').forEach(btn => btn.addEventListener('click', async () => { await addEvent({ eventType: btn.dataset.quickEvent, timeLabel: nowTime() }); closeSheet(); }));
+  $$('[data-quick-event]').forEach(btn => btn.addEventListener('click', async () => {
+    await addEvent({ eventType: btn.dataset.quickEvent, timeLabel: nowTime() });
+    closeSheet();
+  }));
   $('eventForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     await addEvent({ eventType: $('eventType').value, timeLabel: $('eventTime').value || nowTime(), note: $('eventNote').value.trim() });
@@ -415,13 +477,22 @@ function bindEvents() {
   });
   $('copyInviteBtn')?.addEventListener('click', async () => {
     if (!workspaceData?.inviteCode) return;
-    try { await navigator.clipboard.writeText(workspaceData.inviteCode); toast('Код скопійовано', 'success'); }
-    catch { toast('Не вдалося скопіювати', 'error'); }
+    try {
+      await navigator.clipboard.writeText(workspaceData.inviteCode);
+      toast('Код скопійовано', 'success');
+    } catch {
+      toast('Не вдалося скопіювати', 'error');
+    }
   });
   $('joinWorkspaceForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    try { await joinWorkspaceByInvite($('inviteCodeInput').value); $('inviteCodeInput').value = ''; toast('Ви приєдналися', 'success'); }
-    catch (err) { toast(err.message || 'Не вдалося приєднатися', 'error'); }
+    try {
+      await joinWorkspaceByInvite($('inviteCodeInput').value);
+      $('inviteCodeInput').value = '';
+      toast('Ви приєдналися', 'success');
+    } catch (err) {
+      toast(err.message || 'Не вдалося приєднатися', 'error');
+    }
   });
 }
 
@@ -433,7 +504,10 @@ function bootAuth() {
     if (!currentUser) return;
     try {
       await ensureWorkspaceForUser(currentUser);
-      subscribePet(); subscribeMembers(); subscribeEvents(); renderAll();
+      subscribePet();
+      subscribeMembers();
+      subscribeEvents();
+      renderAll();
     } catch (e) {
       toast(e.message || 'Помилка запуску', 'error');
     }

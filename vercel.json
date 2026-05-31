@@ -4,10 +4,6 @@
     {
       "source": "/__/auth/:path*",
       "destination": "https://dogs-55f5e.firebaseapp.com/__/auth/:path*"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/proxy.js"
     }
   ]
 }

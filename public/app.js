@@ -1,7 +1,7 @@
 import { AGE_PROGRAMS, COURSES, KNOWLEDGE, SOCIAL_ITEMS, TOILET_GUIDE, TYPE_CONFIG } from './content.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
+  apiKey: 'AIzaSyCY2SKRPpopi7mtsihrlqocxdgG8cBjNHI',
   authDomain: 'dogsbelli.vercel.app',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
@@ -23,28 +23,16 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const avatarLetter = (name = 'П') => ((name.trim()[0] || 'П').toUpperCase());
 
-let currentUser = null;
-let workspaceId = null;
-let workspaceData = null;
-let currentPet = null;
-let eventsState = [];
-let membersState = [];
-let currentCourseId = 'pee-pad';
-let obMode = 'pad';
+let currentUser = null, workspaceId = null, workspaceData = null, currentPet = null;
+let eventsState = [], membersState = [], currentCourseId = 'pee-pad', obMode = 'pad';
 let themeMode = localStorage.getItem('doggo_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 let dailyDone = JSON.parse(localStorage.getItem('doggo_daily_done') || '{}');
-let unsubEvents = null;
-let unsubMembers = null;
-let unsubPet = null;
+let unsubEvents = null, unsubMembers = null, unsubPet = null;
 
 const haptic = (ms = 10) => { if (navigator.vibrate) navigator.vibrate(ms); };
 const toast = (msg, type = '') => {
-  const box = $('toastContainer');
-  if (!box) return;
-  const el = document.createElement('div');
-  el.className = `toast ${type}`.trim();
-  el.textContent = msg;
-  box.appendChild(el);
+  const box = $('toastContainer'); if (!box) return;
+  const el = document.createElement('div'); el.className = `toast ${type}`.trim(); el.textContent = msg; box.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); }, 2600);
 };
@@ -64,9 +52,9 @@ const getProgramByAge = (weeks) => {
   return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
 };
 const createInviteCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
-
-function setVisible(el, yes) { if (el) el.classList.toggle('hidden', !yes); }
-function timeSince(ts) { if (!ts) return ''; const d = ts.toDate ? ts.toDate() : new Date(ts); const m = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000)); if (m < 1) return 'щойно'; if (m < 60) return `${m} хв тому`; const h = Math.floor(m / 60); return `${h} год тому`; }
+const setVisible = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
+const createdToDate = (ts) => ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+const timeSince = (ts) => { const d = createdToDate(ts); if (!d) return ''; const m = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000)); if (m < 1) return 'щойно'; if (m < 60) return `${m} хв тому`; const h = Math.floor(m / 60); return `${h} год тому`; };
 
 function renderHeader() {
   const petName = currentPet?.name?.trim() || 'Песик';
@@ -76,9 +64,22 @@ function renderHeader() {
   $('headerSub').textContent = `${weekLabel(weeks)} · ${program.stage}`;
   $('profileName').textContent = petName;
   $('profileMeta').textContent = [currentPet?.breed || 'Порода не вказана', weekLabel(weeks)].join(' · ');
+  $('ageSummaryBadge').textContent = program.stage;
+  $('ageSummaryBadge2').textContent = program.stage;
   const avatar = $('userAvatar');
   avatar.innerHTML = currentUser?.photoURL ? `<img src="${currentUser.photoURL}" alt="user">` : avatarLetter(currentUser?.displayName || petName);
-  $('ageSummaryBadge').textContent = program.stage;
+}
+
+function renderAgeFocus() {
+  const weeks = getAgeInWeeks(currentPet?.birthDate);
+  const program = getProgramByAge(weeks);
+  const box = $('periodFocus');
+  if (!box) return;
+  box.innerHTML = `
+    <div class="plan-item"><strong>Пріоритети</strong><br>${program.priorities.map(x => `• ${x}`).join('<br>')}</div>
+    <div class="plan-item"><strong>План на зараз</strong><br>${program.plan.map(x => `• ${x}`).join('<br>')}</div>
+    <div class="plan-item"><strong>Підказка</strong><br>${program.tip}</div>
+  `;
 }
 
 function renderWeekCalendar() {
@@ -97,47 +98,30 @@ function renderWeekCalendar() {
 }
 
 function renderDailyPlan() {
-  const list = $('dailyItems'); const badge = $('dailyProgressBadge');
-  if (!list || !badge) return;
+  const list = $('dailyItems'); const badge = $('dailyProgressBadge'); if (!list || !badge) return;
   const plan = (getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.plan || []).slice(0, 3);
   const done = dailyDone[todayKey()] || {};
   badge.textContent = `${Object.values(done).filter(Boolean).length}/${plan.length}`;
   list.innerHTML = plan.map((item, i) => `<label class="daily-item ${done[i] ? 'done' : ''}"><input type="checkbox" data-daily-index="${i}" ${done[i] ? 'checked' : ''}><span>${item}</span></label>`).join('');
-  $$('[data-daily-index]').forEach(cb => cb.addEventListener('change', () => {
-    const key = todayKey();
-    dailyDone[key] = dailyDone[key] || {};
-    dailyDone[key][cb.dataset.dailyIndex] = cb.checked;
-    localStorage.setItem('doggo_daily_done', JSON.stringify(dailyDone));
-    renderDailyPlan();
-  }));
+  $$('[data-daily-index]').forEach(cb => cb.addEventListener('change', () => { const key = todayKey(); dailyDone[key] = dailyDone[key] || {}; dailyDone[key][cb.dataset.dailyIndex] = cb.checked; localStorage.setItem('doggo_daily_done', JSON.stringify(dailyDone)); renderDailyPlan(); }));
 }
 
 function renderKpis() {
   const start = startOfToday();
-  const todayEvents = eventsState.filter(e => { const ts = e.createdAt?.toDate ? e.createdAt.toDate() : new Date(e.createdAt || 0); return ts >= start; });
-  const pad = todayEvents.filter(e => e.eventType === 'pad').length;
-  const out = todayEvents.filter(e => e.eventType === 'outdoor').length;
-  const miss = todayEvents.filter(e => e.eventType === 'miss').length;
-  $('kpiPad').textContent = pad;
-  $('kpiOutdoor').textContent = out;
-  $('kpiMiss').textContent = miss;
+  const todayEvents = eventsState.filter(e => { const ts = createdToDate(e.createdAt); return ts && ts >= start; });
+  $('kpiPad').textContent = todayEvents.filter(e => e.eventType === 'pad').length;
+  $('kpiOutdoor').textContent = todayEvents.filter(e => e.eventType === 'outdoor').length;
+  $('kpiMiss').textContent = todayEvents.filter(e => e.eventType === 'miss').length;
   $('kpiTotal').textContent = eventsState.length;
-  $('streakValue').textContent = pad + out;
+  $('streakValue').textContent = todayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
 }
 
 function renderSuggestion() {
-  const card = $('suggestionCard'); const text = $('suggestionText');
-  if (!card || !text) return;
+  const card = $('suggestionCard'); const text = $('suggestionText'); if (!card || !text) return;
   const toilet = eventsState.filter(e => ['pad', 'outdoor', 'miss'].includes(e.eventType));
-  if (toilet.length < 4) {
-    text.textContent = getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.tip || 'Записуйте події кілька днів поспіль.';
-    setVisible(card, true); return;
-  }
-  const recent = toilet.slice(0, 20);
-  const success = recent.filter(e => e.eventType !== 'miss').length;
-  const rate = Math.round(success / recent.length * 100);
-  const missTriggers = {};
-  toilet.filter(e => e.eventType === 'miss' && e.trigger).forEach(e => { missTriggers[e.trigger] = (missTriggers[e.trigger] || 0) + 1; });
+  if (toilet.length < 4) { text.textContent = getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.tip || 'Записуйте події кілька днів поспіль.'; setVisible(card, true); return; }
+  const recent = toilet.slice(0, 20); const success = recent.filter(e => e.eventType !== 'miss').length; const rate = Math.round(success / recent.length * 100);
+  const missTriggers = {}; toilet.filter(e => e.eventType === 'miss' && e.trigger).forEach(e => { missTriggers[e.trigger] = (missTriggers[e.trigger] || 0) + 1; });
   const topTrigger = Object.entries(missTriggers).sort((a, b) => b[1] - a[1])[0];
   let msg = '';
   if (rate >= 80 && recent.length >= 10) msg = `Чудовий прогрес: ${rate}% успіху. Можна трохи розширювати простір.`;
@@ -147,52 +131,43 @@ function renderSuggestion() {
   text.textContent = msg; setVisible(card, true);
 }
 
-function renderChart() {
-  const canvas = $('progressChart'); if (!canvas || !canvas.getContext) return;
+function renderChart(canvasId) {
+  const canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
   const rect = canvas.getBoundingClientRect(); if (!rect.width) return;
   const ctx = canvas.getContext('2d'); const dpr = window.devicePixelRatio || 1;
   canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const w = rect.width, h = rect.height;
-  ctx.clearRect(0, 0, w, h);
+  const w = rect.width, h = rect.height; ctx.clearRect(0, 0, w, h);
   const days = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
     const next = new Date(d); next.setDate(next.getDate() + 1);
-    const dayEvents = eventsState.filter(e => { if (!e.createdAt) return false; const ts = e.createdAt.toDate ? e.createdAt.toDate() : new Date(e.createdAt); return ts >= d && ts < next; });
+    const dayEvents = eventsState.filter(e => { const ts = createdToDate(e.createdAt); return ts && ts >= d && ts < next; });
     const success = dayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
     const miss = dayEvents.filter(e => e.eventType === 'miss').length;
     const total = success + miss;
     days.push({ date: d, pct: total ? Math.round(success / total * 100) : null });
   }
   const css = getComputedStyle(document.documentElement);
-  const primary = css.getPropertyValue('--primary').trim();
-  const danger = css.getPropertyValue('--danger').trim();
-  const faint = css.getPropertyValue('--faint').trim();
-  const line = css.getPropertyValue('--line').trim();
+  const primary = css.getPropertyValue('--primary').trim(); const danger = css.getPropertyValue('--danger').trim(); const faint = css.getPropertyValue('--faint').trim(); const line = css.getPropertyValue('--line').trim();
   const pad = { top: 12, right: 6, bottom: 18, left: 6 };
   const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom, bw = cw / days.length;
   ctx.strokeStyle = line; ctx.lineWidth = 1;
   [0, 50, 100].forEach(v => { const y = pad.top + ch - (v / 100) * ch; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke(); });
   days.forEach((day, i) => {
     const x = pad.left + i * bw + bw * .18; const barW = bw * .64;
-    if (day.pct == null) {
-      ctx.fillStyle = faint; ctx.beginPath(); ctx.arc(x + barW / 2, pad.top + ch - 4, 2, 0, Math.PI * 2); ctx.fill();
-    } else {
+    if (day.pct == null) { ctx.fillStyle = faint; ctx.beginPath(); ctx.arc(x + barW / 2, pad.top + ch - 4, 2, 0, Math.PI * 2); ctx.fill(); }
+    else {
       const barH = Math.max(4, (day.pct / 100) * ch); const y = pad.top + ch - barH;
       ctx.fillStyle = day.pct >= 70 ? primary : day.pct >= 40 ? '#d97706' : danger;
       const r = Math.min(4, barW / 2);
-      ctx.beginPath();
-      ctx.moveTo(x, y + barH); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.lineTo(x + barW - r, y); ctx.quadraticCurveTo(x + barW, y, x + barW, y + r); ctx.lineTo(x + barW, y + barH); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x, y + barH); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.lineTo(x + barW - r, y); ctx.quadraticCurveTo(x + barW, y, x + barW, y + r); ctx.lineTo(x + barW, y + barH); ctx.closePath(); ctx.fill();
     }
-    if (i % 3 === 0 || i === days.length - 1) {
-      ctx.fillStyle = faint; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${day.date.getDate()}/${day.date.getMonth() + 1}`, x + barW / 2, h - 3);
-    }
+    if (i % 3 === 0 || i === days.length - 1) { ctx.fillStyle = faint; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${day.date.getDate()}/${day.date.getMonth() + 1}`, x + barW / 2, h - 3); }
   });
 }
 
 function renderCourses() {
-  const grid = $('courseGrid'); const viewer = $('selectedCourse');
-  if (!grid || !viewer) return;
+  const grid = $('courseGrid'); const viewer = $('selectedCourse'); if (!grid || !viewer) return;
   grid.innerHTML = COURSES.map(course => `
     <button type="button" class="course-btn ${course.id === currentCourseId ? 'selected' : ''}" data-course-id="${course.id}">
       <span class="c-badge">${course.badge}</span>
@@ -214,85 +189,24 @@ function renderCourses() {
     </div>`;
 }
 
-function renderKnowledge() {
-  const grid = $('knowledgeGrid'); if (!grid) return;
-  grid.innerHTML = KNOWLEDGE.map(k => `<div class="k-card"><strong>${k.title}</strong><p>${k.text}</p><span class="k-tag">${k.tag}</span></div>`).join('');
-}
-
-function renderSocial() {
-  const grid = $('socialGrid'); if (!grid) return;
-  grid.innerHTML = SOCIAL_ITEMS.map(item => `<label class="social-item"><input type="checkbox"><span>${item}</span></label>`).join('');
-}
-
-function renderToiletGuide() {
-  const grid = $('toiletGuide'); if (!grid) return;
-  grid.innerHTML = TOILET_GUIDE.map(step => `<div class="k-card"><strong>${step.title}</strong><p>${step.text}</p></div>`).join('');
-}
-
-function renderMembers() {
-  const list = $('membersList'); if (!list) return;
-  list.innerHTML = membersState.length ? membersState.map(m => `
-    <div class="member-chip">
-      <div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="${m.displayName || 'user'}">` : avatarLetter(m.displayName)}</div>
-      <span>${m.displayName || 'Учасник'}</span>
-    </div>`).join('') : '<div class="empty">Поки що тут тільки ви.</div>';
-}
-
-function renderWorkspaceMeta() {
-  $('workspaceName').textContent = workspaceData?.name || '—';
-  $('inviteCodeView').textContent = workspaceData?.inviteCode || '—';
-}
-
-function fillPetForm() {
-  $('petName').value = currentPet?.name || '';
-  $('petBirthDate').value = currentPet?.birthDate || '';
-  $('petSex').value = currentPet?.sex || 'хлопчик';
-  $('petBreed').value = currentPet?.breed || '';
-  $('petToiletMode').value = currentPet?.toiletMode || 'pad';
-}
-
-function renderFeed() {
-  const list = $('recentLogs'); if (!list) return;
+function renderKnowledge() { const grid = $('knowledgeGrid'); if (grid) grid.innerHTML = KNOWLEDGE.map(k => `<div class="k-card"><strong>${k.title}</strong><p>${k.text}</p><span class="k-tag">${k.tag}</span></div>`).join(''); }
+function renderSocial() { const grid = $('socialGrid'); if (grid) grid.innerHTML = SOCIAL_ITEMS.map(item => `<label class="social-item"><input type="checkbox"><span>${item}</span></label>`).join(''); }
+function renderToiletGuide() { const grid = $('toiletGuide'); if (grid) grid.innerHTML = TOILET_GUIDE.map(step => `<div class="k-card"><strong>${step.title}</strong><p>${step.text}</p></div>`).join(''); }
+function renderMembers() { const list = $('membersList'); if (!list) return; list.innerHTML = membersState.length ? membersState.map(m => `<div class="member-chip"><div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="${m.displayName || 'user'}">` : avatarLetter(m.displayName)}</div><span>${m.displayName || 'Учасник'}</span></div>`).join('') : '<div class="empty">Поки що тут тільки ви.</div>'; }
+function renderWorkspaceMeta() { $('workspaceName').textContent = workspaceData?.name || '—'; $('inviteCodeView').textContent = workspaceData?.inviteCode || '—'; }
+function fillPetForm() { $('petName').value = currentPet?.name || ''; $('petBirthDate').value = currentPet?.birthDate || ''; $('petSex').value = currentPet?.sex || 'хлопчик'; $('petBreed').value = currentPet?.breed || ''; $('petToiletMode').value = currentPet?.toiletMode || 'pad'; }
+function renderFeed(targetId = 'recentLogs') {
+  const list = $(targetId); if (!list) return;
   if (!eventsState.length) { list.innerHTML = '<div class="empty">Поки що немає записів. Натисни + і додай першу подію.</div>'; return; }
   list.innerHTML = eventsState.slice(0, 20).map(item => {
     const conf = TYPE_CONFIG[item.eventType] || { icon: '•', label: 'Подія', tone: '' };
-    return `
-      <div class="feed-item" data-event-id="${item.id}">
-        <div>
-          <strong>${conf.icon} ${conf.label}</strong>
-          <div class="meta">${timeSince(item.createdAt)}${item.note ? ` · ${item.note}` : ''}</div>
-        </div>
-        <button type="button" class="btn-sm" data-delete-event="${item.id}">Видалити</button>
-        <div class="delete-bg">Delete</div>
-      </div>`;
+    return `<div class="feed-item" data-event-id="${item.id}"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${timeSince(item.createdAt)}${item.note ? ` · ${item.note}` : ''}</div></div><button type="button" class="btn-sm" data-delete-event="${item.id}">Видалити</button><div class="delete-bg">Delete</div></div>`;
   }).join('');
   $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => { if (!confirm('Видалити запис?')) return; await deleteEvent(btn.dataset.deleteEvent); }));
 }
 
-function renderAll() {
-  renderHeader();
-  renderWeekCalendar();
-  renderDailyPlan();
-  renderKpis();
-  renderSuggestion();
-  renderFeed();
-  renderCourses();
-  renderKnowledge();
-  renderSocial();
-  renderToiletGuide();
-  renderMembers();
-  renderWorkspaceMeta();
-  fillPetForm();
-  requestAnimationFrame(renderChart);
-}
-
-function setActiveTab(id) {
-  $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === id));
-  $$('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
-  setVisible($('fabAddEvent'), id !== 'tabProfile');
-  if (id === 'tabDiary') requestAnimationFrame(renderChart);
-}
-
+function renderAll() { renderHeader(); renderAgeFocus(); renderWeekCalendar(); renderDailyPlan(); renderKpis(); renderSuggestion(); renderFeed('recentLogs'); renderFeed('recentLogsDiary'); renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide(); renderMembers(); renderWorkspaceMeta(); fillPetForm(); requestAnimationFrame(() => { renderChart('progressChart'); renderChart('progressChartDiary'); }); }
+function setActiveTab(id) { $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === id)); $$('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id)); setVisible($('fabAddEvent'), id !== 'tabProfile'); if (id === 'tabDiary') requestAnimationFrame(() => renderChart('progressChartDiary')); }
 function openSheet() { setVisible($('eventSheet'), true); $('eventTime').value = nowTime(); }
 function closeSheet() { setVisible($('eventSheet'), false); }
 function savePetProfile(payload) { if (!currentUser || !workspaceId) return; return db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ ...(currentPet || {}), ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); }
@@ -301,31 +215,20 @@ function deleteEvent(id) { if (!workspaceId || !id) return Promise.resolve(); re
 
 async function ensureWorkspaceForUser(user) {
   const udoc = await db.collection('users').doc(user.uid).get();
-  if (udoc.exists && udoc.data().workspaceId) {
-    workspaceId = udoc.data().workspaceId;
-    const wdoc = await db.collection('workspaces').doc(workspaceId).get();
-    workspaceData = wdoc.exists ? wdoc.data() : null;
-    return;
-  }
-  const wsRef = db.collection('workspaces').doc();
-  workspaceId = wsRef.id;
-  const inviteCode = createInviteCode();
-  workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]} Family`, ownerId: user.uid, inviteCode };
+  if (udoc.exists && udoc.data().workspaceId) { workspaceId = udoc.data().workspaceId; const wdoc = await db.collection('workspaces').doc(workspaceId).get(); workspaceData = wdoc.exists ? wdoc.data() : null; return; }
+  const wsRef = db.collection('workspaces').doc(); workspaceId = wsRef.id; const inviteCode = createInviteCode(); workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]} Family`, ownerId: user.uid, inviteCode };
   await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', workspaceId }, { merge: true });
   await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
   await wsRef.collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: 'хлопчик', breed: '', toiletMode: 'pad', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
 }
-
 function subscribePet() { if (!workspaceId) return; unsubPet?.(); unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(s => { currentPet = s.exists ? s.data() : null; renderAll(); }); }
 function subscribeMembers() { if (!workspaceId) return; unsubMembers?.(); unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members').onSnapshot(s => { membersState = []; s.forEach(d => membersState.push(d.data())); renderMembers(); }); }
 function subscribeEvents() { if (!workspaceId) return; unsubEvents?.(); unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(200).onSnapshot(s => { eventsState = []; s.forEach(d => eventsState.push({ id: d.id, ...d.data() })); renderAll(); }); }
 
 async function joinWorkspaceByInvite(code) {
-  const clean = (code || '').trim().toUpperCase();
-  if (!clean) throw new Error('Введи код запрошення');
-  const snap = await db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get();
-  if (snap.empty) throw new Error('Код не знайдено');
+  const clean = (code || '').trim().toUpperCase(); if (!clean) throw new Error('Введи код запрошення');
+  const snap = await db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get(); if (snap.empty) throw new Error('Код не знайдено');
   workspaceId = snap.docs[0].id; workspaceData = snap.docs[0].data();
   await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', workspaceId }, { merge: true });
   await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
@@ -334,9 +237,7 @@ async function joinWorkspaceByInvite(code) {
 
 function loginGoogle() { auth.signInWithRedirect(googleProvider); }
 async function logoutGoogle() {
-  unsubEvents?.(); unsubMembers?.(); unsubPet?.();
-  unsubEvents = unsubMembers = unsubPet = null;
-  await auth.signOut();
+  unsubEvents?.(); unsubMembers?.(); unsubPet?.(); unsubEvents = unsubMembers = unsubPet = null; await auth.signOut();
   currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = []; membersState = [];
   setVisible($('appContent'), false); setVisible($('authScreen'), true); setVisible($('logoutBtn'), false);
 }
@@ -361,7 +262,7 @@ function bindEvents() {
   $('petProfileForm')?.addEventListener('submit', async e => { e.preventDefault(); await savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), toiletMode: $('petToiletMode').value }); toast('Профіль збережено', 'success'); });
   $('copyInviteBtn')?.addEventListener('click', async () => { if (!workspaceData?.inviteCode) return; try { await navigator.clipboard.writeText(workspaceData.inviteCode); toast('Код скопійовано', 'success'); } catch { toast('Не вдалося скопіювати', 'error'); } });
   $('joinWorkspaceForm')?.addEventListener('submit', async e => { e.preventDefault(); try { await joinWorkspaceByInvite($('inviteCodeInput').value); $('inviteCodeInput').value = ''; toast('Ви приєдналися', 'success'); } catch (err) { toast(err.message || 'Не вдалося приєднатися', 'error'); } });
-  window.addEventListener('resize', () => { if ($('tabDiary')?.classList.contains('active')) renderChart(); });
+  window.addEventListener('resize', () => { if ($('tabDiary')?.classList.contains('active')) renderChart('progressChartDiary'); });
 }
 
 function bootAuth() {

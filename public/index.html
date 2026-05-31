@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="uk">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dog Coach AI</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
@@ -54,7 +54,10 @@
               <circle cx="50" cy="50" r="42" class="ring-bg"></circle>
               <circle cx="50" cy="50" r="42" class="ring-fill" id="ringFill"></circle>
             </svg>
-            <div class="ring-center"><div id="ringPct" class="ring-pct">0%</div><div class="ring-label">Сьогодні</div></div>
+            <div class="ring-center">
+              <div id="ringPct" class="ring-pct">0%</div>
+              <div class="ring-label">Сьогодні</div>
+            </div>
           </div>
           <div class="progress-stats">
             <div class="p-stat s-success"><span class="p-lbl">Пелюшка</span><strong id="kpiPad" class="p-val">0</strong></div>
@@ -143,26 +146,6 @@
           <div id="membersList" class="members-grid"></div>
         </div>
       </section>
-
-      <section id="tabAI" class="tab-panel">
-        <div class="card-elevated">
-          <div class="section-header"><h2>AI-помічник</h2><span class="subtle">Поради по собаці</span></div>
-          <div class="ai-quick">
-            <button class="ai-quick-btn" data-ai-quick="Що робити з промахом?" type="button">Промах</button>
-            <button class="ai-quick-btn" data-ai-quick="Що тренувати сьогодні?" type="button">Сьогодні</button>
-            <button class="ai-quick-btn" data-ai-quick="Чому собака кусається?" type="button">Кусається</button>
-            <button class="ai-quick-btn" data-ai-quick="Як привчити до пелюшки?" type="button">Пелюшка</button>
-          </div>
-          <div id="aiChat" class="ai-chat"></div>
-          <form id="aiForm" class="ai-form">
-            <textarea id="aiPrompt" rows="3" placeholder="Напиши питання до AI..."></textarea>
-            <div class="ai-actions">
-              <button type="submit" class="btn-primary">Надіслати</button>
-              <button type="button" id="aiClear" class="btn-sm">Очистити</button>
-            </div>
-          </form>
-        </div>
-      </section>
     </main>
 
     <nav class="bottom-nav">
@@ -171,7 +154,6 @@
       <button class="nav-tab" data-tab="tabCourses" type="button">🎓<span>Курси</span></button>
       <button class="nav-tab" data-tab="tabKnowledge" type="button">📚<span>Знання</span></button>
       <button class="nav-tab" data-tab="tabProfile" type="button">👤<span>Профіль</span></button>
-      <button class="nav-tab" data-tab="tabAI" type="button">🤖<span>AI</span></button>
     </nav>
 
     <button id="fabAddEvent" class="btn-primary" style="position:fixed;right:16px;bottom:92px;width:auto;padding:.85rem 1rem;border-radius:999px;z-index:120;" type="button">+ Подія</button>

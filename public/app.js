@@ -33,7 +33,6 @@ let eventsState = [], membersState = [], currentCourseId = 'pee-pad', obMode = '
 let themeMode = localStorage.getItem('doggo_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 let dailyDone = JSON.parse(localStorage.getItem('doggo_daily_done') || '{}');
 let unsubEvents = null, unsubMembers = null, unsubPet = null;
-let loginHandled = false;
 
 const haptic = (ms = 10) => { if (navigator.vibrate) navigator.vibrate(ms); };
 const toast = (msg, type = '') => {
@@ -170,11 +169,6 @@ function renderFeed(targetId = 'recentLogs') {
   $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => { if (!confirm('Видалити запис?')) return; await deleteEvent(btn.dataset.deleteEvent); }));
 }
 
-function renderAll() {
-  renderHeader(); renderAgeFocus(); renderDailyPlan(); renderKpis(); renderSuggestion(); renderFeed('recentLogs'); renderFeed('recentLogsDiary'); renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide(); renderMembers(); renderWorkspaceMeta(); fillPetForm();
-  requestAnimationFrame(() => { renderChart('progressChartDiary'); });
-}
-
 function renderChart(canvasId) {
   const canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
   const rect = canvas.getBoundingClientRect(); if (!rect.width) return;
@@ -208,6 +202,11 @@ function renderChart(canvasId) {
     }
     if (i % 3 === 0 || i === days.length - 1) { ctx.fillStyle = faint; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${day.date.getDate()}/${day.date.getMonth() + 1}`, x + barW / 2, h - 3); }
   });
+}
+
+function renderAll() {
+  renderHeader(); renderAgeFocus(); renderDailyPlan(); renderKpis(); renderSuggestion(); renderFeed('recentLogs'); renderFeed('recentLogsDiary'); renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide(); renderMembers(); renderWorkspaceMeta(); fillPetForm();
+  requestAnimationFrame(() => { renderChart('progressChartDiary'); });
 }
 
 function setActiveTab(id) {
@@ -247,17 +246,8 @@ async function joinWorkspaceByInvite(code) {
 }
 
 async function loginGoogle() {
-  try {
-    await auth.signInWithPopup(googleProvider);
-  } catch (e) {
-    try { await auth.signInWithRedirect(googleProvider); } catch (err) { toast(err.message || 'Login error', 'error'); }
-  }
-}
-
-async function handleRedirectResult() {
-  if (loginHandled) return;
-  loginHandled = true;
-  try { await auth.getRedirectResult(); } catch (e) {}
+  try { await auth.signInWithPopup(googleProvider); }
+  catch (e) { try { await auth.signInWithRedirect(googleProvider); } catch (err) { toast(err.message || 'Login error', 'error'); } }
 }
 
 async function logoutGoogle() {
@@ -279,10 +269,6 @@ function bindEvents() {
   $('petProfileForm')?.addEventListener('submit', async e => { e.preventDefault(); await savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), toiletMode: $('petToiletMode').value }); toast('Профіль збережено', 'success'); });
   $('copyInviteBtn')?.addEventListener('click', async () => { if (!workspaceData?.inviteCode) return; try { await navigator.clipboard.writeText(workspaceData.inviteCode); toast('Код скопійовано', 'success'); } catch { toast('Не вдалося скопіювати', 'error'); } });
   $('joinWorkspaceForm')?.addEventListener('submit', async e => { e.preventDefault(); try { await joinWorkspaceByInvite($('inviteCodeInput').value); $('inviteCodeInput').value = ''; toast('Ви приєдналися', 'success'); } catch (err) { toast(err.message || 'Не вдалося приєднатися', 'error'); } });
-  $('aiForm')?.addEventListener('submit', async e => { e.preventDefault(); const p = $('aiPrompt').value.trim(); if (!p) return; const box = $('aiChat'); box.insertAdjacentHTML('beforeend', `<div class="ai-msg user">${p}</div><div class="ai-msg assistant">Зараз відповім локально: ${p}</div>`); $('aiPrompt').value = ''; });
-  $('aiClear')?.addEventListener('click', () => { const box = $('aiChat'); if (box) box.innerHTML = ''; });
-  $$('[data-ai-quick]').forEach(btn => btn.addEventListener('click', () => { $('aiPrompt').value = btn.dataset.aiQuick; $('aiPrompt').focus(); }));
-  window.addEventListener('resize', () => { if ($('tabDiary')?.classList.contains('active')) renderChart('progressChartDiary'); });
 }
 
 function bootAuth() {
@@ -292,7 +278,7 @@ function bootAuth() {
     setVisible($('appContent'), !!currentUser);
     setVisible($('logoutBtn'), !!currentUser);
     if (!currentUser) return;
-    try { await ensureWorkspaceForUser(currentUser); subscribePet(); subscribeMembers(); subscribeEvents(); await handleRedirectResult(); renderAll(); } catch (e) { toast(e.message || 'Помилка запуску', 'error'); }
+    try { await ensureWorkspaceForUser(currentUser); subscribePet(); subscribeMembers(); subscribeEvents(); renderAll(); } catch (e) { toast(e.message || 'Помилка запуску', 'error'); }
   });
 }
 

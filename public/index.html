@@ -20,7 +20,7 @@
       <h1 class="auth-title">Dog Coach AI</h1>
       <p class="auth-subtitle">AI-помічник для щоденних порад по собаці</p>
       <div class="auth-pills"><span>Туалет</span><span>Тренування</span><span>Соціалізація</span></div>
-      <button id="googleLoginBtn" class="btn-google">Увійти через Google</button>
+      <button id="googleLoginBtn" class="btn-google" type="button">Увійти через Google</button>
       <div class="auth-hint">Після входу відкриється твій робочий простір</div>
     </div>
   </div>
@@ -35,8 +35,8 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="header-btn" data-theme-toggle title="Тема">☾</button>
-        <button id="logoutBtn" class="header-btn" title="Вийти">↩</button>
+        <button class="header-btn" data-theme-toggle type="button">☾</button>
+        <button id="logoutBtn" class="header-btn" type="button">↩</button>
       </div>
     </header>
 
@@ -69,7 +69,7 @@
 
         <div class="streak-bar"><div class="streak-fire">🔥</div><div class="streak-text">Ритм дня: <strong id="streakValue">0</strong></div></div>
 
-        <div class="tip-card">
+        <div id="suggestionCard" class="tip-card">
           <div class="tip-glow"></div>
           <div class="tip-content">
             <span class="tip-badge">Порада AI</span>
@@ -78,12 +78,12 @@
         </div>
 
         <div class="quick-grid">
-          <button class="q-btn q-accent" data-quick-event="training"><span class="q-icon">🎓</span><span>Трен</span></button>
-          <button class="q-btn q-success" data-quick-event="pad"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
-          <button class="q-btn q-success" data-quick-event="outdoor"><span class="q-icon">🌳</span><span>Вулиця</span></button>
-          <button class="q-btn q-danger" data-quick-event="miss"><span class="q-icon">❌</span><span>Промах</span></button>
-          <button class="q-btn q-neutral" data-quick-event="sleep"><span class="q-icon">😴</span><span>Сон</span></button>
-          <button class="q-btn q-neutral" data-quick-event="note"><span class="q-icon">📝</span><span>Нотатка</span></button>
+          <button class="q-btn q-accent" data-quick-event="training" type="button"><span class="q-icon">🎓</span><span>Трен</span></button>
+          <button class="q-btn q-success" data-quick-event="pad" type="button"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
+          <button class="q-btn q-success" data-quick-event="outdoor" type="button"><span class="q-icon">🌳</span><span>Вулиця</span></button>
+          <button class="q-btn q-danger" data-quick-event="miss" type="button"><span class="q-icon">❌</span><span>Промах</span></button>
+          <button class="q-btn q-neutral" data-quick-event="sleep" type="button"><span class="q-icon">😴</span><span>Сон</span></button>
+          <button class="q-btn q-neutral" data-quick-event="note" type="button"><span class="q-icon">📝</span><span>Нотатка</span></button>
         </div>
 
         <div class="daily-card">
@@ -152,10 +152,10 @@
         <div class="card-elevated">
           <div class="section-header"><h2>AI-помічник</h2><span class="subtle">Поради по собаці</span></div>
           <div class="ai-quick">
-            <button class="ai-quick-btn" data-ai-quick="Що робити з промахом?">Промах</button>
-            <button class="ai-quick-btn" data-ai-quick="Що тренувати сьогодні?">Сьогодні</button>
-            <button class="ai-quick-btn" data-ai-quick="Чому собака кусається?">Кусається</button>
-            <button class="ai-quick-btn" data-ai-quick="Як привчити до пелюшки?">Пелюшка</button>
+            <button class="ai-quick-btn" data-ai-quick="Що робити з промахом?" type="button">Промах</button>
+            <button class="ai-quick-btn" data-ai-quick="Що тренувати сьогодні?" type="button">Сьогодні</button>
+            <button class="ai-quick-btn" data-ai-quick="Чому собака кусається?" type="button">Кусається</button>
+            <button class="ai-quick-btn" data-ai-quick="Як привчити до пелюшки?" type="button">Пелюшка</button>
           </div>
           <div id="aiChat" class="ai-chat"></div>
           <form id="aiForm" class="ai-form">
@@ -170,15 +170,15 @@
     </main>
 
     <nav class="bottom-nav">
-      <button class="nav-tab active" data-tab="tabHome">🏠<span>Дім</span></button>
-      <button class="nav-tab" data-tab="tabDiary">📈<span>Щоденник</span></button>
-      <button class="nav-tab" data-tab="tabCourses">🎓<span>Курси</span></button>
-      <button class="nav-tab" data-tab="tabKnowledge">📚<span>Знання</span></button>
-      <button class="nav-tab" data-tab="tabProfile">👤<span>Профіль</span></button>
-      <button class="nav-tab" data-tab="tabAI">🤖<span>AI</span></button>
+      <button class="nav-tab active" data-tab="tabHome" type="button">🏠<span>Дім</span></button>
+      <button class="nav-tab" data-tab="tabDiary" type="button">📈<span>Щоденник</span></button>
+      <button class="nav-tab" data-tab="tabCourses" type="button">🎓<span>Курси</span></button>
+      <button class="nav-tab" data-tab="tabKnowledge" type="button">📚<span>Знання</span></button>
+      <button class="nav-tab" data-tab="tabProfile" type="button">👤<span>Профіль</span></button>
+      <button class="nav-tab" data-tab="tabAI" type="button">🤖<span>AI</span></button>
     </nav>
 
-    <button id="fabAddEvent" class="btn-primary" style="position:fixed;right:16px;bottom:92px;width:auto;padding:.85rem 1rem;border-radius:999px;z-index:120;">+ Подія</button>
+    <button id="fabAddEvent" class="btn-primary" style="position:fixed;right:16px;bottom:92px;width:auto;padding:.85rem 1rem;border-radius:999px;z-index:120;" type="button">+ Подія</button>
 
     <div id="eventSheet" class="sheet-overlay hidden">
       <div id="sheetBackdrop" class="sheet-backdrop"></div>

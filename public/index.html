@@ -46,10 +46,6 @@
           <div class="profile-avatar-big">🐾</div>
           <h3 id="profileName">Песик</h3>
           <div id="profileMeta" class="profile-meta">—</div>
-          <div style="margin-top:.5rem; display:flex; gap:.4rem; justify-content:center; flex-wrap:wrap;">
-            <span id="ageSummaryBadge" class="age-pill">—</span>
-            <span id="ageSummaryBadge2" class="age-pill">—</span>
-          </div>
         </div>
 
         <div class="progress-section">
@@ -67,10 +63,7 @@
           </div>
         </div>
 
-        <div class="streak-bar"><div class="streak-fire">🔥</div><div class="streak-text">Ритм дня: <strong id="streakValue">0</strong></div></div>
-
         <div id="suggestionCard" class="tip-card">
-          <div class="tip-glow"></div>
           <div class="tip-content">
             <span class="tip-badge">Порада AI</span>
             <p id="suggestionText">—</p>
@@ -78,12 +71,12 @@
         </div>
 
         <div class="quick-grid">
-          <button class="q-btn q-accent" data-quick-event="training" type="button"><span class="q-icon">🎓</span><span>Трен</span></button>
-          <button class="q-btn q-success" data-quick-event="pad" type="button"><span class="q-icon">🧻</span><span>Пелюшка</span></button>
-          <button class="q-btn q-success" data-quick-event="outdoor" type="button"><span class="q-icon">🌳</span><span>Вулиця</span></button>
-          <button class="q-btn q-danger" data-quick-event="miss" type="button"><span class="q-icon">❌</span><span>Промах</span></button>
-          <button class="q-btn q-neutral" data-quick-event="sleep" type="button"><span class="q-icon">😴</span><span>Сон</span></button>
-          <button class="q-btn q-neutral" data-quick-event="note" type="button"><span class="q-icon">📝</span><span>Нотатка</span></button>
+          <button class="q-btn q-accent" data-quick-event="training" type="button">🎓 Трен</button>
+          <button class="q-btn q-success" data-quick-event="pad" type="button">🧻 Пелюшка</button>
+          <button class="q-btn q-success" data-quick-event="outdoor" type="button">🌳 Вулиця</button>
+          <button class="q-btn q-danger" data-quick-event="miss" type="button">❌ Промах</button>
+          <button class="q-btn q-neutral" data-quick-event="sleep" type="button">😴 Сон</button>
+          <button class="q-btn q-neutral" data-quick-event="note" type="button">📝 Нотатка</button>
         </div>
 
         <div class="daily-card">
@@ -101,7 +94,10 @@
       </section>
 
       <section id="tabDiary" class="tab-panel">
-        <div class="chart-card"><div class="chart-header"><h3>Прогрес за 14 днів</h3></div><canvas id="progressChartDiary" height="170"></canvas></div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Прогрес за 14 днів</h3></div>
+          <canvas id="progressChartDiary" height="170"></canvas>
+        </div>
         <div class="section-header"><h2>Щоденник</h2><span class="subtle">Історія</span></div>
         <div id="recentLogsDiary" class="feed"></div>
       </section>

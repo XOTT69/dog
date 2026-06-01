@@ -1061,6 +1061,97 @@ details summary {
   cursor: pointer;
   user-select: none;
 }
+/* ===== ONBOARDING ===== */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: var(--bg);
+}
+
+.onboarding-card {
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.onboarding-step { animation: fadeUp 250ms var(--ease); }
+.onboarding-emoji { font-size: 3rem; margin-bottom: 1rem; }
+.onboarding-step h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 1.25rem; }
+
+.ob-input {
+  margin-bottom: 1rem;
+}
+
+.ob-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.ob-row .btn { flex: 1; }
+
+.ob-dots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.ob-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all var(--duration) var(--ease);
+}
+
+.ob-dot.active {
+  background: var(--accent);
+  width: 24px;
+  border-radius: 4px;
+}
+
+/* ===== STREAK ===== */
+.streak-badge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0.3rem 0.6rem;
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.streak-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius);
+}
+
+[data-theme="dark"] .streak-card {
+  background: linear-gradient(135deg, #422006 0%, #1c1917 100%);
+  border-color: #d97706;
+}
+
+.streak-fire { font-size: 2rem; }
+.streak-info strong { display: block; font-size: 1rem; color: var(--text); }
 
 /* ===== PRINT ===== */
 @media print {

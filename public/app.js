@@ -247,14 +247,29 @@
     `).join('');
   }
 
-  function renderSocial() {
+   function renderSocial() {
     const grid = $('socialGrid');
-    if (grid) grid.innerHTML = SOCIAL_ITEMS.map(item => `
-      <label class="social-item">
-        <input type="checkbox">
-        <span>${item}</span>
-      </label>
+    if (!grid) return;
+    const socialDone = JSON.parse(localStorage.getItem('dc_social') || '{}');
+
+    grid.innerHTML = SOCIAL_ITEMS.map(group => `
+      <div class="social-group">
+        <h5 class="social-group-title">${group.category}</h5>
+        ${group.items.map(item => {
+          const key = group.category + ':' + item;
+          return `<label class="social-item">
+            <input type="checkbox" data-social-key="${key}" ${socialDone[key] ? 'checked' : ''}>
+            <span>${item}</span>
+          </label>`;
+        }).join('')}
+      </div>
     `).join('');
+
+    $$('[data-social-key]').forEach(cb => cb.addEventListener('change', () => {
+      const done = JSON.parse(localStorage.getItem('dc_social') || '{}');
+      done[cb.dataset.socialKey] = cb.checked;
+      localStorage.setItem('dc_social', JSON.stringify(done));
+    }));
   }
 
   function renderToiletGuide() {

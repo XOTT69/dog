@@ -1,408 +1,500 @@
-const AGE_PROGRAMS = window.AGE_PROGRAMS;
-const COURSES = window.COURSES;
-const KNOWLEDGE = window.KNOWLEDGE;
-const SOCIAL_ITEMS = window.SOCIAL_ITEMS;
-const TOILET_GUIDE = window.TOILET_GUIDE;
-const TYPE_CONFIG = window.TYPE_CONFIG;
+/* ===== Dog Coach AI — Main App ===== */
+(function () {
+  'use strict';
 
-const firebaseConfig = {
-  apiKey: window.FIREBASE_API_KEY || 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: window.FIREBASE_AUTH_DOMAIN || 'dogs-55f5e.firebaseapp.com',
-  projectId: window.FIREBASE_PROJECT_ID || 'dogs-55f5e',
-  storageBucket: window.FIREBASE_STORAGE_BUCKET || 'dogs-55f5e.firebasestorage.app',
-  messagingSenderId: window.FIREBASE_MESSAGING_SENDER_ID || '1053489833652',
-  appId: window.FIREBASE_APP_ID || '1:1053489833652:web:ddf53d87b0a4af4207d9e1',
-  measurementId: window.FIREBASE_MEASUREMENT_ID || 'G-2M9G6V5WBB'
-};
+  const AGE_PROGRAMS = window.AGE_PROGRAMS;
+  const COURSES = window.COURSES;
+  const KNOWLEDGE = window.KNOWLEDGE;
+  const SOCIAL_ITEMS = window.SOCIAL_ITEMS;
+  const TOILET_GUIDE = window.TOILET_GUIDE;
+  const TYPE_CONFIG = window.TYPE_CONFIG;
 
-try {
-  firebase.initializeApp(firebaseConfig);
-} catch (e) {
-  console.error('Firebase init error:', e);
-  toast('Помилка ініціалізації Firebase', 'error');
-}
+  // ===== Firebase Init =====
+  const firebaseConfig = window.FIREBASE_CONFIG;
+  try {
+    firebase.initializeApp(firebaseConfig);
+  } catch (e) {
+    console.error('Firebase init error:', e);
+  }
 
-const auth = firebase.auth();
-const db = firebase.firestore();
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const googleProvider = new firebase.auth.GoogleAuthProvider();
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+  db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-db.enablePersistence({ synchronizeTabs: true }).catch(function () {});
+  // ===== State =====
+  let currentUser = null;
+  let workspaceId = null;
+  let workspaceData = null;
+  let currentPet = null;
+  let eventsState = [];
+  let membersState = [];
+  let currentCourseId = 'pee-pad';
+  let unsubEvents = null;
+  let unsubMembers = null;
+  let unsubPet = null;
+  let themeMode = localStorage.getItem('dc_theme') || 'light';
+  let dailyDone = JSON.parse(localStorage.getItem('dc_daily') || '{}');
+  let renderQueued = false;
 
-const $ = (id) => document.getElementById(id);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  // ===== DOM Helpers =====
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const show = (el) => el?.classList.remove('hidden');
+  const hide = (el) => el?.classList.add('hidden');
+  const showLoading = () => show($('loadingOverlay'));
+  const hideLoading = () => hide($('loadingOverlay'));
 
-let currentUser = null;
-let workspaceId = null;
-let workspaceData = null;
-let currentPet = null;
-let eventsState = [];
-let membersState = [];
-let currentCourseId = 'pee-pad';
-let unsubEvents = null;
-let unsubMembers = null;
-let unsubPet = null;
-let themeMode = localStorage.getItem('doggo_theme') || 'light';
-let dailyDone = JSON.parse(localStorage.getItem('doggo_daily_done') || '{}');
+  // ===== Utilities =====
+  const nowTime = () => new Date().toTimeString().slice(0, 5);
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  const avatarLetter = (name = '') => (name.trim()[0] || 'П').toUpperCase();
+  const tsToDate = (ts) => ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+  const haptic = () => { if (navigator.vibrate) navigator.vibrate(8); };
 
-const setVisible = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
-const showLoading = () => setVisible($('loadingOverlay'), true);
-const hideLoading = () => setVisible($('loadingOverlay'), false);
-const haptic = (ms = 10) => { if (navigator.vibrate) navigator.vibrate(ms); };
-const nowTime = () => new Date().toTimeString().slice(0, 5);
-const todayKey = () => new Date().toISOString().slice(0, 10);
-const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
-const avatarLetter = (name = 'П') => ((name.trim()[0] || 'П').toUpperCase());
-const createdToDate = (ts) => ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+  function getAgeInWeeks(bd) {
+    if (!bd) return null;
+    const diff = Date.now() - new Date(bd).getTime();
+    return isNaN(diff) || diff < 0 ? null : Math.floor(diff / 604800000);
+  }
 
-function toast(msg, type = '') {
-  const box = $('toastContainer');
-  if (!box) return;
-  const el = document.createElement('div');
-  el.className = `toast ${type}`.trim();
-  el.textContent = msg;
-  box.appendChild(el);
-  requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => {
-    el.classList.remove('show');
-    setTimeout(() => el.remove(), 250);
-  }, 2600);
-}
+  function weekLabel(weeks) {
+    if (weeks == null) return '—';
+    if (weeks < 8) return `${weeks} тиж.`;
+    if (weeks < 52) return `${Math.floor(weeks / 4.345)} міс.`;
+    const y = weeks / 52;
+    return y < 2 ? `${y.toFixed(1)} р.` : `${Math.floor(y)} р.`;
+  }
 
-function setTheme(mode) {
-  themeMode = mode === 'dark' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', themeMode);
-  localStorage.setItem('doggo_theme', themeMode);
-}
+  function getProgramByAge(weeks) {
+    if (weeks == null) return AGE_PROGRAMS[1] || AGE_PROGRAMS[0];
+    return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
+  }
 
-function getAgeInWeeks(bd) {
-  if (!bd) return null;
-  const diff = Date.now() - new Date(bd).getTime();
-  return isNaN(diff) || diff < 0 ? null : Math.floor(diff / 604800000);
-}
+  // ===== Toast =====
+  function toast(msg, type = '') {
+    const box = $('toastContainer');
+    if (!box) return;
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    box.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 300);
+    }, 2800);
+  }
 
-function weekLabel(weeks) {
-  if (weeks == null) return '—';
-  if (weeks < 8) return `${weeks} тиж.`;
-  if (weeks < 52) return `${Math.floor(weeks / 4.345)} міс.`;
-  return `${(weeks / 52).toFixed(1)} р.`;
-}
+  // ===== Theme =====
+  function setTheme(mode) {
+    themeMode = mode === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', themeMode);
+    localStorage.setItem('dc_theme', themeMode);
+  }
 
-function getProgramByAge(weeks) {
-  if (weeks == null) return AGE_PROGRAMS[1] || AGE_PROGRAMS[0];
-  return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
-}
+  // ===== Render Functions =====
+  function queueRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => {
+      renderQueued = false;
+      renderAll();
+    });
+  }
 
-function renderHeader() {
-  const petName = currentPet?.name?.trim() || 'Песик';
-  const weeks = getAgeInWeeks(currentPet?.birthDate);
-  const program = getProgramByAge(weeks);
-  $('petNameHeader').textContent = petName;
-  $('headerSub').textContent = `${weekLabel(weeks)} · ${program.stage}`;
-  $('profileName').textContent = petName;
-  $('profileMeta').textContent = [currentPet?.breed || 'Порода не вказана', weekLabel(weeks)].join(' · ');
-  const avatar = $('userAvatar');
-  if (avatar) avatar.innerHTML = currentUser?.photoURL ? `<img src="${currentUser.photoURL}" alt="user">` : avatarLetter(currentUser?.displayName || petName);
-}
+  function renderHeader() {
+    const petName = currentPet?.name?.trim() || 'Песик';
+    const weeks = getAgeInWeeks(currentPet?.birthDate);
+    const program = getProgramByAge(weeks);
+    $('petNameHeader').textContent = petName;
+    $('headerSub').textContent = `${weekLabel(weeks)} · ${program.stage}`;
+    $('profileName').textContent = petName;
+    $('profileMeta').textContent = [currentPet?.breed || 'Порода не вказана', weekLabel(weeks)].join(' · ');
+    const avatar = $('userAvatar');
+    if (avatar) {
+      avatar.innerHTML = currentUser?.photoURL
+        ? `<img src="${currentUser.photoURL}" alt="user">`
+        : avatarLetter(currentUser?.displayName || petName);
+    }
+  }
 
-function renderAgeFocus() {
-  const weeks = getAgeInWeeks(currentPet?.birthDate);
-  const program = getProgramByAge(weeks);
-  const box = $('periodFocus');
-  if (!box) return;
-  box.innerHTML = `
-    <div class="plan-item"><strong>Пріоритети</strong><br>${program.priorities.map(x => `• ${x}`).join('<br>')}</div>
-    <div class="plan-item"><strong>План на зараз</strong><br>${program.plan.map(x => `• ${x}`).join('<br>')}</div>
-    <div class="plan-item"><strong>Підказка</strong><br>${program.tip}</div>
-  `;
-}
+  function renderAgeFocus() {
+    const weeks = getAgeInWeeks(currentPet?.birthDate);
+    const program = getProgramByAge(weeks);
+    const box = $('periodFocus');
+    if (!box) return;
+    box.innerHTML = `
+      <div class="plan-item"><strong>🎯 Пріоритети</strong>${program.priorities.map(x => `<br>• ${x}`).join('')}</div>
+      <div class="plan-item"><strong>📋 План</strong>${program.plan.map(x => `<br>• ${x}`).join('')}</div>
+      <div class="plan-item"><strong>💡 Підказка</strong><br>${program.tip}</div>
+    `;
+  }
 
-function renderDailyPlan() {
-  const list = $('dailyItems');
-  const badge = $('dailyProgressBadge');
-  if (!list || !badge) return;
-  const plan = (getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.plan || []).slice(0, 3);
-  const done = dailyDone[todayKey()] || {};
-  badge.textContent = `${Object.values(done).filter(Boolean).length}/${plan.length}`;
-  list.innerHTML = plan.map((item, i) => `<label class="daily-item ${done[i] ? 'done' : ''}"><input type="checkbox" data-daily-index="${i}" ${done[i] ? 'checked' : ''}><span>${item}</span></label>`).join('');
-  $$('[data-daily-index]').forEach(cb => cb.addEventListener('change', () => {
+  function renderDailyPlan() {
+    const list = $('dailyItems');
+    const badge = $('dailyProgressBadge');
+    if (!list || !badge) return;
+    const plan = (getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.plan || []);
     const key = todayKey();
-    dailyDone[key] = dailyDone[key] || {};
-    dailyDone[key][cb.dataset.dailymarker || cb.dataset.dailyIndex] = cb.checked;
-    localStorage.setItem('doggo_daily_done', JSON.stringify(dailyDone));
-    renderDailyPlan();
-  }));
-}
+    const done = dailyDone[key] || {};
+    const doneCount = Object.values(done).filter(Boolean).length;
+    badge.textContent = `${doneCount}/${plan.length}`;
 
-function renderKpis() {
-  const start = startOfToday();
-  const todayEvents = eventsState.filter(e => {
-    const ts = createdToDate(e.createdAt);
-    return ts && ts >= start;
-  });
-  $('kpiPad').textContent = todayEvents.filter(e => e.eventType === 'pad').length;
-  $('kpiOutdoor').textContent = todayEvents.filter(e => e.eventType === 'outdoor').length;
-  $('kpiMiss').textContent = todayEvents.filter(e => e.eventType === 'miss').length;
-  const success = todayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
-  const total = Math.max(1, todayEvents.filter(e => ['pad', 'outdoor', 'miss'].includes(e.eventType)).length);
-  const pct = Math.round(success / total * 100);
-  $('ringPct').textContent = `${pct}%`;
-  const ring = $('ringFill');
-  if (ring) ring.style.strokeDashoffset = String(264 - (264 * pct / 100));
-}
+    list.innerHTML = plan.map((item, i) => `
+      <label class="daily-item ${done[i] ? 'done' : ''}">
+        <input type="checkbox" data-daily="${i}" ${done[i] ? 'checked' : ''}>
+        <span>${item}</span>
+      </label>
+    `).join('');
 
-function renderSuggestion() {
-  const text = $('suggestionText');
-  if (!text) return;
-  const toilet = eventsState.filter(e => ['pad', 'outdoor', 'miss'].includes(e.eventType));
-  if (toilet.length < 4) {
-    text.textContent = getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.tip || 'Записуйте події кілька днів поспіль.';
-    return;
+    $$('[data-daily]').forEach(cb => cb.addEventListener('change', () => {
+      const k = todayKey();
+      dailyDone[k] = dailyDone[k] || {};
+      dailyDone[k][cb.dataset.daily] = cb.checked;
+      localStorage.setItem('dc_daily', JSON.stringify(dailyDone));
+      renderDailyPlan();
+    }));
   }
-  const recent = toilet.slice(0, 20);
-  const success = recent.filter(e => e.eventType !== 'miss').length;
-  const rate = Math.round(success / recent.length * 100);
-  text.textContent = rate >= 80 ? `Чудовий прогрес: ${rate}% успіху.` : rate < 50 ? `Успішність лише ${rate}%.` : `Стабільність: ${rate}%.`;
-}
 
-function renderCourses() {
-  const grid = $('courseGrid');
-  const viewer = $('selectedCourse');
-  if (!grid || !viewer) return;
-  grid.innerHTML = COURSES.map(course => `
-    <button type="button" class="course-btn ${course.id === currentCourseId ? 'selected' : ''}" data-course-id="${course.id}">
-      <span class="c-badge">${course.badge}</span>
-      <strong>${course.title}</strong>
-      <div class="c-meta">${course.description}</div>
-    </button>`).join('');
-  $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => {
-    currentCourseId = btn.dataset.courseId;
-    renderCourses();
-    haptic();
-  }));
-  const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
-  viewer.innerHTML = `<div class="course-detail"><h3>${course.title}</h3><p class="mt-6">${course.description}</p><h4>Кроки</h4><ul>${course.steps.map(s => `<li>${s}</li>`).join('')}</ul><h4>Не робити</h4><ul class="mistakes">${course.mistakes.map(s => `<li>${s}</li>`).join('')}</ul><h4>Чекліст</h4><ul class="checks">${course.checklist.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
-}
-
-function renderKnowledge() {
-  const grid = $('knowledgeGrid');
-  if (grid) grid.innerHTML = KNOWLEDGE.map(k => `<div class="k-card"><strong>${k.title}</strong><p>${k.text}</p><span class="k-tag">${k.tag}</span></div>`).join('');
-}
-
-function renderSocial() {
-  const grid = $('socialGrid');
-  if (grid) grid.innerHTML = SOCIAL_ITEMS.map(item => `<label class="social-item"><input type="checkbox"><span>${item}</span></label>`).join('');
-}
-
-function renderToiletGuide() {
-  const grid = $('toiletGuide');
-  if (grid) grid.innerHTML = TOILET_GUIDE.map(step => `<div class="k-card"><strong>${step.title}</strong><p>${step.text}</p></div>`).join('');
-}
-
-function renderMembers() {
-  const list = $('membersList');
-  if (!list) return;
-  list.innerHTML = membersState.length
-    ? membersState.map(m => `<div class="member-chip"><div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="user">` : avatarLetter(m.displayName)}</div><span>${m.displayName || 'Учасник'}</span></div>`).join('')
-    : '<div class="empty">Поки що тут тільки ви.</div>';
-}
-
-function renderWorkspaceMeta() {
-  $('inviteCodeView').textContent = workspaceData?.inviteCode || '—';
-}
-function fillPetForm() {
-  $('petName').value = currentPet?.name || '';
-  $('petBirthDate').value = currentPet?.birthDate || '';
-  $('petSex').value = currentPet?.sex || 'хлопчик';
-  $('petBreed').value = currentPet?.breed || '';
-  $('petToiletMode').value = currentPet?.toiletMode || 'pad';
-}
-
-function renderFeed(targetId = 'recentLogs') {
-  const list = $(targetId);
-  if (!list) return;
-  if (!eventsState.length) {
-    list.innerHTML = '<div class="empty">Поки що немає записів. Натисни + і додай першу подію.</div>';
-    return;
-  }
-  list.innerHTML = eventsState.slice(0, 20).map(item => {
-    const conf = TYPE_CONFIG[item.eventType] || { icon: '•', label: 'Подія', tone: '' };
-    const d = createdToDate(item.createdAt);
-    return `<div class="feed-item" data-event-id="${item.id}"><div><strong>${conf.icon} ${conf.label}</strong><div class="meta">${d ? d.toLocaleString('uk') : ''}${item.note ? ` · ${item.note}` : ''}</div></div><button type="button" class="btn-sm" data-delete-event="${item.id}">Видалити</button></div>`;
-  }).join('');
-  $$('[data-delete-event]').forEach(btn => btn.addEventListener('click', async () => {
-    if (!confirm('Видалити запис?')) return;
-    await deleteEvent(btn.dataset.deleteEvent);
-  }));
-}
-
-function renderChart(canvasId) {
-  const canvas = $(canvasId);
-  if (!canvas || !canvas.getContext) return;
-  const rect = canvas.getBoundingClientRect();
-  if (!rect.width) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const w = rect.width, h = rect.height;
-  ctx.clearRect(0, 0, w, h);
-
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
-    const next = new Date(d); next.setDate(next.getDate() + 1);
-    const dayEvents = eventsState.filter(e => {
-      const ts = createdToDate(e.createdAt);
-      return ts && ts >= d && ts < next;
+  function renderKpis() {
+    const start = startOfToday();
+    const todayEvents = eventsState.filter(e => {
+      const ts = tsToDate(e.createdAt);
+      return ts && ts >= start;
     });
-    const success = dayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
-    const miss = dayEvents.filter(e => e.eventType === 'miss').length;
+    const pad = todayEvents.filter(e => e.eventType === 'pad').length;
+    const outdoor = todayEvents.filter(e => e.eventType === 'outdoor').length;
+    const miss = todayEvents.filter(e => e.eventType === 'miss').length;
+
+    $('kpiPad').textContent = pad;
+    $('kpiOutdoor').textContent = outdoor;
+    $('kpiMiss').textContent = miss;
+
+    const success = pad + outdoor;
     const total = success + miss;
-    days.push({ date: d, pct: total ? Math.round(success / total * 100) : null });
-  }
+    const pct = total > 0 ? Math.round(success / total * 100) : 0;
 
-  const css = getComputedStyle(document.documentElement);
-  const primary = css.getPropertyValue('--primary').trim();
-  const danger = css.getPropertyValue('--danger').trim();
-  const faint = css.getPropertyValue('--faint').trim();
-  const line = css.getPropertyValue('--line').trim();
-
-  const pad = { top: 12, right: 6, bottom: 18, left: 6 };
-  const cw = w - pad.left - pad.right;
-  const ch = h - pad.top - pad.bottom;
-  const bw = cw / days.length;
-
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 1;
-  [0, 50, 100].forEach(v => {
-    const y = pad.top + ch - (v / 100) * ch;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(w - pad.right, y);
-    ctx.stroke();
-  });
-
-  days.forEach((day, i) => {
-    const x = pad.left + i * bw + bw * .18;
-    const barW = bw * .64;
-    if (day.pct == null) {
-      ctx.fillStyle = faint;
-      ctx.beginPath();
-      ctx.arc(x + barW / 2, pad.top + ch - 4, 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      const barH = Math.max(4, (day.pct / 100) * ch);
-      const y = pad.top + ch - barH;
-      ctx.fillStyle = day.pct >= 70 ? primary : day.pct >= 40 ? '#d97706' : danger;
-      const r = Math.min(4, barW / 2);
-      ctx.beginPath();
-      ctx.moveTo(x, y + barH);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.lineTo(x + barW - r, y);
-      ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
-      ctx.lineTo(x + barW, y + barH);
-      ctx.closePath();
-      ctx.fill();
+    $('ringPct').textContent = `${pct}%`;
+    const ring = $('ringFill');
+    if (ring) {
+      // 2 * π * 40 = 251.3
+      const circumference = 251.3;
+      ring.style.strokeDashoffset = String(circumference - (circumference * pct / 100));
     }
-    if (i % 3 === 0 || i === days.length - 1) {
-      ctx.fillStyle = faint;
-      ctx.font = '11px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${day.date.getDate()}/${day.date.getMonth() + 1}`, x + barW / 2, h - 3);
+  }
+
+  function renderSuggestion() {
+    const text = $('suggestionText');
+    if (!text) return;
+    const toilet = eventsState.filter(e => ['pad', 'outdoor', 'miss'].includes(e.eventType));
+    if (toilet.length < 5) {
+      text.textContent = getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.tip || 'Записуйте події кілька днів для персональних порад.';
+      return;
     }
-  });
-}
-
-function renderAll() {
-  renderHeader();
-  renderAgeFocus();
-  renderDailyPlan();
-  renderKpis();
-  renderSuggestion();
-  renderFeed('recentLogs');
-  renderFeed('recentLogsDiary');
-  renderCourses();
-  renderKnowledge();
-  renderSocial();
-  renderToiletGuide();
-  renderMembers();
-  renderWorkspaceMeta();
-  fillPetForm();
-  requestAnimationFrame(() => renderChart('progressChartDiary'));
-}
-
-function setActiveTab(id) {
-  $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === id));
-  $$('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
-  setVisible($('fabAddEvent'), id !== 'tabProfile');
-  if (id === 'tabDiary') requestAnimationFrame(() => renderChart('progressChartDiary'));
-}
-
-function openSheet() { setVisible($('eventSheet'), true); $('eventTime').value = nowTime(); }
-function closeSheet() { setVisible($('eventSheet'), false); }
-
-async function savePetProfile(payload) {
-  if (!currentUser || !workspaceId) {
-    toast('Спочатку увійдіть в систему', 'error');
-    return;
+    const recent = toilet.slice(0, 20);
+    const success = recent.filter(e => e.eventType !== 'miss').length;
+    const rate = Math.round(success / recent.length * 100);
+    if (rate >= 80) text.textContent = `🎉 Чудовий прогрес! Успішність ${rate}% за останні ${recent.length} подій.`;
+    else if (rate >= 50) text.textContent = `📈 Стабільність: ${rate}%. Продовжуйте фіксувати моменти після сну і їжі.`;
+    else text.textContent = `⚠️ Успішність ${rate}%. Спробуйте обмежити простір і частіше виводити на місце.`;
   }
-  showLoading();
-  try {
-    await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({
-      ...(currentPet || {}),
-      ...payload,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    toast('Профіль збережено', 'success');
-  } catch (e) {
-    console.error('Save pet profile error:', e);
-    toast('Помилка збереження профілю', 'error');
-  } finally {
-    hideLoading();
-  }
-}
 
-async function addEvent(payload) {
-  if (!currentUser || !workspaceId) {
-    toast('Спочатку увійдіть в систему', 'error');
-    return;
+  function renderCourses() {
+    const grid = $('courseGrid');
+    const viewer = $('selectedCourse');
+    if (!grid || !viewer) return;
+
+    grid.innerHTML = COURSES.map(course => `
+      <button type="button" class="course-btn ${course.id === currentCourseId ? 'selected' : ''}" data-course-id="${course.id}">
+        <span class="c-badge">${course.badge}</span>
+        <strong>${course.title}</strong>
+        <div class="c-meta">${course.description}</div>
+      </button>
+    `).join('');
+
+    $$('[data-course-id]').forEach(btn => btn.addEventListener('click', () => {
+      currentCourseId = btn.dataset.courseId;
+      renderCourses();
+      haptic();
+    }));
+
+    const course = COURSES.find(c => c.id === currentCourseId) || COURSES[0];
+    viewer.innerHTML = `
+      <div class="course-detail">
+        <h3>${course.title}</h3>
+        <p style="color:var(--text-secondary);margin-bottom:1rem">${course.description}</p>
+        <h4>Кроки</h4>
+        <ul>${course.steps.map(s => `<li>${s}</li>`).join('')}</ul>
+        <h4>Помилки</h4>
+        <ul class="mistakes">${course.mistakes.map(s => `<li>${s}</li>`).join('')}</ul>
+        <h4>Чекліст</h4>
+        <ul class="checks">${course.checklist.map(s => `<li>${s}</li>`).join('')}</ul>
+      </div>
+    `;
   }
-  try {
-    await db.collection('workspaces').doc(workspaceId).collection('events').add({
-      eventType: payload.eventType,
-      byUid: currentUser.uid,
-      byName: currentUser.displayName || 'Я',
-      trigger: payload.trigger || '',
-      note: payload.note || '',
-      timeLabel: payload.timeLabel || nowTime(),
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+
+  function renderKnowledge() {
+    const grid = $('knowledgeGrid');
+    if (grid) grid.innerHTML = KNOWLEDGE.map(k => `
+      <div class="k-card">
+        <strong>${k.title}</strong>
+        <p>${k.text}</p>
+        <span class="k-tag">${k.tag}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderSocial() {
+    const grid = $('socialGrid');
+    if (grid) grid.innerHTML = SOCIAL_ITEMS.map(item => `
+      <label class="social-item">
+        <input type="checkbox">
+        <span>${item}</span>
+      </label>
+    `).join('');
+  }
+
+  function renderToiletGuide() {
+    const grid = $('toiletGuide');
+    if (grid) grid.innerHTML = TOILET_GUIDE.map(step => `
+      <div class="k-card">
+        <strong>${step.title}</strong>
+        <p>${step.text}</p>
+      </div>
+    `).join('');
+  }
+
+  function renderMembers() {
+    const list = $('membersList');
+    if (!list) return;
+    list.innerHTML = membersState.length
+      ? membersState.map(m => `
+          <div class="member-chip">
+            <div class="m-avatar">${m.photoURL ? `<img src="${m.photoURL}" alt="">` : avatarLetter(m.displayName)}</div>
+            <span>${m.displayName || 'Учасник'}</span>
+          </div>
+        `).join('')
+      : '<div class="empty">Поки що тут тільки ви.</div>';
+  }
+
+  function renderWorkspaceMeta() {
+    const el = $('inviteCodeView');
+    if (el) el.textContent = workspaceData?.inviteCode || '—';
+  }
+
+  function fillPetForm() {
+    if ($('petName')) $('petName').value = currentPet?.name || '';
+    if ($('petBirthDate')) $('petBirthDate').value = currentPet?.birthDate || '';
+    if ($('petSex')) $('petSex').value = currentPet?.sex || 'хлопчик';
+    if ($('petBreed')) $('petBreed').value = currentPet?.breed || '';
+    if ($('petToiletMode')) $('petToiletMode').value = currentPet?.toiletMode || 'pad';
+  }
+
+  function renderFeed(targetId) {
+    const list = $(targetId);
+    if (!list) return;
+    if (!eventsState.length) {
+      list.innerHTML = '<div class="empty">Немає записів. Натисніть + щоб додати подію.</div>';
+      return;
+    }
+    list.innerHTML = eventsState.slice(0, 30).map(item => {
+      const conf = TYPE_CONFIG[item.eventType] || { icon: '•', label: 'Подія' };
+      const d = tsToDate(item.createdAt);
+      const timeStr = d ? d.toLocaleString('uk', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+      return `
+        <div class="feed-item" data-event-id="${item.id}">
+          <div>
+            <strong>${conf.icon} ${conf.label}</strong>
+            <div class="meta">${timeStr}${item.note ? ` · ${item.note}` : ''}</div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" data-delete-event="${item.id}">✕</button>
+        </div>
+      `;
+    }).join('');
+
+    $$(`#${targetId} [data-delete-event]`).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Видалити цей запис?')) return;
+        await deleteEvent(btn.dataset.deleteEvent);
+      });
     });
-    toast('Подію додано', 'success');
-  } catch (e) {
-    console.error('Add event error:', e);
-    toast('Помилка додавання події', 'error');
   }
-}
 
-async function deleteEvent(id) {
-  if (!workspaceId || !id) {
-    toast('Помилка: немає даних для видалення', 'error');
-    return;
-  }
-  try {
-    await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
-    toast('Подію видалено', 'success');
-  } catch (e) {
-    console.error('Delete event error:', e);
-    toast('Помилка видалення події', 'error');
-  }
-}
+  function renderChart(canvasId) {
+    const canvas = $(canvasId);
+    if (!canvas || !canvas.getContext) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width) return;
 
-async function ensureWorkspaceForUser(user) {
-  try {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+      const next = new Date(d); next.setDate(next.getDate() + 1);
+      const dayEvents = eventsState.filter(e => {
+        const ts = tsToDate(e.createdAt);
+        return ts && ts >= d && ts < next;
+      });
+      const success = dayEvents.filter(e => ['pad', 'outdoor'].includes(e.eventType)).length;
+      const miss = dayEvents.filter(e => e.eventType === 'miss').length;
+      const total = success + miss;
+      days.push({ date: d, pct: total ? Math.round(success / total * 100) : null });
+    }
+
+    const isDark = themeMode === 'dark';
+    const accent = isDark ? '#2dd4bf' : '#0f766e';
+    const danger = isDark ? '#f87171' : '#dc2626';
+    const warning = isDark ? '#fbbf24' : '#d97706';
+    const muted = isDark ? '#78716c' : '#a8a29e';
+    const border = isDark ? '#292524' : '#e7e5e4';
+
+    const pad = { top: 10, right: 4, bottom: 20, left: 4 };
+    const cw = w - pad.left - pad.right;
+    const ch = h - pad.top - pad.bottom;
+    const bw = cw / days.length;
+
+    // Grid lines
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    [0, 50, 100].forEach(v => {
+      const y = pad.top + ch - (v / 100) * ch;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+    });
+
+    // Bars
+    days.forEach((day, i) => {
+      const x = pad.left + i * bw + bw * 0.2;
+      const barW = bw * 0.6;
+
+      if (day.pct == null) {
+        ctx.fillStyle = muted;
+        ctx.beginPath();
+        ctx.arc(x + barW / 2, pad.top + ch - 3, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const barH = Math.max(3, (day.pct / 100) * ch);
+        const y = pad.top + ch - barH;
+        ctx.fillStyle = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
+        const r = Math.min(3, barW / 2);
+        ctx.beginPath();
+        ctx.moveTo(x, y + barH);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.lineTo(x + barW - r, y);
+        ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+        ctx.lineTo(x + barW, y + barH);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Date labels
+      if (i % 3 === 0 || i === days.length - 1) {
+        ctx.fillStyle = muted;
+        ctx.font = '10px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${day.date.getDate()}/${day.date.getMonth() + 1}`, x + barW / 2, h - 4);
+      }
+    });
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderAgeFocus();
+    renderDailyPlan();
+    renderKpis();
+    renderSuggestion();
+    renderFeed('recentLogs');
+    renderFeed('recentLogsDiary');
+    renderCourses();
+    renderKnowledge();
+    renderSocial();
+    renderToiletGuide();
+    renderMembers();
+    renderWorkspaceMeta();
+    fillPetForm();
+    renderChart('progressChartDiary');
+  }
+
+  // ===== Tab Navigation =====
+  function setActiveTab(id) {
+    $$('.tab').forEach(p => p.classList.toggle('active', p.id === id));
+    $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+    if (id === 'tabProfile') hide($('fabAddEvent'));
+    else show($('fabAddEvent'));
+    if (id === 'tabDiary') requestAnimationFrame(() => renderChart('progressChartDiary'));
+  }
+
+  // ===== Sheet =====
+  function openSheet() {
+    show($('eventSheet'));
+    $('eventTime').value = nowTime();
+  }
+  function closeSheet() { hide($('eventSheet')); }
+
+  // ===== Firestore Operations =====
+  async function savePetProfile(payload) {
+    if (!currentUser || !workspaceId) return toast('Увійдіть в систему', 'error');
+    showLoading();
+    try {
+      await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({
+        ...(currentPet || {}),
+        ...payload,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      toast('Профіль збережено', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('Помилка збереження', 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  async function addEvent(payload) {
+    if (!currentUser || !workspaceId) return toast('Увійдіть в систему', 'error');
+    try {
+      await db.collection('workspaces').doc(workspaceId).collection('events').add({
+        eventType: payload.eventType,
+        byUid: currentUser.uid,
+        byName: currentUser.displayName || 'Я',
+        note: payload.note || '',
+        timeLabel: payload.timeLabel || nowTime(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      toast('Додано ✓', 'success');
+      haptic();
+    } catch (e) {
+      console.error(e);
+      toast('Помилка додавання', 'error');
+    }
+  }
+
+  async function deleteEvent(id) {
+    if (!workspaceId || !id) return;
+    try {
+      await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
+      toast('Видалено', 'success');
+    } catch (e) {
+      console.error(e);
+      toast('Помилка видалення', 'error');
+    }
+  }
+
+  // ===== Workspace =====
+  async function ensureWorkspaceForUser(user) {
     const udoc = await db.collection('users').doc(user.uid).get();
     if (udoc.exists && udoc.data().workspaceId) {
       workspaceId = udoc.data().workspaceId;
@@ -410,300 +502,427 @@ async function ensureWorkspaceForUser(user) {
       workspaceData = wdoc.exists ? wdoc.data() : null;
       return;
     }
+
     const wsRef = db.collection('workspaces').doc();
     workspaceId = wsRef.id;
     const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-    workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]} Family`, ownerId: user.uid, inviteCode };
+    workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]}`, ownerId: user.uid, inviteCode };
+
     await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', workspaceId }, { merge: true });
-    await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    await wsRef.collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: 'хлопчик', breed: '', toiletMode: 'pad', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-  } catch (e) {
-    console.error('Ensure workspace error:', e);
-    toast('Помилка створення робочого простору', 'error');
-    throw e;
+    await db.collection('users').doc(user.uid).set({
+      uid: user.uid, email: user.email || '', displayName: user.displayName || '',
+      photoURL: user.photoURL || '', role: 'owner', workspaceId
+    }, { merge: true });
+    await wsRef.collection('members').doc(user.uid).set({
+      uid: user.uid, email: user.email || '', displayName: user.displayName || '',
+      photoURL: user.photoURL || '', role: 'owner',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await wsRef.collection('dogs').doc('primary').set({
+      name: '', birthDate: '', sex: 'хлопчик', breed: '', toiletMode: 'pad',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
   }
-}
 
-function subscribePet() {
-  if (!workspaceId) return;
-  unsubPet?.();
-  unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(s => {
-    currentPet = s.exists ? s.data() : null;
-    renderAll();
-  });
-}
-
-function subscribeMembers() {
-  if (!workspaceId) return;
-  unsubMembers?.();
-  unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members').onSnapshot(s => {
-    membersState = [];
-    s.forEach(d => membersState.push(d.data()));
-    renderMembers();
-  });
-}
-
-function subscribeEvents() {
-  if (!workspaceId) return;
-  unsubEvents?.();
-  unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events').orderBy('createdAt', 'desc').limit(200).onSnapshot(s => {
-    eventsState = [];
-    s.forEach(d => eventsState.push({ id: d.id, ...d.data() }));
-    renderAll();
-  });
-}
-
-async function joinWorkspaceByInvite(code) {
-  try {
+  async function joinWorkspaceByInvite(code) {
     const clean = (code || '').trim().toUpperCase();
-    if (!clean) throw new Error('Введи код запрошення');
+    if (!clean) throw new Error('Введіть код запрошення');
     const snap = await db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get();
     if (snap.empty) throw new Error('Код не знайдено');
+
     workspaceId = snap.docs[0].id;
     workspaceData = snap.docs[0].data();
-    await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', workspaceId }, { merge: true });
-    await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+
+    await db.collection('users').doc(currentUser.uid).set({
+      uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || '',
+      photoURL: currentUser.photoURL || '', role: 'member', workspaceId
+    }, { merge: true });
+    await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({
+      uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || '',
+      photoURL: currentUser.photoURL || '', role: 'member',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
     subscribePet();
     subscribeMembers();
     subscribeEvents();
-    renderAll();
-  } catch (e) {
-    console.error('Join workspace error:', e);
-    throw e;
+    queueRender();
   }
-}
 
-async function loginGoogle() {
-  showLoading();
-  try {
-    const result = await auth.signInWithPopup(googleProvider);
-    console.log('Google login success:', result.user.email);
-  } catch (e) {
-    console.error('Google popup error:', e.code, e.message);
-    
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      try {
-        toast('Відкриваємо вхід у новому вікні...', 'info');
-        await auth.signInWithRedirect(googleProvider);
-      } catch (err) {
-        console.error('Google redirect error:', err.code, err.message);
-        if (err.code === 'auth/unauthorized-domain') {
-          toast('Помилка: домен не авторизовано в Firebase Console', 'error');
-        } else if (err.code === 'auth/operation-not-allowed') {
-          toast('Помилка: Google Auth не увімкнено в Firebase Console', 'error');
-        } else {
-          toast(err.message || 'Помилка входу через Google', 'error');
-        }
-      }
-    } else if (e.code === 'auth/unauthorized-domain') {
-      toast('Помилка: домен не авторизовано. Додайте поточний домен в Firebase Console → Authentication → Settings → Authorized domains', 'error');
-    } else if (e.code === 'auth/operation-not-allowed') {
-      toast('Помилка: Google Auth не увімкнено. Увімкніть в Firebase Console → Authentication → Sign-in method', 'error');
-    } else if (e.code === 'auth/configuration-not-found') {
-      toast('Помилка конфігурації Firebase. Перевірте authDomain в налаштуваннях', 'error');
-    } else {
-      toast(`${e.message || 'Помилка входу'}`, 'error');
-    }
-  } finally {
-    hideLoading();
+  // ===== Subscriptions =====
+  function subscribePet() {
+    unsubPet?.();
+    unsubPet = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary')
+      .onSnapshot(s => {
+        currentPet = s.exists ? s.data() : null;
+        queueRender();
+      });
   }
-}
 
-async function logoutGoogle() {
-  unsubEvents?.();
-  unsubMembers?.();
-  unsubPet?.();
-  unsubEvents = unsubMembers = unsubPet = null;
-  await auth.signOut();
-  currentUser = null;
-  workspaceId = null;
-  workspaceData = null;
-  currentPet = null;
-  eventsState = [];
-  membersState = [];
-  setVisible($('appContent'), false);
-  setVisible($('authScreen'), true);
-}
+  function subscribeMembers() {
+    unsubMembers?.();
+    unsubMembers = db.collection('workspaces').doc(workspaceId).collection('members')
+      .onSnapshot(s => {
+        membersState = [];
+        s.forEach(d => membersState.push(d.data()));
+        renderMembers();
+      });
+  }
 
-function addAIMessage(text, type) {
-  const chat = $('aiChat');
-  if (!chat) return;
-  const msg = document.createElement('div');
-  msg.className = `ai-msg ${type}`;
-  msg.textContent = text;
-  chat.appendChild(msg);
-  chat.scrollTop = chat.scrollHeight;
-}
+  function subscribeEvents() {
+    unsubEvents?.();
+    unsubEvents = db.collection('workspaces').doc(workspaceId).collection('events')
+      .orderBy('createdAt', 'desc').limit(200)
+      .onSnapshot(s => {
+        eventsState = [];
+        s.forEach(d => eventsState.push({ id: d.id, ...d.data() }));
+        queueRender();
+      });
+  }
 
-async function fetchAIResponse(prompt) {
-  try {
-    const petInfo = currentPet ? 
-      `Ім'я: ${currentPet.name || 'Песик'}, Вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, Порода: ${currentPet.breed || 'Невідома'}, Стать: ${currentPet.sex}` : 
-      'Інформація про собаку недоступна';
-    
-    const systemPrompt = `Ти професійний кінолог-інструктор. Дай чіткі, практичні поради українською мовою. 
-Порода собаки: ${petInfo}. 
-Відповідай коротко, по суті, з конкретними кроками. Максимум 3-4 речення.`;
-
-    const response = await fetch('/api/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'groq/llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 500,
-        top_p: 0.9
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (data.error) {
-      console.error('AI proxy error:', data.error);
-      return getLocalAIResponse(prompt);
-    }
-    
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      return data.choices[0].message.content;
-    }
-    
-    return getLocalAIResponse(prompt);
-  } catch (e) {
-    console.error('AI fetch error:', e);
-    // Fallback to local responses if API fails
-    return getLocalAIResponse(prompt);
-  }
-}
-
-function getLocalAIResponse(prompt) {
-  const lower = prompt.toLowerCase();
-  
-  if (lower.includes('команда') || lower.includes('сідати')) {
-    return 'Для навчання команди "Сідати": 1) Тримайте ласощі біля носа собаки. 2) Повільно підніміть руку над головою. 3) Коли собака сяде, скажіть "Сідати" і дайте ласощі. 4) Повторюйте 5-10 разів на день.';
-  }
-  
-  if (lower.includes('гриз') || lower.includes('речі')) {
-    return 'Щоб зупинити гризіння речей: 1) Дайте собці іграшки для гризіння. 2) Приберіть цінні речі. 3) Коли гризе - скажіть "Ні" і дайте іграшку. 4) Більше прогулянок знижує стрес.';
-  }
-  
-  if (lower.includes('гавк') || lower.includes('лает')) {
-    return 'Для зменшення гавкоту: 1) Знайдіть причину (нудьга, тривога). 2) Більше фізичної активності. 3) Навчіть команду "Тихо". 4) Ігноруйте зайвий гавкіт, винагороджуйте тишу.';
-  }
-  
-  if (lower.includes('соціалізація') || lower.includes('цуценя')) {
-    return 'Соціалізація цуценя: 1) Знайомте з новими людьми, тваринами, звуками. 2) Починайте з 8-12 тижнів. 3) Будьте позитивними, давайте ласощі. 4) Уникляйте страшних ситуацій.';
-  }
-  
-  if (lower.includes('пелюшка') || lower.includes('туалет')) {
-    return 'Навчання на пелюшку: 1) Ставте пелюшку в одному місці. 2) Хваліть за успіх. 3) Не карайте за промахи. 4) Виводьте на вулицю регулярно. 5) Приберіть запахи.';
-  }
-  
-  if (lower.includes('прогулянк')) {
-    return 'Поради для прогулянок: 1) Використовуйте повідок. 2) Дозволяйте досліджувати. 3) Беріть воду та ласощі. 4) Уникляйте спеки. 5) Соціалізуйте з іншими собаками.';
-  }
-  
-  return 'Я AI-помічник для кінологів. Запитайте про команди, гризіння, гавкіт, соціалізацію, туалет або прогулянки, і я дам професійні поради!';
-}
-
-function bindEvents() {
-  setTheme(themeMode);
-  $$('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => setTheme(themeMode === 'dark' ? 'light' : 'dark')));
-  $('googleLoginBtn')?.addEventListener('click', loginGoogle);
-  $('logoutBtn')?.addEventListener('click', logoutGoogle);
-  $('fabAddEvent')?.addEventListener('click', openSheet);
-  $('sheetBackdrop')?.addEventListener('click', closeSheet);
-  $$('.nav-tab').forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
-  $$('[data-quick-event]').forEach(btn => btn.addEventListener('click', async () => {
-    await addEvent({ eventType: btn.dataset.quickEvent, timeLabel: nowTime() });
-    closeSheet();
-  }));
-  $('eventForm')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    await addEvent({ eventType: $('eventType').value, timeLabel: $('eventTime').value || nowTime(), note: $('eventNote').value.trim() });
-    e.target.reset();
-    closeSheet();
-  });
-  $('petProfileForm')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    await savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), toiletMode: $('petToiletMode').value });
-  });
-  $('copyInviteBtn')?.addEventListener('click', async () => {
-    if (!workspaceData?.inviteCode) return;
-    try {
-      await navigator.clipboard.writeText(workspaceData.inviteCode);
-      toast('Код скопійовано', 'success');
-    } catch {
-      toast('Не вдалося скопіювати', 'error');
-    }
-  });
-  $('joinWorkspaceForm')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    try {
-      await joinWorkspaceByInvite($('inviteCodeInput').value);
-      $('inviteCodeInput').value = '';
-      toast('Ви приєдналися', 'success');
-    } catch (err) {
-      toast(err.message || 'Не вдалося приєднатися', 'error');
-    }
-  });
-  
-  // AI Chat functionality
-  $('aiForm')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const input = $('aiInput');
-    const message = input.value.trim();
-    if (!message) return;
-    
-    addAIMessage(message, 'user');
-    input.value = '';
-    
-    try {
-      const response = await fetchAIResponse(message);
-      addAIMessage(response, 'assistant');
-    } catch (err) {
-      addAIMessage('На жаль, виникла помилка. Спробуйте пізніше.', 'assistant');
-    }
-  });
-  
-  $$('[data-ai-prompt]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const prompt = btn.dataset.aiPrompt;
-      $('aiInput').value = prompt;
-      $('aiForm')?.dispatchEvent(new Event('submit'));
-    });
-  });
-  
-  $('clearChatBtn')?.addEventListener('click', () => {
-    const chat = $('aiChat');
-    if (chat) chat.innerHTML = '';
-  });
-}
-
-function bootAuth() {
-  auth.onAuthStateChanged(async user => {
-    currentUser = user || null;
-    setVisible($('authScreen'), !currentUser);
-    setVisible($('appContent'), !!currentUser);
-    if (!currentUser) return;
+  // ===== Auth =====
+  async function loginGoogle() {
     showLoading();
     try {
-      await ensureWorkspaceForUser(currentUser);
-      subscribePet();
-      subscribeMembers();
-      subscribeEvents();
-      renderAll();
+      await auth.signInWithPopup(googleProvider);
     } catch (e) {
-      toast(e.message || 'Помилка запуску', 'error');
+      console.error('Auth error:', e.code, e.message);
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+        try { await auth.signInWithRedirect(googleProvider); } catch (err) {
+          toast(err.message || 'Помилка входу', 'error');
+        }
+      } else if (e.code === 'auth/unauthorized-domain') {
+        toast('Домен не авторизовано. Додайте його в Firebase Console → Auth → Authorized domains', 'error');
+      } else {
+        toast(e.message || 'Помилка входу', 'error');
+      }
     } finally {
       hideLoading();
     }
-  });
-}
+  }
 
-bindEvents();
-bootAuth();
+  async function logout() {
+    unsubEvents?.(); unsubMembers?.(); unsubPet?.();
+    unsubEvents = unsubMembers = unsubPet = null;
+    await auth.signOut();
+    currentUser = null; workspaceId = null; workspaceData = null;
+    currentPet = null; eventsState = []; membersState = [];
+    hide($('appContent'));
+    show($('authScreen'));
+  }
+  // ===== AI Chat =====
+  function addChatMessage(text, type) {
+    const chat = $('aiChat');
+    if (!chat) return;
+    const msg = document.createElement('div');
+    msg.className = `ai-msg ${type}`;
+    msg.textContent = text;
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function showTypingIndicator() {
+    const chat = $('aiChat');
+    if (!chat) return;
+    const el = document.createElement('div');
+    el.className = 'ai-msg loading';
+    el.id = 'typingIndicator';
+    el.textContent = 'Думаю...';
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function removeTypingIndicator() {
+    const el = $('typingIndicator');
+    if (el) el.remove();
+  }
+
+  async function fetchAIResponse(prompt) {
+    const petInfo = currentPet
+      ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}, режим туалету: ${currentPet.toiletMode || 'pad'}`
+      : '';
+
+    const recentEvents = eventsState.slice(0, 10).map(e => {
+      const conf = TYPE_CONFIG[e.eventType] || { label: e.eventType };
+      return conf.label;
+    }).join(', ');
+
+    const systemPrompt = `Ти професійний кінолог-інструктор з 15+ роками досвіду. Відповідай українською мовою.
+Правила:
+- Коротко: 3-5 речень максимум
+- Конкретні кроки, які можна зробити прямо зараз
+- Якщо питання не про собак — ввічливо поверни до теми
+- Враховуй вік і породу при відповіді
+
+${petInfo ? `Контекст: ${petInfo}` : ''}
+${recentEvents ? `Останні події: ${recentEvents}` : ''}`;
+
+    try {
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 600,
+          top_p: 0.9
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content.trim();
+      }
+
+      throw new Error('Unexpected response format');
+    } catch (e) {
+      console.warn('AI API error, using fallback:', e.message);
+      return getLocalFallback(prompt);
+    }
+  }
+
+  function getLocalFallback(prompt) {
+    const lower = prompt.toLowerCase();
+    const weeks = getAgeInWeeks(currentPet?.birthDate);
+    const program = getProgramByAge(weeks);
+
+    if (lower.includes('команд') || lower.includes('сідати') || lower.includes('лежати')) {
+      return '1) Тримайте ласощі біля носа. 2) Повільно підніміть руку — собака сяде автоматично. 3) Одразу маркер "Так!" + ласощі. 4) Повторюйте 5-8 разів, 2-3 підходи на день. Сесія не довше 2 хвилин.';
+    }
+    if (lower.includes('гриз') || lower.includes('речі') || lower.includes('взуття')) {
+      return '1) Приберіть доступні речі. 2) Дайте 2-3 жувальні іграшки. 3) Коли гризе своє — маркер + похвала. 4) Гризе чуже — мовчки заберіть, дайте іграшку. Більше фізичної і розумової активності знижує потребу гризти.';
+    }
+    if (lower.includes('гавк') || lower.includes('лає') || lower.includes('шум')) {
+      return '1) Знайдіть причину: нудьга, страх, збудження? 2) При гавкоті — не кричіть у відповідь. 3) Навчіть команду "Тихо": чекайте паузу → маркер → ласощі. 4) Збільшіть фізичне навантаження і нюхові ігри.';
+    }
+    if (lower.includes('соціалізац') || lower.includes('боїться') || lower.includes('страх')) {
+      return '1) Не змушуйте підходити до страшного. 2) Покажіть на безпечній відстані. 3) Цікавість = ласощі і похвала. 4) Закінчуйте до ознак стресу. Поступово зменшуйте дистанцію за кілька днів.';
+    }
+    if (lower.includes('пелюшк') || lower.includes('туалет') || lower.includes('калюж')) {
+      return '1) Обмежте простір. 2) Після сну/їжі/гри — мовчки на пелюшку. 3) Зробило — одразу "Так!" + ласощі. 4) Промах — тихо прибрати ензимним засобом. 5) Записуйте час — побачите патерн.';
+    }
+    if (lower.includes('прогулянк') || lower.includes('повідець') || lower.includes('тягне')) {
+      return '1) Собака тягне — зупиніться повністю. 2) Повідець вільний — йдете далі. 3) Беріть ласощі для підкріплення. 4) Перші тижні гуляйте коротко і в тихих місцях. Терпіння — ключ.';
+    }
+    if (lower.includes('кусає') || lower.includes('зуби') || lower.includes('щипає')) {
+      return '1) Кусає — завмріть і тихо "ай". 2) Заберіть увагу на 5 секунд. 3) Дайте іграшку замість руки. 4) Грає спокійно — хваліть. 5) Перезбуджено — пауза або вийдіть з кімнати.';
+    }
+
+    // Generic fallback using current program tip
+    return program?.tip || 'Запитайте про конкретну ситуацію: команди, туалет, гризіння, гавкіт, страхи або прогулянки — і я дам покроковий план.';
+  }
+
+  async function handleAISubmit(prompt) {
+    if (!prompt.trim()) return;
+
+    addChatMessage(prompt, 'user');
+    showTypingIndicator();
+
+    try {
+      const response = await fetchAIResponse(prompt);
+      removeTypingIndicator();
+      addChatMessage(response, 'assistant');
+    } catch (e) {
+      removeTypingIndicator();
+      addChatMessage('Виникла помилка. Спробуйте ще раз.', 'assistant');
+    }
+  }
+
+  // ===== Event Binding =====
+  function bindEvents() {
+    setTheme(themeMode);
+
+    // Theme toggle
+    $$('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => {
+      setTheme(themeMode === 'dark' ? 'light' : 'dark');
+      haptic();
+    }));
+
+    // Auth
+    $('googleLoginBtn')?.addEventListener('click', loginGoogle);
+    $('logoutBtn')?.addEventListener('click', logout);
+
+    // Navigation
+    $$('.nav-item').forEach(btn => btn.addEventListener('click', () => {
+      setActiveTab(btn.dataset.tab);
+      haptic();
+    }));
+
+    // FAB & Sheet
+    $('fabAddEvent')?.addEventListener('click', openSheet);
+    $('sheetBackdrop')?.addEventListener('click', closeSheet);
+
+    // Quick events
+    $$('[data-quick-event]').forEach(btn => btn.addEventListener('click', async () => {
+      await addEvent({ eventType: btn.dataset.quickEvent, timeLabel: nowTime() });
+      closeSheet();
+    }));
+
+    // Event form
+    $('eventForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const eventType = $('eventType').value;
+      const timeLabel = $('eventTime').value || nowTime();
+      const note = $('eventNote').value.trim();
+      await addEvent({ eventType, timeLabel, note });
+      $('eventNote').value = '';
+      closeSheet();
+    });
+
+    // Pet profile form
+    $('petProfileForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await savePetProfile({
+        name: $('petName').value.trim(),
+        birthDate: $('petBirthDate').value,
+        sex: $('petSex').value,
+        breed: $('petBreed').value.trim(),
+        toiletMode: $('petToiletMode').value
+      });
+    });
+
+    // Invite code
+    $('copyInviteBtn')?.addEventListener('click', async () => {
+      if (!workspaceData?.inviteCode) return;
+      try {
+        await navigator.clipboard.writeText(workspaceData.inviteCode);
+        toast('Код скопійовано', 'success');
+      } catch {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = workspaceData.inviteCode;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        toast('Код скопійовано', 'success');
+      }
+    });
+
+    // Join workspace
+    $('joinWorkspaceForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('inviteCodeInput');
+      try {
+        await joinWorkspaceByInvite(input.value);
+        input.value = '';
+        toast('Ви приєдналися!', 'success');
+      } catch (err) {
+        toast(err.message || 'Не вдалося приєднатися', 'error');
+      }
+    });
+
+    // AI Chat form
+    $('aiForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('aiInput');
+      const message = input.value.trim();
+      if (!message) return;
+      input.value = '';
+      input.style.height = 'auto';
+      await handleAISubmit(message);
+    });
+
+    // AI quick prompts
+    $$('[data-ai-prompt]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const prompt = btn.dataset.aiPrompt;
+        await handleAISubmit(prompt);
+        haptic();
+      });
+    });
+
+    // Clear chat
+    $('clearChatBtn')?.addEventListener('click', () => {
+      const chat = $('aiChat');
+      if (chat) chat.innerHTML = '';
+    });
+
+    // Auto-resize textarea
+    const aiInput = $('aiInput');
+    if (aiInput) {
+      aiInput.addEventListener('input', () => {
+        aiInput.style.height = 'auto';
+        aiInput.style.height = Math.min(aiInput.scrollHeight, 120) + 'px';
+      });
+    }
+
+    // Keyboard shortcut: Enter to send in AI chat (Shift+Enter for newline)
+    $('aiInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        $('aiForm')?.requestSubmit();
+      }
+    });
+
+    // Close sheet on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeSheet();
+    });
+
+    // Handle window resize for chart
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => renderChart('progressChartDiary'), 200);
+    });
+  }
+
+  // ===== Auth State & Boot =====
+  function bootAuth() {
+    auth.onAuthStateChanged(async (user) => {
+      currentUser = user || null;
+
+      if (!currentUser) {
+        show($('authScreen'));
+        hide($('appContent'));
+        return;
+      }
+
+      hide($('authScreen'));
+      show($('appContent'));
+      showLoading();
+
+      try {
+        await ensureWorkspaceForUser(currentUser);
+        subscribePet();
+        subscribeMembers();
+        subscribeEvents();
+        queueRender();
+      } catch (e) {
+        console.error('Boot error:', e);
+        toast('Помилка завантаження даних', 'error');
+      } finally {
+        hideLoading();
+      }
+    });
+  }
+
+  // ===== Init =====
+  bindEvents();
+  bootAuth();
+
+  // Handle redirect result (for popup-blocked fallback)
+  auth.getRedirectResult().then((result) => {
+    if (result?.user) {
+      console.log('Redirect login success:', result.user.email);
+    }
+  }).catch((e) => {
+    if (e.code && e.code !== 'auth/no-auth-event') {
+      console.error('Redirect error:', e);
+      toast('Помилка входу через redirect', 'error');
+    }
+  });
+
+})();

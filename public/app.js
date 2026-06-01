@@ -6,15 +6,21 @@ const TOILET_GUIDE = window.TOILET_GUIDE;
 const TYPE_CONFIG = window.TYPE_CONFIG;
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCY2SKRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: 'dogs-55f5e.firebaseapp.com',
-  projectId: 'dogs-55f5e',
-  storageBucket: 'dogs-55f5e.firebasestorage.app',
-  messagingSenderId: '1053489833652',
-  appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
+  apiKey: window.FIREBASE_API_KEY || 'AIzaSyCY2SKRPpopi7mtsihrlqocxdgG8cBjNHI',
+  authDomain: window.FIREBASE_AUTH_DOMAIN || 'dogs-55f5e.firebaseapp.com',
+  projectId: window.FIREBASE_PROJECT_ID || 'dogs-55f5e',
+  storageBucket: window.FIREBASE_STORAGE_BUCKET || 'dogs-55f5e.firebasestorage.app',
+  messagingSenderId: window.FIREBASE_MESSAGING_SENDER_ID || '1053489833652',
+  appId: window.FIREBASE_APP_ID || '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
 };
 
-firebase.initializeApp(firebaseConfig);
+try {
+  firebase.initializeApp(firebaseConfig);
+} catch (e) {
+  console.error('Firebase init error:', e);
+  toast('Помилка ініціалізації Firebase', 'error');
+}
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
@@ -39,6 +45,8 @@ let themeMode = localStorage.getItem('doggo_theme') || 'light';
 let dailyDone = JSON.parse(localStorage.getItem('doggo_daily_done') || '{}');
 
 const setVisible = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
+const showLoading = () => setVisible($('loadingOverlay'), true);
+const hideLoading = () => setVisible($('loadingOverlay'), false);
 const haptic = (ms = 10) => { if (navigator.vibrate) navigator.vibrate(ms); };
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -335,49 +343,85 @@ function setActiveTab(id) {
 function openSheet() { setVisible($('eventSheet'), true); $('eventTime').value = nowTime(); }
 function closeSheet() { setVisible($('eventSheet'), false); }
 
-function savePetProfile(payload) {
-  if (!currentUser || !workspaceId) return;
-  return db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({
-    ...(currentPet || {}),
-    ...payload,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+async function savePetProfile(payload) {
+  if (!currentUser || !workspaceId) {
+    toast('Спочатку увійдіть в систему', 'error');
+    return;
+  }
+  showLoading();
+  try {
+    await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({
+      ...(currentPet || {}),
+      ...payload,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    toast('Профіль збережено', 'success');
+  } catch (e) {
+    console.error('Save pet profile error:', e);
+    toast('Помилка збереження профілю', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-function addEvent(payload) {
-  if (!currentUser || !workspaceId) return;
-  return db.collection('workspaces').doc(workspaceId).collection('events').add({
-    eventType: payload.eventType,
-    byUid: currentUser.uid,
-    byName: currentUser.displayName || 'Я',
-    trigger: payload.trigger || '',
-    note: payload.note || '',
-    timeLabel: payload.timeLabel || nowTime(),
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
+async function addEvent(payload) {
+  if (!currentUser || !workspaceId) {
+    toast('Спочатку увійдіть в систему', 'error');
+    return;
+  }
+  try {
+    await db.collection('workspaces').doc(workspaceId).collection('events').add({
+      eventType: payload.eventType,
+      byUid: currentUser.uid,
+      byName: currentUser.displayName || 'Я',
+      trigger: payload.trigger || '',
+      note: payload.note || '',
+      timeLabel: payload.timeLabel || nowTime(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Подію додано', 'success');
+  } catch (e) {
+    console.error('Add event error:', e);
+    toast('Помилка додавання події', 'error');
+  }
 }
 
-function deleteEvent(id) {
-  if (!workspaceId || !id) return Promise.resolve();
-  return db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
+async function deleteEvent(id) {
+  if (!workspaceId || !id) {
+    toast('Помилка: немає даних для видалення', 'error');
+    return;
+  }
+  try {
+    await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete();
+    toast('Подію видалено', 'success');
+  } catch (e) {
+    console.error('Delete event error:', e);
+    toast('Помилка видалення події', 'error');
+  }
 }
 
 async function ensureWorkspaceForUser(user) {
-  const udoc = await db.collection('users').doc(user.uid).get();
-  if (udoc.exists && udoc.data().workspaceId) {
-    workspaceId = udoc.data().workspaceId;
-    const wdoc = await db.collection('workspaces').doc(workspaceId).get();
-    workspaceData = wdoc.exists ? wdoc.data() : null;
-    return;
+  try {
+    const udoc = await db.collection('users').doc(user.uid).get();
+    if (udoc.exists && udoc.data().workspaceId) {
+      workspaceId = udoc.data().workspaceId;
+      const wdoc = await db.collection('workspaces').doc(workspaceId).get();
+      workspaceData = wdoc.exists ? wdoc.data() : null;
+      return;
+    }
+    const wsRef = db.collection('workspaces').doc();
+    workspaceId = wsRef.id;
+    const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+    workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]} Family`, ownerId: user.uid, inviteCode };
+    await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', workspaceId }, { merge: true });
+    await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await wsRef.collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: 'хлопчик', breed: '', toiletMode: 'pad', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  } catch (e) {
+    console.error('Ensure workspace error:', e);
+    toast('Помилка створення робочого простору', 'error');
+    throw e;
   }
-  const wsRef = db.collection('workspaces').doc();
-  workspaceId = wsRef.id;
-  const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-  workspaceData = { name: `${(user.displayName || 'Мій').split(' ')[0]} Family`, ownerId: user.uid, inviteCode };
-  await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-  await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', workspaceId }, { merge: true });
-  await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email || '', displayName: user.displayName || 'User', photoURL: user.photoURL || '', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-  await wsRef.collection('dogs').doc('primary').set({ name: '', birthDate: '', sex: 'хлопчик', breed: '', toiletMode: 'pad', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
 }
 
 function subscribePet() {
@@ -410,29 +454,58 @@ function subscribeEvents() {
 }
 
 async function joinWorkspaceByInvite(code) {
-  const clean = (code || '').trim().toUpperCase();
-  if (!clean) throw new Error('Введи код запрошення');
-  const snap = await db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get();
-  if (snap.empty) throw new Error('Код не знайдено');
-  workspaceId = snap.docs[0].id;
-  workspaceData = snap.docs[0].data();
-  await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', workspaceId }, { merge: true });
-  await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-  subscribePet();
-  subscribeMembers();
-  subscribeEvents();
-  renderAll();
+  try {
+    const clean = (code || '').trim().toUpperCase();
+    if (!clean) throw new Error('Введи код запрошення');
+    const snap = await db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get();
+    if (snap.empty) throw new Error('Код не знайдено');
+    workspaceId = snap.docs[0].id;
+    workspaceData = snap.docs[0].data();
+    await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', workspaceId }, { merge: true });
+    await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || 'User', photoURL: currentUser.photoURL || '', role: 'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    subscribePet();
+    subscribeMembers();
+    subscribeEvents();
+    renderAll();
+  } catch (e) {
+    console.error('Join workspace error:', e);
+    throw e;
+  }
 }
 
 async function loginGoogle() {
+  showLoading();
   try {
-    await auth.signInWithPopup(googleProvider);
+    const result = await auth.signInWithPopup(googleProvider);
+    console.log('Google login success:', result.user.email);
   } catch (e) {
-    try {
-      await auth.signInWithRedirect(googleProvider);
-    } catch (err) {
-      toast(err.message || 'Login error', 'error');
+    console.error('Google popup error:', e.code, e.message);
+    
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      try {
+        toast('Відкриваємо вхід у новому вікні...', 'info');
+        await auth.signInWithRedirect(googleProvider);
+      } catch (err) {
+        console.error('Google redirect error:', err.code, err.message);
+        if (err.code === 'auth/unauthorized-domain') {
+          toast('Помилка: домен не авторизовано в Firebase Console', 'error');
+        } else if (err.code === 'auth/operation-not-allowed') {
+          toast('Помилка: Google Auth не увімкнено в Firebase Console', 'error');
+        } else {
+          toast(err.message || 'Помилка входу через Google', 'error');
+        }
+      }
+    } else if (e.code === 'auth/unauthorized-domain') {
+      toast('Помилка: домен не авторизовано. Додайте поточний домен в Firebase Console → Authentication → Settings → Authorized domains', 'error');
+    } else if (e.code === 'auth/operation-not-allowed') {
+      toast('Помилка: Google Auth не увімкнено. Увімкніть в Firebase Console → Authentication → Sign-in method', 'error');
+    } else if (e.code === 'auth/configuration-not-found') {
+      toast('Помилка конфігурації Firebase. Перевірте authDomain в налаштуваннях', 'error');
+    } else {
+      toast(`${e.message || 'Помилка входу'}`, 'error');
     }
+  } finally {
+    hideLoading();
   }
 }
 
@@ -473,7 +546,6 @@ function bindEvents() {
   $('petProfileForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     await savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), toiletMode: $('petToiletMode').value });
-    toast('Профіль збережено', 'success');
   });
   $('copyInviteBtn')?.addEventListener('click', async () => {
     if (!workspaceData?.inviteCode) return;
@@ -502,6 +574,7 @@ function bootAuth() {
     setVisible($('authScreen'), !currentUser);
     setVisible($('appContent'), !!currentUser);
     if (!currentUser) return;
+    showLoading();
     try {
       await ensureWorkspaceForUser(currentUser);
       subscribePet();
@@ -510,6 +583,8 @@ function bootAuth() {
       renderAll();
     } catch (e) {
       toast(e.message || 'Помилка запуску', 'error');
+    } finally {
+      hideLoading();
     }
   });
 }

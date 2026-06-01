@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f766e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -89,7 +89,7 @@
 
         <!-- Stats -->
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card stat-ring-card">
             <div class="stat-ring">
               <svg viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="40" class="ring-bg"/>
@@ -97,7 +97,7 @@
               </svg>
               <span id="ringPct" class="ring-value">0%</span>
             </div>
-            <span class="stat-label">Успіх сьогодні</span>
+            <span class="stat-label">Успіх</span>
           </div>
           <div class="stat-card">
             <div class="stat-number success" id="kpiPad">0</div>
@@ -109,7 +109,7 @@
           </div>
           <div class="stat-card">
             <div class="stat-number danger" id="kpiMiss">0</div>
-            <span class="stat-label">❌ Промахи</span>
+            <span class="stat-label">❌ Промах</span>
           </div>
         </div>
 
@@ -161,16 +161,40 @@
         <div id="recentLogsDiary" class="feed"></div>
       </section>
 
-      <!-- TAB: Courses -->
+      <!-- TAB: Courses (Courses + Knowledge + AI combined) -->
       <section id="tabCourses" class="tab">
-        <h3 class="page-title">🎓 Курси</h3>
+        <h3 class="page-title">🎓 Навчання</h3>
+
+        <!-- AI Chat Section -->
+        <div class="card ai-section">
+          <h4 class="card-title">🤖 Запитати AI кінолога</h4>
+          <div class="ai-prompts">
+            <button class="chip" data-ai-prompt="Як навчити команду 'Сідати'?" type="button">Команди</button>
+            <button class="chip" data-ai-prompt="Що робити якщо пес гризе речі?" type="button">Гризіння</button>
+            <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">Гавкіт</button>
+            <button class="chip" data-ai-prompt="Поради для соціалізації цуценя" type="button">Соціалізація</button>
+            <button class="chip" data-ai-prompt="Як навчити на пелюшку?" type="button">Туалет</button>
+            <button class="chip" data-ai-prompt="Поради для прогулянок" type="button">Прогулянки</button>
+          </div>
+          <div id="aiChat" class="chat-box"></div>
+          <form id="aiForm" class="chat-form">
+            <div class="chat-input-row">
+              <textarea id="aiInput" placeholder="Запитайте пораду..." rows="1"></textarea>
+              <button class="btn btn-primary btn-send" type="submit" aria-label="Надіслати">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="clearChatBtn" type="button">Очистити чат</button>
+          </form>
+        </div>
+
+        <!-- Courses -->
+        <h4 class="section-title mt-lg">Курси</h4>
         <div id="courseGrid" class="course-grid"></div>
         <div id="selectedCourse"></div>
-      </section>
 
-      <!-- TAB: Knowledge -->
-      <section id="tabKnowledge" class="tab">
-        <h3 class="page-title">📚 База знань</h3>
+        <!-- Knowledge -->
+        <h4 class="section-title mt-lg">📚 База знань</h4>
         <div id="knowledgeGrid" class="knowledge-grid"></div>
 
         <h4 class="section-title mt-lg">🌍 Соціалізація</h4>
@@ -178,27 +202,6 @@
 
         <h4 class="section-title mt-lg">🚽 Туалет — алгоритм</h4>
         <div id="toiletGuide" class="knowledge-grid"></div>
-      </section>
-
-      <!-- TAB: AI -->
-      <section id="tabAI" class="tab">
-        <h3 class="page-title">🤖 AI Кінолог</h3>
-        <div class="ai-prompts">
-          <button class="chip" data-ai-prompt="Як навчити команду 'Сідати'?" type="button">🎓 Команди</button>
-          <button class="chip" data-ai-prompt="Що робити якщо пес гризе речі?" type="button">🦴 Гризіння</button>
-          <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">🔊 Гавкіт</button>
-          <button class="chip" data-ai-prompt="Поради для соціалізації цуценя" type="button">🐕 Соціалізація</button>
-          <button class="chip" data-ai-prompt="Як навчити на пелюшку?" type="button">🧻 Туалет</button>
-          <button class="chip" data-ai-prompt="Поради для прогулянок" type="button">🌳 Прогулянки</button>
-        </div>
-        <div id="aiChat" class="chat-box"></div>
-        <form id="aiForm" class="chat-form">
-          <textarea id="aiInput" placeholder="Запитайте пораду..." rows="2"></textarea>
-          <div class="chat-actions">
-            <button class="btn btn-primary" type="submit">Надіслати</button>
-            <button class="btn btn-ghost" id="clearChatBtn" type="button">Очистити</button>
-          </div>
-        </form>
       </section>
 
       <!-- TAB: Profile -->
@@ -242,7 +245,7 @@
         <div class="card">
           <h4 class="card-title">👥 Команда</h4>
           <div class="invite-row">
-            <span class="text-muted">Код запрошення:</span>
+            <span class="text-muted">Код:</span>
             <code id="inviteCodeView">—</code>
             <button id="copyInviteBtn" class="btn btn-ghost btn-sm" type="button">Копіювати</button>
           </div>
@@ -255,13 +258,24 @@
       </section>
     </main>
 
-    <!-- Bottom Nav -->
-    <nav class="nav" aria-label="Основна навігація">
-      <button class="nav-item active" data-tab="tabHome" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Дім</span></button>
-      <button class="nav-item" data-tab="tabDiary" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Щоденник</span></button>
-      <button class="nav-item" data-tab="tabCourses" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Курси</span></button>
-      <button class="nav-item" data-tab="tabAI" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg><span>AI</span></button>
-      <button class="nav-item" data-tab="tabProfile" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Профіль</span></button>
+    <!-- Bottom Nav — 4 tabs -->
+    <nav class="nav" aria-label="Навігація">
+      <button class="nav-item active" data-tab="tabHome" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Дім</span>
+      </button>
+      <button class="nav-item" data-tab="tabDiary" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Щоденник</span>
+      </button>
+      <button class="nav-item" data-tab="tabCourses" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>Навчання</span>
+      </button>
+      <button class="nav-item" data-tab="tabProfile" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Профіль</span>
+      </button>
     </nav>
 
     <!-- FAB -->

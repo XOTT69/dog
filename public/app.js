@@ -639,58 +639,45 @@
   }
 
   async function fetchAIResponse(prompt) {
-    const petInfo = currentPet
-      ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}, режим туалету: ${currentPet.toiletMode || 'pad'}`
-      : '';
+  const petInfo = currentPet
+    ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}`
+    : '';
 
-    const recentEvents = eventsState.slice(0, 10).map(e => {
-      const conf = TYPE_CONFIG[e.eventType] || { label: e.eventType };
-      return conf.label;
-    }).join(', ');
+  const systemPrompt = `Ти професійний кінолог-інструктор. Відповідай українською, коротко (3-5 речень), з конкретними кроками. ${petInfo}`;
 
-    const systemPrompt = `Ти професійний кінолог-інструктор з 15+ роками досвіду. Відповідай українською мовою.
-Правила:
-- Коротко: 3-5 речень максимум
-- Конкретні кроки, які можна зробити прямо зараз
-- Якщо питання не про собак — ввічливо поверни до теми
-- Враховуй вік і породу при відповіді
+  try {
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'groq/llama-3.3-70b-versatile',  // primary, fallback автоматичний
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 600,
+        stream: false  // для простоти, streaming потребує EventSource на клієнті
+      })
+    });
 
-${petInfo ? `Контекст: ${petInfo}` : ''}
-${recentEvents ? `Останні події: ${recentEvents}` : ''}`;
-
-    try {
-      const response = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 600,
-          top_p: 0.9
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.choices && data.choices[0]?.message?.content) {
-        return data.choices[0].message.content.trim();
-      }
-
-      throw new Error('Unexpected response format');
-    } catch (e) {
-      console.warn('AI API error, using fallback:', e.message);
-      return getLocalFallback(prompt);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${response.status}`);
     }
+
+    const data = await response.json();
+    
+    if (data.choices?.[0]?.message?.content) {
+      return data.choices[0].message.content.trim();
+    }
+
+    throw new Error('Empty AI response');
+  } catch (e) {
+    console.warn('AI error, using local fallback:', e.message);
+    return getLocalFallback(prompt);
   }
+}
 
   function getLocalFallback(prompt) {
     const lower = prompt.toLowerCase();

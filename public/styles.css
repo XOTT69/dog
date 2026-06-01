@@ -1016,6 +1016,51 @@ textarea {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* ===== SHEET CATEGORIES ===== */
+.sheet-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.sheet-events { margin-bottom: 0.75rem; }
+
+.sheet-extra { margin-top: 0.75rem; }
+
+.action-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+/* ===== FILTER ROW ===== */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filter-row .chip.active,
+.sheet-categories .chip.active {
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+/* ===== FEED META COLORS ===== */
+.feed-item .meta.danger { color: var(--danger); }
+.feed-item .meta.warning { color: var(--warning); }
+
+/* ===== DETAILS ===== */
+details summary {
+  cursor: pointer;
+  user-select: none;
+}
 
 /* ===== PRINT ===== */
 @media print {

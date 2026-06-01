@@ -375,7 +375,6 @@ textarea {
   color: var(--text-muted);
   transition: color var(--duration) var(--ease);
   -webkit-tap-highlight-color: transparent;
-  border-radius: 0;
   position: relative;
 }
 
@@ -383,7 +382,6 @@ textarea {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
-  transition: transform var(--duration) var(--ease);
 }
 
 .nav-item span { white-space: nowrap; }
@@ -848,21 +846,37 @@ textarea {
   display: inline-block;
 }
 
-/* ===== SOCIAL/CHECKLIST ===== */
-.checklist-grid { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
+/* ===== SOCIAL GROUPS ===== */
+.checklist-grid { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
+
+.social-group { margin-bottom: 0.5rem; }
+
+.social-group-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.35rem;
+  padding-left: 0.25rem;
+}
 
 .social-item {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.55rem 0.85rem;
+  padding: 0.5rem 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 0.83rem;
   color: var(--text-secondary);
   cursor: pointer;
+  margin-bottom: 0.25rem;
+  transition: all var(--duration) var(--ease);
 }
+
+.social-item:hover { border-color: var(--accent); }
 
 .social-item input[type="checkbox"] {
   width: 18px;

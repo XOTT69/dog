@@ -78,7 +78,6 @@
     <main class="main">
       <!-- TAB: Home -->
       <section id="tabHome" class="tab active">
-        <!-- Pet Card -->
         <div class="pet-card">
           <div class="pet-emoji">🐾</div>
           <div class="pet-info">
@@ -87,9 +86,8 @@
           </div>
         </div>
 
-        <!-- Stats -->
         <div class="stats-grid">
-          <div class="stat-card stat-ring-card">
+          <div class="stat-card">
             <div class="stat-ring">
               <svg viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="40" class="ring-bg"/>
@@ -113,13 +111,11 @@
           </div>
         </div>
 
-        <!-- AI Suggestion -->
         <div class="suggestion-card">
           <div class="suggestion-badge">✨ AI порада</div>
           <p id="suggestionText">Записуйте події кілька днів, і AI дасть персональні рекомендації.</p>
         </div>
 
-        <!-- Quick Actions -->
         <h4 class="section-title">Швидкі дії</h4>
         <div class="actions-grid">
           <button class="action-btn accent" data-quick-event="training" type="button"><span class="action-icon">🎓</span>Тренування</button>
@@ -130,7 +126,6 @@
           <button class="action-btn neutral" data-quick-event="feed" type="button"><span class="action-icon">🍖</span>Їжа</button>
         </div>
 
-        <!-- Daily Plan -->
         <div class="card">
           <div class="card-header">
             <h4>📋 План на сьогодні</h4>
@@ -139,13 +134,11 @@
           <div id="dailyItems"></div>
         </div>
 
-        <!-- Age Focus -->
         <div class="card">
           <h4 class="card-title">🎯 Фокус по віку</h4>
           <div id="periodFocus"></div>
         </div>
 
-        <!-- Recent Events -->
         <h4 class="section-title">Останні події</h4>
         <div id="recentLogs" class="feed"></div>
       </section>
@@ -161,11 +154,11 @@
         <div id="recentLogsDiary" class="feed"></div>
       </section>
 
-      <!-- TAB: Courses (Courses + Knowledge + AI combined) -->
+      <!-- TAB: Courses (includes AI, Knowledge, Social, Toilet) -->
       <section id="tabCourses" class="tab">
         <h3 class="page-title">🎓 Навчання</h3>
 
-        <!-- AI Chat Section -->
+        <!-- AI Chat -->
         <div class="card ai-section">
           <h4 class="card-title">🤖 Запитати AI кінолога</h4>
           <div class="ai-prompts">
@@ -174,7 +167,7 @@
             <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">Гавкіт</button>
             <button class="chip" data-ai-prompt="Поради для соціалізації цуценя" type="button">Соціалізація</button>
             <button class="chip" data-ai-prompt="Як навчити на пелюшку?" type="button">Туалет</button>
-            <button class="chip" data-ai-prompt="Поради для прогулянок" type="button">Прогулянки</button>
+            <button class="chip" data-ai-prompt="Як навчити не тягнути повідок?" type="button">Повідок</button>
           </div>
           <div id="aiChat" class="chat-box"></div>
           <form id="aiForm" class="chat-form">
@@ -189,7 +182,7 @@
         </div>
 
         <!-- Courses -->
-        <h4 class="section-title mt-lg">Курси</h4>
+        <h4 class="section-title">Курси</h4>
         <div id="courseGrid" class="course-grid"></div>
         <div id="selectedCourse"></div>
 
@@ -197,9 +190,11 @@
         <h4 class="section-title mt-lg">📚 База знань</h4>
         <div id="knowledgeGrid" class="knowledge-grid"></div>
 
+        <!-- Social -->
         <h4 class="section-title mt-lg">🌍 Соціалізація</h4>
         <div id="socialGrid" class="checklist-grid"></div>
 
+        <!-- Toilet Guide -->
         <h4 class="section-title mt-lg">🚽 Туалет — алгоритм</h4>
         <div id="toiletGuide" class="knowledge-grid"></div>
       </section>
@@ -258,7 +253,7 @@
       </section>
     </main>
 
-    <!-- Bottom Nav — 4 tabs -->
+    <!-- Bottom Nav -->
     <nav class="nav" aria-label="Навігація">
       <button class="nav-item active" data-tab="tabHome" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -302,6 +297,8 @@
                 <option value="sleep">😴 Сон</option>
                 <option value="walk">🚶 Прогулянка</option>
                 <option value="training">🎓 Тренування</option>
+                <option value="play">🎾 Гра</option>
+                <option value="vet">🏥 Ветеринар</option>
                 <option value="note">📝 Нотатка</option>
               </select>
             </div>

@@ -11,8 +11,30 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- Critical CSS — показується одразу -->
+  <style>
+    body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#fafaf9;color:#1c1917}
+    .auth-screen{min-height:100dvh;display:grid;place-items:center;padding:2rem}
+    .auth-card{text-align:center;padding:2.5rem 1.5rem;max-width:360px;width:100%;background:#fff;border:1px solid #e7e5e4;border-radius:16px}
+    .auth-icon{font-size:3.5rem;margin-bottom:1rem}
+    .auth-card h1{font-size:1.75rem;font-weight:700;margin-bottom:0.5rem}
+    .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.3);z-index:9999;backdrop-filter:blur(4px)}
+    .spinner{width:40px;height:40px;border:3px solid #e7e5e4;border-top-color:#0f766e;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hidden{display:none!important}
+    [data-theme="dark"] body,.app[data-theme="dark"]{background:#0c0a09;color:#fafaf9}
+  </style>
+
+  <!-- Full CSS -->
   <link rel="stylesheet" href="styles.css">
+
+  <!-- Preload Firebase -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" as="script" crossorigin>
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" as="script" crossorigin>
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" as="script" crossorigin>
+
   <script>
     window.FIREBASE_CONFIG = {
       apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
@@ -69,10 +91,7 @@
       <section id="tabHome" class="tab active">
         <div class="pet-card">
           <div class="pet-emoji">🐾</div>
-          <div class="pet-info">
-            <h3 id="profileName">Песик</h3>
-            <span id="profileMeta" class="text-muted">—</span>
-          </div>
+          <div class="pet-info"><h3 id="profileName">Песик</h3><span id="profileMeta" class="text-muted">—</span></div>
         </div>
 
         <div class="suggestion-card">
@@ -81,10 +100,7 @@
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" class="ring-bg"/><circle cx="50" cy="50" r="40" class="ring-fill" id="ringFill"/></svg><span id="ringPct" class="ring-value">0%</span></div>
-            <span class="stat-label">Горшик</span>
-          </div>
+          <div class="stat-card"><div class="stat-ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" class="ring-bg"/><circle cx="50" cy="50" r="40" class="ring-fill" id="ringFill"/></svg><span id="ringPct" class="ring-value">0%</span></div><span class="stat-label">Горшик</span></div>
           <div class="stat-card"><div class="stat-number success" id="kpiSuccess">0</div><span class="stat-label">✅ На місці</span></div>
           <div class="stat-card"><div class="stat-number danger" id="kpiMiss">0</div><span class="stat-label">❌ Мимо</span></div>
           <div class="stat-card"><div class="stat-number" id="kpiTotal">0</div><span class="stat-label">📊 Всього</span></div>
@@ -93,25 +109,13 @@
         <h4 class="section-title">Швидкі дії</h4>
         <div class="quick-categories" id="quickCategories"></div>
 
-        <div class="card">
-          <div class="card-header"><h4>📋 План на сьогодні</h4><span id="dailyProgressBadge" class="badge">0/0</span></div>
-          <div id="dailyItems"></div>
-        </div>
+        <div class="card"><div class="card-header"><h4>📋 План на сьогодні</h4><span id="dailyProgressBadge" class="badge">0/0</span></div><div id="dailyItems"></div></div>
 
-        <div class="card" id="remindersCard" style="display:none">
-          <h4 class="card-title">🔔 Нагадування</h4>
-          <div id="remindersList"></div>
-        </div>
+        <div class="card" id="remindersCard" style="display:none"><h4 class="card-title">🔔 Нагадування</h4><div id="remindersList"></div></div>
 
-        <div class="card" id="heatCard" style="display:none">
-          <h4 class="card-title">🏥 Репродуктивне здоров'я</h4>
-          <div id="heatInfo"></div>
-        </div>
+        <div class="card" id="heatCard" style="display:none"><h4 class="card-title">🏥 Репродуктивне здоров'я</h4><div id="heatInfo"></div></div>
 
-        <div class="card">
-          <h4 class="card-title">🎯 Фокус по віку</h4>
-          <div id="periodFocus"></div>
-        </div>
+        <div class="card"><h4 class="card-title">🎯 Фокус по віку</h4><div id="periodFocus"></div></div>
 
         <h4 class="section-title">Останні події</h4>
         <div id="recentLogs" class="feed"></div>
@@ -156,7 +160,6 @@
             <button class="btn btn-ghost btn-sm" id="clearChatBtn" type="button">Очистити</button>
           </form>
         </div>
-
         <div class="filter-row" id="courseFilters">
           <button class="chip active" data-course-level="all">Всі</button>
           <button class="chip" data-course-level="базовий">🟢 Базовий</button>
@@ -165,7 +168,6 @@
         </div>
         <div id="courseGrid" class="course-grid"></div>
         <div id="selectedCourse"></div>
-
         <h4 class="section-title mt-lg">📚 База знань</h4>
         <div id="knowledgeGrid" class="knowledge-grid"></div>
         <h4 class="section-title mt-lg">🌍 Соціалізація</h4>
@@ -197,10 +199,7 @@
           <div class="form-grid">
             <div class="field full"><label for="petLastVaccine">Остання вакцина</label><input id="petLastVaccine" type="date"></div>
             <div class="field full"><label for="petLastDeworming">Дегельмінтизація</label><input id="petLastDeworming" type="date"></div>
-            <div class="field full" id="heatDateField" style="display:none">
-              <label for="petLastHeat">Перша/остання тічка (якщо була)</label>
-              <input id="petLastHeat" type="date">
-            </div>
+            <div class="field full" id="heatDateField" style="display:none"><label for="petLastHeat">Перша/остання тічка (якщо була)</label><input id="petLastHeat" type="date"></div>
           </div>
           <button class="btn btn-primary full-width" id="saveHealthBtn" type="button">Зберегти здоров'я</button>
         </div>
@@ -213,15 +212,8 @@
 
         <div class="card">
           <h4 class="card-title">👥 Команда</h4>
-          <div class="invite-row">
-            <span class="text-muted">Код:</span>
-            <code id="inviteCodeView">—</code>
-            <button id="copyInviteBtn" class="btn btn-ghost btn-sm" type="button">Копіювати</button>
-          </div>
-          <form id="joinWorkspaceForm" class="join-form">
-            <input id="inviteCodeInput" type="text" placeholder="Введіть код">
-            <button class="btn btn-primary btn-sm" type="submit">Приєднатися</button>
-          </form>
+          <div class="invite-row"><span class="text-muted">Код:</span><code id="inviteCodeView">—</code><button id="copyInviteBtn" class="btn btn-ghost btn-sm" type="button">Копіювати</button></div>
+          <form id="joinWorkspaceForm" class="join-form"><input id="inviteCodeInput" type="text" placeholder="Введіть код"><button class="btn btn-primary btn-sm" type="submit">Приєднатися</button></form>
           <div id="membersList" class="members-list"></div>
         </div>
       </section>

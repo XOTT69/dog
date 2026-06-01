@@ -526,6 +526,90 @@ async function logoutGoogle() {
   setVisible($('authScreen'), true);
 }
 
+function addAIMessage(text, type) {
+  const chat = $('aiChat');
+  if (!chat) return;
+  const msg = document.createElement('div');
+  msg.className = `ai-msg ${type}`;
+  msg.textContent = text;
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function fetchAIResponse(prompt) {
+  try {
+    const petInfo = currentPet ? 
+      `Ім'я: ${currentPet.name || 'Песик'}, Вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, Порода: ${currentPet.breed || 'Невідома'}, Стать: ${currentPet.sex}` : 
+      'Інформація про собаку недоступна';
+    
+    const systemPrompt = `Ти професійний кінолог-інструктор. Дай чіткі, практичні поради українською мовою. 
+Порода собаки: ${petInfo}. 
+Відповідай коротко, по суті, з конкретними кроками. Максимум 3-4 речення.`;
+
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'groq/llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+        top_p: 0.9
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('AI proxy error:', data.error);
+      return getLocalAIResponse(prompt);
+    }
+    
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content;
+    }
+    
+    return getLocalAIResponse(prompt);
+  } catch (e) {
+    console.error('AI fetch error:', e);
+    // Fallback to local responses if API fails
+    return getLocalAIResponse(prompt);
+  }
+}
+
+function getLocalAIResponse(prompt) {
+  const lower = prompt.toLowerCase();
+  
+  if (lower.includes('команда') || lower.includes('сідати')) {
+    return 'Для навчання команди "Сідати": 1) Тримайте ласощі біля носа собаки. 2) Повільно підніміть руку над головою. 3) Коли собака сяде, скажіть "Сідати" і дайте ласощі. 4) Повторюйте 5-10 разів на день.';
+  }
+  
+  if (lower.includes('гриз') || lower.includes('речі')) {
+    return 'Щоб зупинити гризіння речей: 1) Дайте собці іграшки для гризіння. 2) Приберіть цінні речі. 3) Коли гризе - скажіть "Ні" і дайте іграшку. 4) Більше прогулянок знижує стрес.';
+  }
+  
+  if (lower.includes('гавк') || lower.includes('лает')) {
+    return 'Для зменшення гавкоту: 1) Знайдіть причину (нудьга, тривога). 2) Більше фізичної активності. 3) Навчіть команду "Тихо". 4) Ігноруйте зайвий гавкіт, винагороджуйте тишу.';
+  }
+  
+  if (lower.includes('соціалізація') || lower.includes('цуценя')) {
+    return 'Соціалізація цуценя: 1) Знайомте з новими людьми, тваринами, звуками. 2) Починайте з 8-12 тижнів. 3) Будьте позитивними, давайте ласощі. 4) Уникляйте страшних ситуацій.';
+  }
+  
+  if (lower.includes('пелюшка') || lower.includes('туалет')) {
+    return 'Навчання на пелюшку: 1) Ставте пелюшку в одному місці. 2) Хваліть за успіх. 3) Не карайте за промахи. 4) Виводьте на вулицю регулярно. 5) Приберіть запахи.';
+  }
+  
+  if (lower.includes('прогулянк')) {
+    return 'Поради для прогулянок: 1) Використовуйте повідок. 2) Дозволяйте досліджувати. 3) Беріть воду та ласощі. 4) Уникляйте спеки. 5) Соціалізуйте з іншими собаками.';
+  }
+  
+  return 'Я AI-помічник для кінологів. Запитайте про команди, гризіння, гавкіт, соціалізацію, туалет або прогулянки, і я дам професійні поради!';
+}
+
 function bindEvents() {
   setTheme(themeMode);
   $$('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => setTheme(themeMode === 'dark' ? 'light' : 'dark')));
@@ -566,6 +650,37 @@ function bindEvents() {
     } catch (err) {
       toast(err.message || 'Не вдалося приєднатися', 'error');
     }
+  });
+  
+  // AI Chat functionality
+  $('aiForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = $('aiInput');
+    const message = input.value.trim();
+    if (!message) return;
+    
+    addAIMessage(message, 'user');
+    input.value = '';
+    
+    try {
+      const response = await fetchAIResponse(message);
+      addAIMessage(response, 'assistant');
+    } catch (err) {
+      addAIMessage('На жаль, виникла помилка. Спробуйте пізніше.', 'assistant');
+    }
+  });
+  
+  $$('[data-ai-prompt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prompt = btn.dataset.aiPrompt;
+      $('aiInput').value = prompt;
+      $('aiForm')?.dispatchEvent(new Event('submit'));
+    });
+  });
+  
+  $('clearChatBtn')?.addEventListener('click', () => {
+    const chat = $('aiChat');
+    if (chat) chat.innerHTML = '';
   });
 }
 

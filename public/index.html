@@ -31,6 +31,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
   <script defer src="content.js"></script>
   <script defer src="app.js"></script>
 </head>
@@ -172,6 +173,7 @@
             <button class="btn btn-primary full-width" type="submit">Зберегти</button>
           </form>
         </div>
+
         <div class="card">
           <h4 class="card-title">🏥 Здоров'я</h4>
           <div class="form-grid">
@@ -181,7 +183,20 @@
           </div>
           <button class="btn btn-primary full-width" id="saveHealthBtn" type="button">Зберегти здоров'я</button>
         </div>
-        <div class="card"><h4 class="card-title">🔔 Нагадування</h4><div id="remindersSetup"></div><button class="btn btn-ghost full-width mt-lg" id="addReminderBtn" type="button">+ Додати нагадування</button></div>
+
+        <div class="card">
+          <h4 class="card-title">📲 Сповіщення</h4>
+          <p class="text-muted" style="margin-bottom:0.75rem">Нагадування про горшик, вакцини, прогулянки — навіть коли застосунок закритий.</p>
+          <button class="btn btn-primary full-width" id="enablePushBtn" type="button">🔔 Увімкнути сповіщення</button>
+          <p id="pushStatus" class="text-muted" style="margin-top:0.5rem"></p>
+        </div>
+
+        <div class="card">
+          <h4 class="card-title">🔔 Нагадування</h4>
+          <div id="remindersSetup"></div>
+          <button class="btn btn-ghost full-width mt-lg" id="addReminderBtn" type="button">+ Додати нагадування</button>
+        </div>
+
         <div class="card">
           <h4 class="card-title">👥 Команда</h4>
           <div class="invite-row"><span class="text-muted">Код:</span><code id="inviteCodeView">—</code><button id="copyInviteBtn" class="btn btn-ghost btn-sm" type="button">Копіювати</button></div>
@@ -199,6 +214,7 @@
       <button class="nav-item" data-tab="tabProfile" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Профіль</span></button>
     </nav>
 
+    <!-- FAB -->
     <button id="fabAddEvent" class="fab" type="button" aria-label="Додати подію"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 
     <!-- Sheet -->
@@ -220,5 +236,13 @@
       </div>
     </div>
   </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(r => console.log('SW:', r.scope)).catch(e => console.warn('SW:', e));
+      });
+    }
+  </script>
 </body>
 </html>

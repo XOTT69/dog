@@ -11,8 +11,6 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-  <!-- Critical CSS — показується одразу -->
   <style>
     body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#fafaf9;color:#1c1917}
     .auth-screen{min-height:100dvh;display:grid;place-items:center;padding:2rem}
@@ -23,18 +21,12 @@
     .spinner{width:40px;height:40px;border:3px solid #e7e5e4;border-top-color:#0f766e;border-radius:50%;animation:spin .7s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
     .hidden{display:none!important}
-    [data-theme="dark"] body,.app[data-theme="dark"]{background:#0c0a09;color:#fafaf9}
   </style>
-
-  <!-- Full CSS -->
   <link rel="stylesheet" href="styles.css">
-
-  <!-- Preload Firebase -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" as="script" crossorigin>
   <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" as="script" crossorigin>
   <link rel="preload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" as="script" crossorigin>
-
   <script>
     window.FIREBASE_CONFIG = {
       apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
@@ -56,7 +48,6 @@
   <div id="toastContainer" aria-live="polite"></div>
   <div id="loadingOverlay" class="overlay hidden" aria-hidden="true"><div class="spinner"></div></div>
 
-  <!-- Auth -->
   <div id="authScreen" class="auth-screen">
     <div class="auth-card">
       <div class="auth-icon">🐕</div>
@@ -70,7 +61,6 @@
     </div>
   </div>
 
-  <!-- App -->
   <div id="appContent" class="app hidden">
     <header class="header">
       <div class="header-left">
@@ -219,7 +209,6 @@
       </section>
     </main>
 
-    <!-- Nav -->
     <nav class="nav" aria-label="Навігація">
       <button class="nav-item active" data-tab="tabHome" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Дім</span></button>
       <button class="nav-item" data-tab="tabDiary" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Щоденник</span></button>
@@ -227,10 +216,8 @@
       <button class="nav-item" data-tab="tabProfile" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Профіль</span></button>
     </nav>
 
-    <!-- FAB -->
     <button id="fabAddEvent" class="fab" type="button" aria-label="Додати подію"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 
-    <!-- Event Sheet -->
     <div id="eventSheet" class="sheet hidden">
       <div id="sheetBackdrop" class="sheet-bg"></div>
       <div class="sheet-content">

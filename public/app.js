@@ -6,12 +6,13 @@ const TOILET_GUIDE = window.TOILET_GUIDE;
 const TYPE_CONFIG = window.TYPE_CONFIG;
 
 const firebaseConfig = {
-  apiKey: window.FIREBASE_API_KEY || 'AIzaSyCY2SKRPpopi7mtsihrlqocxdgG8cBjNHI',
+  apiKey: window.FIREBASE_API_KEY || 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
   authDomain: window.FIREBASE_AUTH_DOMAIN || 'dogs-55f5e.firebaseapp.com',
   projectId: window.FIREBASE_PROJECT_ID || 'dogs-55f5e',
   storageBucket: window.FIREBASE_STORAGE_BUCKET || 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: window.FIREBASE_MESSAGING_SENDER_ID || '1053489833652',
-  appId: window.FIREBASE_APP_ID || '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
+  appId: window.FIREBASE_APP_ID || '1:1053489833652:web:ddf53d87b0a4af4207d9e1',
+  measurementId: window.FIREBASE_MEASUREMENT_ID || 'G-2M9G6V5WBB'
 };
 
 try {

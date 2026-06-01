@@ -4,25 +4,7 @@
       "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "dogId", "order": "ASCENDING" },
-        { "fieldPath": "eventType", "order": "ASCENDING" },
-        { "fieldPath": "occurredAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "dogId", "order": "ASCENDING" },
-        { "fieldPath": "occurredAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "reminders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "dogId", "order": "ASCENDING" },
-        { "fieldPath": "nextDueAt", "order": "ASCENDING" }
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
   ],

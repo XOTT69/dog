@@ -37,6 +37,7 @@
   let themeMode = localStorage.getItem('dc_theme') || 'light';
   let dailyDone = JSON.parse(localStorage.getItem('dc_daily') || '{}');
   let renderQueued = false;
+  let activeTab = 'tabHome';
 
   // ===== DOM Helpers =====
   const $ = (id) => document.getElementById(id);
@@ -180,8 +181,7 @@
     $('ringPct').textContent = `${pct}%`;
     const ring = $('ringFill');
     if (ring) {
-      // 2 * π * 40 = 251.3
-      const circumference = 251.3;
+      const circumference = 251.3; // 2 * π * 40
       ring.style.strokeDashoffset = String(circumference - (circumference * pct / 100));
     }
   }
@@ -327,7 +327,8 @@
     const canvas = $(canvasId);
     if (!canvas || !canvas.getContext) return;
     const rect = canvas.getBoundingClientRect();
-    if (!rect.width) return;
+    // Skip render if canvas is hidden (tab not active)
+    if (!rect.width || !rect.height) return;
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
@@ -358,35 +359,35 @@
     const muted = isDark ? '#78716c' : '#a8a29e';
     const border = isDark ? '#292524' : '#e7e5e4';
 
-    const pad = { top: 10, right: 4, bottom: 20, left: 4 };
-    const cw = w - pad.left - pad.right;
-    const ch = h - pad.top - pad.bottom;
+    const padding = { top: 10, right: 4, bottom: 20, left: 4 };
+    const cw = w - padding.left - padding.right;
+    const ch = h - padding.top - padding.bottom;
     const bw = cw / days.length;
 
     // Grid lines
     ctx.strokeStyle = border;
     ctx.lineWidth = 1;
     [0, 50, 100].forEach(v => {
-      const y = pad.top + ch - (v / 100) * ch;
+      const y = padding.top + ch - (v / 100) * ch;
       ctx.beginPath();
-      ctx.moveTo(pad.left, y);
-      ctx.lineTo(w - pad.right, y);
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(w - padding.right, y);
       ctx.stroke();
     });
 
     // Bars
     days.forEach((day, i) => {
-      const x = pad.left + i * bw + bw * 0.2;
+      const x = padding.left + i * bw + bw * 0.2;
       const barW = bw * 0.6;
 
       if (day.pct == null) {
         ctx.fillStyle = muted;
         ctx.beginPath();
-        ctx.arc(x + barW / 2, pad.top + ch - 3, 2, 0, Math.PI * 2);
+        ctx.arc(x + barW / 2, padding.top + ch - 3, 2, 0, Math.PI * 2);
         ctx.fill();
       } else {
         const barH = Math.max(3, (day.pct / 100) * ch);
-        const y = pad.top + ch - barH;
+        const y = padding.top + ch - barH;
         ctx.fillStyle = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
         const r = Math.min(3, barW / 2);
         ctx.beginPath();
@@ -425,16 +426,23 @@
     renderMembers();
     renderWorkspaceMeta();
     fillPetForm();
-    renderChart('progressChartDiary');
+    // Only render chart if diary tab is visible
+    if (activeTab === 'tabDiary') {
+      requestAnimationFrame(() => renderChart('progressChartDiary'));
+    }
   }
 
   // ===== Tab Navigation =====
   function setActiveTab(id) {
+    activeTab = id;
     $$('.tab').forEach(p => p.classList.toggle('active', p.id === id));
     $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
     if (id === 'tabProfile') hide($('fabAddEvent'));
     else show($('fabAddEvent'));
-    if (id === 'tabDiary') requestAnimationFrame(() => renderChart('progressChartDiary'));
+    // Render chart when switching to diary (canvas needs to be visible first)
+    if (id === 'tabDiary') {
+      requestAnimationFrame(() => renderChart('progressChartDiary'));
+    }
   }
 
   // ===== Sheet =====
@@ -611,6 +619,7 @@
     hide($('appContent'));
     show($('authScreen'));
   }
+
   // ===== AI Chat =====
   function addChatMessage(text, type) {
     const chat = $('aiChat');
@@ -639,45 +648,45 @@
   }
 
   async function fetchAIResponse(prompt) {
-  const petInfo = currentPet
-    ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}`
-    : '';
+    const petInfo = currentPet
+      ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}`
+      : '';
 
-  const systemPrompt = `Ти професійний кінолог-інструктор. Відповідай українською, коротко (3-5 речень), з конкретними кроками. ${petInfo}`;
+    const systemPrompt = `Ти професійний кінолог-інструктор. Відповідай українською, коротко (3-5 речень), з конкретними кроками. ${petInfo}`;
 
-  try {
-    const response = await fetch('/api/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'groq/llama-3.3-70b-versatile',  // primary, fallback автоматичний
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 600,
-        stream: false  // для простоти, streaming потребує EventSource на клієнті
-      })
-    });
+    try {
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'groq/llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 600,
+          stream: false
+        })
+      });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content.trim();
+      }
+
+      throw new Error('Empty AI response');
+    } catch (e) {
+      console.warn('AI error, using local fallback:', e.message);
+      return getLocalFallback(prompt);
     }
-
-    const data = await response.json();
-    
-    if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content.trim();
-    }
-
-    throw new Error('Empty AI response');
-  } catch (e) {
-    console.warn('AI error, using local fallback:', e.message);
-    return getLocalFallback(prompt);
   }
-}
 
   function getLocalFallback(prompt) {
     const lower = prompt.toLowerCase();
@@ -706,7 +715,6 @@
       return '1) Кусає — завмріть і тихо "ай". 2) Заберіть увагу на 5 секунд. 3) Дайте іграшку замість руки. 4) Грає спокійно — хваліть. 5) Перезбуджено — пауза або вийдіть з кімнати.';
     }
 
-    // Generic fallback using current program tip
     return program?.tip || 'Запитайте про конкретну ситуацію: команди, туалет, гризіння, гавкіт, страхи або прогулянки — і я дам покроковий план.';
   }
 
@@ -786,7 +794,6 @@
         await navigator.clipboard.writeText(workspaceData.inviteCode);
         toast('Код скопійовано', 'success');
       } catch {
-        // Fallback for older browsers
         const ta = document.createElement('textarea');
         ta.value = workspaceData.inviteCode;
         document.body.appendChild(ta);
@@ -836,7 +843,7 @@
       if (chat) chat.innerHTML = '';
     });
 
-    // Auto-resize textarea
+    // Auto-resize AI textarea
     const aiInput = $('aiInput');
     if (aiInput) {
       aiInput.addEventListener('input', () => {
@@ -845,7 +852,7 @@
       });
     }
 
-    // Keyboard shortcut: Enter to send in AI chat (Shift+Enter for newline)
+    // Enter to send (Shift+Enter for newline)
     $('aiInput')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -853,16 +860,18 @@
       }
     });
 
-    // Close sheet on Escape
+    // Escape closes sheet
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeSheet();
     });
 
-    // Handle window resize for chart
-    let resizeTimeout;
+    // Resize re-renders chart
+    let resizeTimer;
     window.addEventListener('resize', () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => renderChart('progressChartDiary'), 200);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (activeTab === 'tabDiary') renderChart('progressChartDiary');
+      }, 200);
     });
   }
 
@@ -900,7 +909,7 @@
   bindEvents();
   bootAuth();
 
-  // Handle redirect result (for popup-blocked fallback)
+  // Handle redirect result (popup-blocked fallback)
   auth.getRedirectResult().then((result) => {
     if (result?.user) {
       console.log('Redirect login success:', result.user.email);

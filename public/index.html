@@ -48,6 +48,7 @@
   <div id="toastContainer" aria-live="polite"></div>
   <div id="loadingOverlay" class="overlay hidden" aria-hidden="true"><div class="spinner"></div></div>
 
+  <!-- Auth -->
   <div id="authScreen" class="auth-screen">
     <div class="auth-card">
       <div class="auth-icon">🐕</div>
@@ -61,6 +62,43 @@
     </div>
   </div>
 
+  <!-- Onboarding -->
+  <div id="onboardingScreen" class="onboarding hidden">
+    <div class="onboarding-card">
+      <div id="onboardingStep1" class="onboarding-step">
+        <div class="onboarding-emoji">🐾</div>
+        <h2>Як звати вашого песика?</h2>
+        <input id="obName" type="text" placeholder="Ім'я" class="ob-input">
+        <button class="btn btn-primary full-width" id="obNext1" type="button">Далі →</button>
+      </div>
+      <div id="onboardingStep2" class="onboarding-step hidden">
+        <div class="onboarding-emoji">🎂</div>
+        <h2>Коли народився?</h2>
+        <input id="obBirthDate" type="date" class="ob-input">
+        <div class="ob-row">
+          <button class="btn btn-ghost" id="obBack2" type="button">← Назад</button>
+          <button class="btn btn-primary" id="obNext2" type="button">Далі →</button>
+        </div>
+      </div>
+      <div id="onboardingStep3" class="onboarding-step hidden">
+        <div class="onboarding-emoji">🐕</div>
+        <h2>Розкажіть більше</h2>
+        <select id="obSex" class="ob-input"><option value="хлопчик">🐶 Хлопчик</option><option value="дівчинка">🐶 Дівчинка</option></select>
+        <input id="obBreed" type="text" placeholder="Порода (необов'язково)" class="ob-input">
+        <div class="ob-row">
+          <button class="btn btn-ghost" id="obBack3" type="button">← Назад</button>
+          <button class="btn btn-primary" id="obFinish" type="button">Готово! 🎉</button>
+        </div>
+      </div>
+      <div class="ob-dots">
+        <span class="ob-dot active" data-step="1"></span>
+        <span class="ob-dot" data-step="2"></span>
+        <span class="ob-dot" data-step="3"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- App -->
   <div id="appContent" class="app hidden">
     <header class="header">
       <div class="header-left">
@@ -71,6 +109,7 @@
         </div>
       </div>
       <div class="header-right">
+        <div id="streakBadge" class="streak-badge hidden">🔥 <span id="streakCount">0</span></div>
         <button class="icon-btn" data-theme-toggle type="button" aria-label="Тема"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
         <button id="logoutBtn" class="icon-btn" type="button" aria-label="Вийти"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
       </div>
@@ -82,6 +121,15 @@
         <div class="pet-card">
           <div class="pet-emoji">🐾</div>
           <div class="pet-info"><h3 id="profileName">Песик</h3><span id="profileMeta" class="text-muted">—</span></div>
+        </div>
+
+        <!-- Streak Card -->
+        <div id="streakCard" class="streak-card hidden">
+          <div class="streak-fire">🔥</div>
+          <div class="streak-info">
+            <strong id="streakText">0 днів поспіль</strong>
+            <span class="text-muted" id="streakSub">Додавайте події щодня!</span>
+          </div>
         </div>
 
         <div class="suggestion-card">
@@ -134,12 +182,13 @@
         <div class="card ai-section">
           <h4 class="card-title">🤖 AI Кінолог</h4>
           <div class="ai-prompts">
-            <button class="chip" data-ai-prompt="Як навчити команду Сідати?" type="button">Команди</button>
-            <button class="chip" data-ai-prompt="Що робити якщо пес гризе речі?" type="button">Гризіння</button>
+            <button class="chip" data-ai-prompt="Як навчити команду Сидіти?" type="button">Сидіти</button>
+            <button class="chip" data-ai-prompt="Що робити якщо гризе речі?" type="button">Гризіння</button>
             <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">Гавкіт</button>
-            <button class="chip" data-ai-prompt="Поради для соціалізації" type="button">Соціалізація</button>
+            <button class="chip" data-ai-prompt="Соціалізація цуценя" type="button">Соціалізація</button>
             <button class="chip" data-ai-prompt="Як навчити на пелюшку?" type="button">Туалет</button>
-            <button class="chip" data-ai-prompt="Як навчити не тягнути повідок?" type="button">Повідок</button>
+            <button class="chip" data-ai-prompt="Не тягнути повідок" type="button">Повідок</button>
+            <button class="chip" data-ai-prompt="Як навчити команду До мене?" type="button">Підклик</button>
           </div>
           <div id="aiChat" class="chat-box"></div>
           <form id="aiForm" class="chat-form">
@@ -151,7 +200,7 @@
           </form>
         </div>
         <div class="filter-row" id="courseFilters">
-          <button class="chip active" data-course-level="all">Всі</button>
+          <button class="chip active" data-course-level="all">Всі (21)</button>
           <button class="chip" data-course-level="базовий">🟢 Базовий</button>
           <button class="chip" data-course-level="середній">🟡 Середній</button>
           <button class="chip" data-course-level="просунутий">🔴 Просунутий</button>
@@ -209,6 +258,7 @@
       </section>
     </main>
 
+    <!-- Nav -->
     <nav class="nav" aria-label="Навігація">
       <button class="nav-item active" data-tab="tabHome" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Дім</span></button>
       <button class="nav-item" data-tab="tabDiary" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Щоденник</span></button>
@@ -216,8 +266,10 @@
       <button class="nav-item" data-tab="tabProfile" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Профіль</span></button>
     </nav>
 
+    <!-- FAB -->
     <button id="fabAddEvent" class="fab" type="button" aria-label="Додати подію"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 
+    <!-- Event Sheet -->
     <div id="eventSheet" class="sheet hidden">
       <div id="sheetBackdrop" class="sheet-bg"></div>
       <div class="sheet-content">

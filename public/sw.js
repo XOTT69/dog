@@ -1,63 +1,60 @@
-const CACHE_NAME = "doggo-coach-shell-v1";
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
-  "./sw.js",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-512-maskable.png"
-];
+// Firebase Messaging SW
+importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
-  );
-  self.skipWaiting();
+firebase.initializeApp({
+  apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
+  authDomain: 'dogs-55f5e.firebaseapp.com',
+  projectId: 'dogs-55f5e',
+  storageBucket: 'dogs-55f5e.firebasestorage.app',
+  messagingSenderId: '1053489833652',
+  appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1'
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+const messaging = firebase.messaging();
+
+// Background message handler
+messaging.onBackgroundMessage((payload) => {
+  const { title, body, icon } = payload.notification || {};
+  self.registration.showNotification(title || 'Dog Coach 🐾', {
+    body: body || '',
+    icon: icon || '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: payload.data || {},
+    actions: [
+      { action: 'open', title: 'Відкрити' },
+      { action: 'dismiss', title: 'Ок' }
+    ]
+  });
 });
 
-self.addEventListener("fetch", (event) => {
-  const request = event.request;
-
-  if (request.method !== "GET") return;
-
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-
-      return fetch(request)
-        .then((networkResponse) => {
-          const responseClone = networkResponse.clone();
-
-          if (
-            request.url.startsWith(self.location.origin) &&
-            networkResponse.status === 200
-          ) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-
-          return networkResponse;
-        })
-        .catch(() => {
-          if (request.mode === "navigate") {
-            return caches.match("./index.html");
-          }
-        });
+// Click handler
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(clientList => {
+      for (const client of clientList) {
+        if (client.url.includes('/') && 'focus' in client) return client.focus();
+      }
+      return clients.openWindow('/');
     })
   );
+});
+
+// Cache for offline (basic)
+const CACHE = 'dogcoach-v3';
+const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/content.js'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET' || e.request.url.includes('/api/') || e.request.url.includes('firestore') || e.request.url.includes('identitytoolkit')) return;
+  e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('/index.html'))));
 });

@@ -150,6 +150,26 @@
         <div id="toiletGuide"></div>
       </section>
 
+      <section id="tabAI" class="tab-panel">
+        <div class="section-header"><h2>AI Кінолог</h2><span class="subtle">Поради 24/7</span></div>
+        <div class="ai-quick">
+          <button class="ai-quick-btn" data-ai-prompt="Як навчити команду 'Сідати'?" type="button">🎓 Команди</button>
+          <button class="ai-quick-btn" data-ai-prompt="Що робити якщо пес гризе речі?" type="button">🦴 Гризіння</button>
+          <button class="ai-quick-btn" data-ai-prompt="Як зупинити гавкіт?" type="button">🔊 Гавкіт</button>
+          <button class="ai-quick-btn" data-ai-prompt="Поради для соціалізації цуценя" type="button">🐕 Соціалізація</button>
+          <button class="ai-quick-btn" data-ai-prompt="Як навчити на пелюшку?" type="button">🧻 Туалет</button>
+          <button class="ai-quick-btn" data-ai-prompt="Поради для прогулянок" type="button">🌳 Прогулянки</button>
+        </div>
+        <div id="aiChat" class="ai-chat"></div>
+        <form id="aiForm" class="ai-form">
+          <textarea id="aiInput" placeholder="Запитайте пораду у AI кінолога..." rows="3"></textarea>
+          <div class="ai-actions">
+            <button class="btn-primary" type="submit">Надіслати</button>
+            <button class="btn-sm" id="clearChatBtn" type="button">Очистити</button>
+          </div>
+        </form>
+      </section>
+
       <section id="tabProfile" class="tab-panel">
         <div class="card-elevated">
           <form id="petProfileForm">
@@ -183,6 +203,7 @@
       <button class="nav-tab" data-tab="tabDiary" type="button">📈<span>Щоденник</span></button>
       <button class="nav-tab" data-tab="tabCourses" type="button">🎓<span>Курси</span></button>
       <button class="nav-tab" data-tab="tabKnowledge" type="button">📚<span>Знання</span></button>
+      <button class="nav-tab" data-tab="tabAI" type="button">🤖<span>AI</span></button>
       <button class="nav-tab" data-tab="tabProfile" type="button">👤<span>Профіль</span></button>
     </nav>
 

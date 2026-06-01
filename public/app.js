@@ -181,7 +181,7 @@
     $('ringPct').textContent = `${pct}%`;
     const ring = $('ringFill');
     if (ring) {
-      const circumference = 251.3; // 2 * π * 40
+      const circumference = 251.3;
       ring.style.strokeDashoffset = String(circumference - (circumference * pct / 100));
     }
   }
@@ -327,7 +327,6 @@
     const canvas = $(canvasId);
     if (!canvas || !canvas.getContext) return;
     const rect = canvas.getBoundingClientRect();
-    // Skip render if canvas is hidden (tab not active)
     if (!rect.width || !rect.height) return;
 
     const ctx = canvas.getContext('2d');
@@ -364,7 +363,6 @@
     const ch = h - padding.top - padding.bottom;
     const bw = cw / days.length;
 
-    // Grid lines
     ctx.strokeStyle = border;
     ctx.lineWidth = 1;
     [0, 50, 100].forEach(v => {
@@ -375,7 +373,6 @@
       ctx.stroke();
     });
 
-    // Bars
     days.forEach((day, i) => {
       const x = padding.left + i * bw + bw * 0.2;
       const barW = bw * 0.6;
@@ -401,7 +398,6 @@
         ctx.fill();
       }
 
-      // Date labels
       if (i % 3 === 0 || i === days.length - 1) {
         ctx.fillStyle = muted;
         ctx.font = '10px system-ui';
@@ -426,7 +422,6 @@
     renderMembers();
     renderWorkspaceMeta();
     fillPetForm();
-    // Only render chart if diary tab is visible
     if (activeTab === 'tabDiary') {
       requestAnimationFrame(() => renderChart('progressChartDiary'));
     }
@@ -439,7 +434,6 @@
     $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
     if (id === 'tabProfile') hide($('fabAddEvent'));
     else show($('fabAddEvent'));
-    // Render chart when switching to diary (canvas needs to be visible first)
     if (id === 'tabDiary') {
       requestAnimationFrame(() => renderChart('progressChartDiary'));
     }
@@ -450,7 +444,10 @@
     show($('eventSheet'));
     $('eventTime').value = nowTime();
   }
-  function closeSheet() { hide($('eventSheet')); }
+
+  function closeSheet() {
+    hide($('eventSheet'));
+  }
 
   // ===== Firestore Operations =====
   async function savePetProfile(payload) {
@@ -648,11 +645,22 @@
   }
 
   async function fetchAIResponse(prompt) {
+    const weeks = getAgeInWeeks(currentPet?.birthDate);
     const petInfo = currentPet
-      ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(getAgeInWeeks(currentPet.birthDate))}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}`
+      ? `Собака: ${currentPet.name || 'Песик'}, вік: ${weekLabel(weeks)}${weeks != null && weeks < 12 ? ' (цуценя до 3 місяців!)' : ''}, порода: ${currentPet.breed || 'невідома'}, стать: ${currentPet.sex || 'невідома'}, режим туалету: ${currentPet.toiletMode || 'pad'}`
       : '';
 
-    const systemPrompt = `Ти професійний кінолог-інструктор. Відповідай українською, коротко (3-5 речень), з конкретними кроками. ${petInfo}`;
+    const systemPrompt = `Ти — професійний український кінолог-інструктор з 15-річним досвідом.
+
+ПРАВИЛА (обов'язкові):
+1. Відповідай ТІЛЬКИ українською мовою. Жодних інших мов, жодних ієрогліфів, жодних латинських термінів без потреби.
+2. Максимум 4-5 речень. Конкретні кроки які можна зробити прямо зараз.
+3. Враховуй вік собаки: якщо цуценя до 3 місяців — ніяких складних команд, фокус на адаптацію і базовий комфорт.
+4. Ніколи не рекомендуй покарання, крики, фізичний вплив.
+5. Якщо не знаєш точної відповіді — скажи "зверніться до ветеринара" замість вигадування.
+6. Формат: пронумеровані кроки або короткі тези. Без вступів типу "Звичайно!" чи "Чудове питання!".
+
+${petInfo}`;
 
     try {
       const response = await fetch('/api/proxy', {
@@ -664,8 +672,8 @@
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
-          temperature: 0.3,
-          max_tokens: 600,
+          temperature: 0.2,
+          max_tokens: 400,
           stream: false
         })
       });
@@ -678,7 +686,12 @@
       const data = await response.json();
 
       if (data.choices?.[0]?.message?.content) {
-        return data.choices[0].message.content.trim();
+        let text = data.choices[0].message.content.trim();
+        // Remove any non-Ukrainian characters (Chinese, Japanese, Korean, etc.)
+        text = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u2e80-\u2eff]/g, '');
+        // Clean up leftover artifacts
+        text = text.replace(/\s{2,}/g, ' ').trim();
+        return text || getLocalFallback(prompt);
       }
 
       throw new Error('Empty AI response');
@@ -848,7 +861,7 @@
     if (aiInput) {
       aiInput.addEventListener('input', () => {
         aiInput.style.height = 'auto';
-        aiInput.style.height = Math.min(aiInput.scrollHeight, 120) + 'px';
+        aiInput.style.height = Math.min(aiInput.scrollHeight, 100) + 'px';
       });
     }
 

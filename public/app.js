@@ -279,7 +279,7 @@
     pts.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x,p.y,i===pts.length-1?5:3,0,Math.PI*2);ctx.fillStyle=lc;ctx.fill();if(i===pts.length-1){ctx.strokeStyle=isDark?'#042f2e':'#fff';ctx.lineWidth=2;ctx.stroke();}});
     ctx.fillStyle=tc;ctx.font='9px system-ui';ctx.textAlign='center';[0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{if(i>=we.length)return;const d=tsToDate(we[i].createdAt);if(d)ctx.fillText(`${d.getDate()}/${d.getMonth()+1}`,pts[i].x,h-4);});
   }
-  // ===== RENDER: Feed =====
+   // ===== RENDER: Feed =====
   function renderFeed(targetId, filter = 'all') {
     const list = $(targetId); if (!list) return;
     let filtered = eventsState;
@@ -296,7 +296,7 @@
     const ctx = canvas.getContext('2d'); const dpr = window.devicePixelRatio || 1;
     canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const w = rect.width, h = rect.height; ctx.clearRect(0, 0, w, h);
-    const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0,0,0,0); const next = new Date(d); next.setDate(next.getDate()+1); const dayEv = eventsState.filter(e => { const ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; }); const s = dayEv.filter(e => isToiletSuccess(e.eventType)).length; const m = dayEv.filter(e => isToiletMiss(e.eventType)).length; const t = s+m; days.push({ date: d, pct: t ? Math.round(s/t*100) : null }); }
+    const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0); const next = new Date(d); next.setDate(next.getDate()+1); const dayEv = eventsState.filter(e => { const ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; }); const s = dayEv.filter(e => isToiletSuccess(e.eventType)).length; const m = dayEv.filter(e => isToiletMiss(e.eventType)).length; const t = s+m; days.push({ date: d, pct: t ? Math.round(s/t*100) : null }); }
     const isDark = themeMode === 'dark'; const accent = isDark ? '#2dd4bf' : '#0f766e'; const danger = isDark ? '#f87171' : '#dc2626'; const warning = isDark ? '#fbbf24' : '#d97706'; const muted = isDark ? '#78716c' : '#a8a29e'; const border = isDark ? '#292524' : '#e7e5e4';
     const p = { top:10, right:4, bottom:20, left:4 }; const cw = w-p.left-p.right, ch = h-p.top-p.bottom, bw = cw/days.length;
     ctx.strokeStyle = border; ctx.lineWidth = 1; [0,50,100].forEach(v => { const y = p.top+ch-(v/100)*ch; ctx.beginPath(); ctx.moveTo(p.left,y); ctx.lineTo(w-p.right,y); ctx.stroke(); });
@@ -315,14 +315,7 @@
   }
 
   function renderKnowledge() { const g = $('knowledgeGrid'); if (g) g.innerHTML = KNOWLEDGE.map(k => `<div class="k-card"><strong>${k.title}</strong><p>${k.text}</p><span class="k-tag">${k.tag}</span></div>`).join(''); }
-
-  function renderSocial() {
-    const grid = $('socialGrid'); if (!grid) return;
-    const done = JSON.parse(localStorage.getItem('dc_social') || '{}');
-    grid.innerHTML = SOCIAL_ITEMS.map(group => `<div class="social-group"><h5 class="social-group-title">${group.category}</h5>${group.items.map(item => { const key = group.category+':'+item; return `<label class="social-item"><input type="checkbox" data-social-key="${key}" ${done[key]?'checked':''}><span>${item}</span></label>`; }).join('')}</div>`).join('');
-    $$('[data-social-key]').forEach(cb => cb.addEventListener('change', () => { const d = JSON.parse(localStorage.getItem('dc_social')||'{}'); d[cb.dataset.socialKey] = cb.checked; localStorage.setItem('dc_social', JSON.stringify(d)); }));
-  }
-
+  function renderSocial() { const grid = $('socialGrid'); if (!grid) return; const done = JSON.parse(localStorage.getItem('dc_social')||'{}'); grid.innerHTML = SOCIAL_ITEMS.map(group => `<div class="social-group"><h5 class="social-group-title">${group.category}</h5>${group.items.map(item => { const key = group.category+':'+item; return `<label class="social-item"><input type="checkbox" data-social-key="${key}" ${done[key]?'checked':''}><span>${item}</span></label>`; }).join('')}</div>`).join(''); $$('[data-social-key]').forEach(cb => cb.addEventListener('change', () => { const d = JSON.parse(localStorage.getItem('dc_social')||'{}'); d[cb.dataset.socialKey] = cb.checked; localStorage.setItem('dc_social', JSON.stringify(d)); })); }
   function renderToiletGuide() { const g = $('toiletGuide'); if (g) g.innerHTML = TOILET_GUIDE.map(s => `<div class="k-card"><strong>${s.title}</strong><p>${s.text}</p></div>`).join(''); }
   function renderMembers() { const list = $('membersList'); if (!list) return; list.innerHTML = membersState.length ? membersState.map(m => `<div class="member-chip"><div class="m-avatar">${m.photoURL?`<img src="${m.photoURL}" alt="">`:avatarLetter(m.displayName)}</div><span>${m.displayName||'Учасник'}</span></div>`).join('') : '<div class="empty">Поки тільки ви 👤</div>'; }
   function renderWorkspaceMeta() { const el = $('inviteCodeView'); if (el) el.textContent = workspaceData?.inviteCode || '—'; }
@@ -339,9 +332,11 @@
     if ($('petLastDeworming')) $('petLastDeworming').value = currentPet?.lastDeworming || '';
     if ($('petLastHeat')) $('petLastHeat').value = currentPet?.lastHeat || '';
     const hf = $('heatDateField'); if (hf) hf.style.display = currentPet?.sex === 'дівчинка' ? '' : 'none';
+    // Push status
+    const ps = $('pushStatus');
+    if (ps) { if (Notification.permission === 'granted') ps.textContent = '✅ Сповіщення увімкнені'; else if (Notification.permission === 'denied') ps.textContent = '❌ Сповіщення заблоковані в налаштуваннях браузера'; else ps.textContent = ''; }
   }
 
-  // ===== RENDER: Sheet =====
   function renderSheetCategories() { const c = $('sheetCategories'); if (!c) return; c.innerHTML = EVENT_CATEGORIES.map(cat => `<button type="button" class="chip ${cat.id===selectedSheetCategory?'active':''}" data-sheet-cat="${cat.id}">${cat.icon} ${cat.name}</button>`).join(''); $$('[data-sheet-cat]').forEach(btn => btn.addEventListener('click', () => { selectedSheetCategory = btn.dataset.sheetCat; selectedEventType = null; renderSheetCategories(); renderSheetEvents(); hide($('sheetExtraFields')); })); }
   function renderSheetEvents() { const c = $('sheetEvents'); if (!c) return; const cat = EVENT_CATEGORIES.find(x => x.id === selectedSheetCategory); if (!cat) return; c.innerHTML = `<div class="actions-grid">${cat.events.map(ev => `<button type="button" class="action-btn ${selectedEventType===ev.type?'selected':''} ${ev.tone==='success'?'green':ev.tone==='danger'?'red':'neutral'}" data-sheet-event="${ev.type}"><span class="action-icon">${ev.icon}</span>${ev.label}</button>`).join('')}</div>`; $$('[data-sheet-event]').forEach(btn => btn.addEventListener('click', () => { selectedEventType = btn.dataset.sheetEvent; renderSheetEvents(); show($('sheetExtraFields')); $('eventTime').value = nowTime(); const conf = TYPE_CONFIG[selectedEventType]; const vf = $('valueField'); if (vf) vf.style.display = conf?.hasValue ? '' : 'none'; haptic(); })); }
 
@@ -362,12 +357,12 @@
   function closeSheet() { hide($('eventSheet')); }
 
   // ===== Firestore =====
-  async function savePetProfile(payload) { if (!currentUser || !workspaceId) return toast('Увійдіть', 'error'); showLoading(); try { await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ ...(currentPet||{}), ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); toast('Збережено ✓', 'success'); } catch (e) { console.error(e); toast('Помилка', 'error'); } finally { hideLoading(); } }
-  async function addEvent(payload) { if (!currentUser || !workspaceId) return toast('Увійдіть', 'error'); try { const data = { eventType: payload.eventType, byUid: currentUser.uid, byName: currentUser.displayName || 'Я', note: payload.note || '', timeLabel: payload.timeLabel || nowTime(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }; if (payload.value) data.value = payload.value; await db.collection('workspaces').doc(workspaceId).collection('events').add(data); toast('Додано ✓', 'success'); haptic(); } catch (e) { console.error(e); toast('Помилка', 'error'); } }
-  async function deleteEvent(id) { if (!workspaceId || !id) return; try { await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete(); toast('Видалено', 'success'); } catch (e) { console.error(e); toast('Помилка', 'error'); } }
+  async function savePetProfile(payload) { if (!currentUser || !workspaceId) return toast('Увійдіть','error'); showLoading(); try { await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set({ ...(currentPet||{}), ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); toast('Збережено ✓','success'); } catch (e) { console.error(e); toast('Помилка','error'); } finally { hideLoading(); } }
+  async function addEvent(payload) { if (!currentUser || !workspaceId) return toast('Увійдіть','error'); try { const data = { eventType: payload.eventType, byUid: currentUser.uid, byName: currentUser.displayName || 'Я', note: payload.note || '', timeLabel: payload.timeLabel || nowTime(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }; if (payload.value) data.value = payload.value; await db.collection('workspaces').doc(workspaceId).collection('events').add(data); toast('Додано ✓','success'); haptic(); } catch (e) { console.error(e); toast('Помилка','error'); } }
+  async function deleteEvent(id) { if (!workspaceId || !id) return; try { await db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete(); toast('Видалено','success'); } catch (e) { console.error(e); toast('Помилка','error'); } }
 
   // ===== Workspace =====
-  async function ensureWorkspaceForUser(user) { const udoc = await db.collection('users').doc(user.uid).get(); if (udoc.exists && udoc.data().workspaceId) { workspaceId = udoc.data().workspaceId; const wdoc = await db.collection('workspaces').doc(workspaceId).get(); workspaceData = wdoc.exists ? wdoc.data() : null; return; } const wsRef = db.collection('workspaces').doc(); workspaceId = wsRef.id; const inviteCode = Math.random().toString(36).slice(2,8).toUpperCase(); workspaceData = { name: (user.displayName||'Мій').split(' ')[0], ownerId: user.uid, inviteCode }; await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email||'', displayName: user.displayName||'', photoURL: user.photoURL||'', role: 'owner', workspaceId }, { merge: true }); await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email||'', displayName: user.displayName||'', photoURL: user.photoURL||'', role: 'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }); await wsRef.collection('dogs').doc('primary').set({ name:'', birthDate:'', sex:'хлопчик', breed:'', toiletMode:'pad', weight:'', issues:'', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+  async function ensureWorkspaceForUser(user) { const udoc = await db.collection('users').doc(user.uid).get(); if (udoc.exists && udoc.data().workspaceId) { workspaceId = udoc.data().workspaceId; const wdoc = await db.collection('workspaces').doc(workspaceId).get(); workspaceData = wdoc.exists ? wdoc.data() : null; return; } const wsRef = db.collection('workspaces').doc(); workspaceId = wsRef.id; const inviteCode = Math.random().toString(36).slice(2,8).toUpperCase(); workspaceData = { name: (user.displayName||'Мій').split(' ')[0], ownerId: user.uid, inviteCode }; await wsRef.set({ ...workspaceData, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); await db.collection('users').doc(user.uid).set({ uid: user.uid, email: user.email||'', displayName: user.displayName||'', photoURL: user.photoURL||'', role:'owner', workspaceId }, { merge: true }); await wsRef.collection('members').doc(user.uid).set({ uid: user.uid, email: user.email||'', displayName: user.displayName||'', photoURL: user.photoURL||'', role:'owner', createdAt: firebase.firestore.FieldValue.serverTimestamp() }); await wsRef.collection('dogs').doc('primary').set({ name:'', birthDate:'', sex:'хлопчик', breed:'', toiletMode:'pad', weight:'', issues:'', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
   async function joinWorkspaceByInvite(code) { const clean = (code||'').trim().toUpperCase(); if (!clean) throw new Error('Введіть код'); const snap = await db.collection('workspaces').where('inviteCode','==',clean).limit(1).get(); if (snap.empty) throw new Error('Не знайдено'); workspaceId = snap.docs[0].id; workspaceData = snap.docs[0].data(); await db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email||'', displayName: currentUser.displayName||'', photoURL: currentUser.photoURL||'', role:'member', workspaceId }, { merge: true }); await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email||'', displayName: currentUser.displayName||'', photoURL: currentUser.photoURL||'', role:'member', createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); subscribePet(); subscribeMembers(); subscribeEvents(); queueRender(); }
 
   // ===== Subscriptions =====
@@ -388,7 +383,7 @@
     const weeks = getAgeInWeeks(currentPet?.birthDate);
     const issues = currentPet?.issues || '';
     const petInfo = currentPet ? `Собака: ${currentPet.name||'Песик'}, ${weekLabel(weeks)}${weeks!=null&&weeks<12?' (цуценя!)':''}, ${currentPet.breed||'?'}, ${currentPet.sex||'?'}, ${getSizeLabel()}${issues?`, проблеми: ${issues}`:''}` : '';
-    const sys = `Ти — професійний український кінолог (15р досвіду).\n\nПРАВИЛА:\n1. ТІЛЬКИ українською. Без ієрогліфів.\n2. 4-5 речень. Конкретні кроки.\n3. До 3 міс — адаптація.\n4. Без покарань.\n5. Не знаєш — "до ветеринара".\n6. Пронумеровані кроки.\n\n${petInfo}`;
+    const sys = `Ти — професійний український кінолог (15р).\nПРАВИЛА:\n1. ТІЛЬКИ українською.\n2. 4-5 речень. Кроки.\n3. До 3 міс — адаптація.\n4. Без покарань.\n5. Не знаєш — "до ветеринара".\n6. Пронумеровані кроки.\n\n${petInfo}`;
     try {
       const r = await fetch('/api/proxy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'groq/llama-3.3-70b-versatile', messages:[{role:'system',content:sys},{role:'user',content:prompt}], temperature:0.2, max_tokens:400, stream:false }) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -400,18 +395,53 @@
 
   function getLocalFallback(prompt) {
     const l = prompt.toLowerCase();
-    if (l.includes('команд')||l.includes('сідати')) return '1) Ласощі біля носа. 2) Підніміть руку — сяде. 3) "Так!" + ласощі. 4) 5-8 разів, 2-3 підходи/день.';
-    if (l.includes('гриз')) return '1) Приберіть речі. 2) Жувальне. 3) Своє — маркер. 4) Чуже — мовчки замініть.';
-    if (l.includes('гавк')) return '1) Причина? 2) Не кричіть. 3) Пауза → маркер. 4) Більше навантаження.';
-    if (l.includes('пелюшк')||l.includes('туалет')) return '1) Менше простору. 2) Після сну/їжі — на місце. 3) "Так!" одразу. 4) Промах — тихо.';
+    if (l.includes('команд')||l.includes('сідати')) return '1) Ласощі біля носа. 2) Руку вгору — сяде. 3) "Так!" + ласощі. 4) 5-8 разів, 2-3/день.';
+    if (l.includes('гриз')) return '1) Приберіть. 2) Жувальне. 3) Своє — маркер. 4) Чуже — замініть.';
+    if (l.includes('гавк')) return '1) Причина? 2) Не кричіть. 3) Пауза → маркер. 4) Навантаження.';
+    if (l.includes('пелюшк')||l.includes('туалет')) return '1) Менше простору. 2) Після сну/їжі. 3) "Так!" одразу. 4) Промах — тихо.';
     if (l.includes('повідець')||l.includes('тягне')) return '1) Тягне = стоп. 2) Вільний = йдемо. 3) Ласощі біля ноги.';
-    if (l.includes('кусає')) return '1) Завмріть. 2) "Ай" + пауза. 3) Іграшку. 4) Перезбуджено — вийдіть.';
-    if (l.includes('до мене')||l.includes('підклик')) return '1) Унікальне слово. 2) Слово → суперласощі ×10. 3) Тільки коли йде. 4) Завжди свято!';
-    if (l.includes('план')||l.includes('сьогодні')) return '1) Ранок: туалет + їжа. 2) 2 хв тренування. 3) Нюхова гра. 4) Прогулянка. 5) Повторити ввечері.';
+    if (l.includes('кусає')) return '1) Завмріть. 2) Пауза. 3) Іграшку. 4) Перезбуджено — вийдіть.';
+    if (l.includes('до мене')||l.includes('підклик')) return '1) Слово. 2) Суперласощі ×10. 3) Тільки коли йде. 4) Свято!';
+    if (l.includes('план')) return '1) Туалет + їжа. 2) 2 хв тренування. 3) Нюхова гра. 4) Прогулянка.';
     return getProgramByAge(getAgeInWeeks(currentPet?.birthDate))?.tip || 'Запитайте конкретніше! 🐾';
   }
 
   async function handleAISubmit(prompt) { if (!prompt.trim()) return; addChatMessage(prompt,'user'); showTyping(); try { const r = await fetchAIResponse(prompt); removeTyping(); addChatMessage(r,'assistant'); } catch { removeTyping(); addChatMessage('Помилка 🔄','assistant'); } }
+
+  // ===== PUSH NOTIFICATIONS =====
+  async function requestPushPermission() {
+    if (!('Notification' in window)) { toast('Не підтримується','error'); return; }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') { await subscribeToPush(); toast('Сповіщення увімкнені! 🔔','success'); }
+    else { toast('Відхилено. Увімкніть в налаштуваннях браузера.','error'); }
+    fillPetForm(); // update status text
+  }
+
+  async function subscribeToPush() {
+    try {
+      if (!firebase.messaging) return;
+      const messaging = firebase.messaging();
+      const token = await messaging.getToken({
+        vapidKey: 'BFvGyG-w5R68xO2RS6gQbYSyAPQaviGnVsHedxjzXajvxg1OUdL1Xe6e4M38j0mewG-Yt3qKgbUnMHmf98PaCiA',
+        serviceWorkerRegistration: await navigator.serviceWorker.getRegistration()
+      });
+      if (token && currentUser && workspaceId) {
+        await db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).update({ pushToken: token });
+        console.log('Push token saved');
+      }
+    } catch (e) { console.warn('Push sub failed:', e); }
+  }
+
+  function scheduleLocalReminder(minutes, title, body) {
+    if (Notification.permission !== 'granted') return;
+    setTimeout(() => {
+      if (document.hidden) {
+        new Notification(title, { body, icon: '/icons/icon-192.png', vibrate: [100, 50, 100] });
+      } else {
+        toast(`${title}: ${body}`, 'success');
+      }
+    }, minutes * 60 * 1000);
+  }
 
   // ===== ONBOARDING =====
   function showOnboarding() { hide($('authScreen')); hide($('appContent')); show($('onboardingScreen')); }
@@ -424,19 +454,13 @@
     $('obNext2')?.addEventListener('click', () => setOnboardingStep(3));
     $('obBack3')?.addEventListener('click', () => setOnboardingStep(2));
     $('obFinish')?.addEventListener('click', async () => {
-      const name = $('obName').value.trim(); const birthDate = $('obBirthDate').value;
-      const sex = $('obSex').value; const breed = $('obBreed').value.trim();
       showLoading();
-      try { await savePetProfile({ name, birthDate, sex, breed }); localStorage.setItem('dc_onboarded','true'); hideOnboarding(); toast(`${name} додано! 🎉`,'success'); queueRender(); }
+      try { await savePetProfile({ name: $('obName').value.trim(), birthDate: $('obBirthDate').value, sex: $('obSex').value, breed: $('obBreed').value.trim() }); localStorage.setItem('dc_onboarded','true'); hideOnboarding(); toast(`${$('obName').value.trim()} додано! 🎉`,'success'); queueRender(); }
       catch { toast('Помилка','error'); } finally { hideLoading(); }
     });
   }
 
-  function checkOnboarding() {
-    if (localStorage.getItem('dc_onboarded')) return false;
-    if (currentPet?.name?.trim()) { localStorage.setItem('dc_onboarded','true'); return false; }
-    return true;
-  }
+  function checkOnboarding() { if (localStorage.getItem('dc_onboarded')) return false; if (currentPet?.name?.trim()) { localStorage.setItem('dc_onboarded','true'); return false; } return true; }
 
   // ===== Event Binding =====
   function bindEvents() {
@@ -453,7 +477,11 @@
       if (!selectedEventType) return toast('Оберіть тип','error');
       const payload = { eventType: selectedEventType, timeLabel: $('eventTime')?.value || nowTime(), note: $('eventNote')?.value?.trim() || '' };
       const val = $('eventValue')?.value; if (val) payload.value = parseFloat(val);
-      await addEvent(payload); $('eventNote').value = ''; $('eventValue').value = ''; closeSheet();
+      await addEvent(payload);
+      // Local reminders
+      if (['meal_morning','meal_day','meal_evening'].includes(payload.eventType)) scheduleLocalReminder(20, '🚽 Час на горшик!', `Після їжі — виведіть ${currentPet?.name||'песика'}!`);
+      if (payload.eventType === 'sleep') scheduleLocalReminder(5, '🚽 Прокинувся!', `${currentPet?.name||'Песик'} — одразу на пелюшку!`);
+      $('eventNote').value = ''; $('eventValue').value = ''; closeSheet();
     });
 
     $('petProfileForm')?.addEventListener('submit', async (e) => { e.preventDefault(); await savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), weight: $('petWeight').value, toiletMode: $('petToiletMode').value, issues: $('petIssues')?.value?.trim() || '' }); });
@@ -476,6 +504,7 @@
 
     $('closeWeeklyBtn')?.addEventListener('click', () => { hide($('weeklyReport')); localStorage.setItem('dc_weekly_dismissed', todayKey()); });
     $('refreshPlanBtn')?.addEventListener('click', () => { localStorage.removeItem('dc_aiplan'); generateAIPlan(); });
+    $('enablePushBtn')?.addEventListener('click', requestPushPermission);
 
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
     let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (activeTab === 'tabDiary') renderChart('progressChartDiary'); }, 200); });
@@ -495,6 +524,8 @@
         await new Promise(resolve => { const unsub = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(s => { currentPet = s.exists ? s.data() : null; unsub(); resolve(); }); });
         if (checkOnboarding()) { hideLoading(); showOnboarding(); }
         else { show($('appContent')); hideLoading(); queueRender(); }
+        // Init push (silent, won't ask permission)
+        if (Notification.permission === 'granted') subscribeToPush();
       } catch (e) { console.error('Boot:', e); toast('Помилка','error'); hideLoading(); }
     });
   }
@@ -503,5 +534,7 @@
   bindEvents();
   bootAuth();
   auth.getRedirectResult().then(r => { if (r?.user) console.log('OK'); }).catch(e => { if (e.code && e.code !== 'auth/no-auth-event') toast('Помилка входу','error'); });
+
+})();
 
 })();

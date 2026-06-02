@@ -7,9 +7,17 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#fafaf9",
-  "theme_color": "#0f766e",
+  "background_color": "#f8f9fa",
+  "theme_color": "#0ea5e9",
   "categories": ["productivity", "lifestyle", "education"],
+  "screenshots": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -22,6 +30,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Швидкий запис",
+      "short_name": "Запис",
+      "description": "Додати подію",
+      "url": "/?action=add",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

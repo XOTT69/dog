@@ -1,5 +1,5 @@
 // Service Worker — push notifications + offline cache
-const CACHE = 'dogcoach-v5';
+const CACHE = 'dogcoach-v4';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/content.js', '/manifest.webmanifest'];
 
 // Install
@@ -42,10 +42,4 @@ self.addEventListener('notificationclick', e => {
     for (const c of list) { if ('focus' in c) return c.focus(); }
     return clients.openWindow('/');
   }));
-});
-// Background sync for offline events (optional, progressive enhancement)
-self.addEventListener('sync', e => {
-  if (e.tag === 'sync-events') {
-    console.log('[SW] Background sync triggered');
-  }
 });

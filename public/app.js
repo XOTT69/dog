@@ -379,11 +379,20 @@
   function showOnboarding(){hide($('authScreen'));hide($('appContent'));show($('onboardingScreen'));}
   function hideOnboarding(){hide($('onboardingScreen'));show($('appContent'));}
   function setOnboardingStep(step){$$('.onboarding-step').forEach(function(s){s.classList.add('hidden');});show($('onboardingStep'+step));$$('.ob-dot').forEach(function(d){d.classList.toggle('active',parseInt(d.dataset.step)===step);});}
-
   function checkOnboarding(){
-    if(localStorage.getItem('dc_onboarded'))return false;
-    if(currentPet&&currentPet.name&&currentPet.name.trim()){localStorage.setItem('dc_onboarded','true');return false;}
-    if(eventsState.length>0){localStorage.setItem('dc_onboarded','true');return false;}
+    // Якщо localStorage каже що вже пройшли — довіряємо
+    if(localStorage.getItem('dc_onboarded')) return false;
+    // Якщо є дані собаки з Firebase — значить вже користувались
+    if(currentPet && currentPet.name && currentPet.name.trim()){
+      localStorage.setItem('dc_onboarded','true');
+      return false;
+    }
+    // Якщо є будь-які події — теж вже користувались
+    if(eventsState.length > 0){
+      localStorage.setItem('dc_onboarded','true');
+      return false;
+    }
+    // Нового юзера показуємо onboarding
     return true;
   }
 
@@ -490,23 +499,33 @@
   }
 
   // ===== BOOT =====
-  function bootAuth(){
+    function bootAuth(){
     auth.onAuthStateChanged(function(user){
       currentUser=user||null;
       if(!currentUser){show($('authScreen'));hide($('appContent'));hide($('onboardingScreen'));hideLoading();return;}
       hide($('authScreen'));showLoading();
       ensureWorkspaceForUser(currentUser).then(function(){
-        subscribePet();subscribeMembers();subscribeEvents();
+        // Підписуємось на всі дані
+        subscribePet();
+        subscribeMembers();
+        subscribeEvents();
+        // Чекаємо поки прийде перший snapshot собаки
         return new Promise(function(resolve){
-          var unsub=db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(s){
-            currentPet=s.exists?s.data():null;
-            unsub();
-            // Check if events exist to prevent false onboarding
-            db.collection('workspaces').doc(workspaceId).collection('events').limit(1).get().then(function(snap){
-              if(!snap.empty)eventsState=[{id:'temp'}];
-              resolve();
-            }).catch(function(){resolve();});
+          var waited = false;
+          var checkReady = function(){
+            if(waited) return;
+            waited = true;
+            // Додатково чекаємо 500ms щоб events встигли прийти
+            setTimeout(resolve, 500);
+          };
+          // Слухаємо перший snapshot
+          var unsub2 = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(s){
+            currentPet = s.exists ? s.data() : null;
+            unsub2();
+            checkReady();
           });
+          // Fallback якщо snapshot не прийде за 3 сек
+          setTimeout(checkReady, 3000);
         });
       }).then(function(){
         if(checkOnboarding()){hideLoading();showOnboarding();}

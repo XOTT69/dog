@@ -102,7 +102,131 @@
   function getSpayAgeRange() { var m = { tiny:{min:5,max:7,label:'5–7 міс'},small:{min:6,max:8,label:'6–8 міс'},medium:{min:8,max:12,label:'8–12 міс'},large:{min:12,max:18,label:'12–18 міс'},giant:{min:18,max:24,label:'18–24 міс'} }; return m[detectPetSize()] || m.medium; }
   function getNeuterAgeRange() { var m = { tiny:{min:6,max:8,label:'6–8 міс'},small:{min:6,max:9,label:'6–9 міс'},medium:{min:9,max:12,label:'9–12 міс'},large:{min:12,max:18,label:'12–18 міс'},giant:{min:18,max:24,label:'18–24 міс'} }; return m[detectPetSize()] || m.medium; }
 
-  // ===== AUDIO — PWA COMPATIBLE =====
+    // ===== AUDIO — WORKS ON iOS PWA =====
+  // Base64-encoded short audio clips (generated programmatically)
+  var clickerAudioSrc = null;
+  var whistleAudioSrc = null;
+  var audioPool = [];
+
+  function generateClickerWav() {
+    // Generate a short "click" sound as WAV
+    var sampleRate = 22050;
+    var duration = 0.08;
+    var samples = Math.floor(sampleRate * duration);
+    var buffer = new Float32Array(samples);
+    
+    // Sharp click: two short bursts
+    for (var i = 0; i < samples; i++) {
+      var t = i / sampleRate;
+      if (t < 0.015) {
+        buffer[i] = 0.9 * Math.sign(Math.sin(2 * Math.PI * 2500 * t)) * (1 - t / 0.015);
+      } else if (t > 0.04 && t < 0.055) {
+        var t2 = t - 0.04;
+        buffer[i] = 0.6 * Math.sign(Math.sin(2 * Math.PI * 2000 * t2)) * (1 - t2 / 0.015);
+      }
+    }
+    return floatToWavDataUri(buffer, sampleRate);
+  }
+
+  function generateWhistleWav() {
+    var sampleRate = 22050;
+    var duration = 0.45;
+    var samples = Math.floor(sampleRate * duration);
+    var buffer = new Float32Array(samples);
+    
+    for (var i = 0; i < samples; i++) {
+      var t = i / sampleRate;
+      // Ascending frequency
+      var freq = 1800 + (1000 * Math.min(t / (duration * 0.35), 1));
+      if (t > duration * 0.35) freq = 2800 - 300 * ((t - duration * 0.35) / (duration * 0.65));
+      // Envelope
+      var env = 0;
+      if (t < 0.02) env = t / 0.02;
+      else if (t > duration - 0.05) env = (duration - t) / 0.05;
+      else env = 1;
+      buffer[i] = 0.5 * env * Math.sin(2 * Math.PI * freq * t);
+      // Add harmonic
+      buffer[i] += 0.1 * env * Math.sin(2 * Math.PI * freq * 2 * t);
+    }
+    return floatToWavDataUri(buffer, sampleRate);
+  }
+
+  function floatToWavDataUri(floatBuffer, sampleRate) {
+    var numSamples = floatBuffer.length;
+    var bitsPerSample = 16;
+    var numChannels = 1;
+    var byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    var blockAlign = numChannels * bitsPerSample / 8;
+    var dataSize = numSamples * blockAlign;
+    var bufferSize = 44 + dataSize;
+    var arrayBuffer = new ArrayBuffer(bufferSize);
+    var view = new DataView(arrayBuffer);
+    
+    // WAV header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, bufferSize - 8, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataSize, true);
+    
+    // Write samples
+    var offset = 44;
+    for (var i = 0; i < numSamples; i++) {
+      var sample = Math.max(-1, Math.min(1, floatBuffer[i]));
+      var intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      view.setInt16(offset, intSample, true);
+      offset += 2;
+    }
+    
+    // Convert to base64
+    var binary = '';
+    var bytes = new Uint8Array(arrayBuffer);
+    for (var j = 0; j < bytes.byteLength; j++) {
+      binary += String.fromCharCode(bytes[j]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  }
+
+  function writeString(view, offset, string) {
+    for (var i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  function initAudioSources() {
+    if (!clickerAudioSrc) clickerAudioSrc = generateClickerWav();
+    if (!whistleAudioSrc) whistleAudioSrc = generateWhistleWav();
+  }
+
+  function playSound(src) {
+    try {
+      var audio = new Audio(src);
+      audio.volume = 1.0;
+      audio.play().catch(function(e) { console.warn('Audio play:', e); });
+    } catch (e) { console.warn('Audio:', e); }
+  }
+
+  function playClicker() {
+    initAudioSources();
+    playSound(clickerAudioSrc);
+    if (navigator.vibrate) navigator.vibrate(15);
+  }
+
+  function playWhistle() {
+    initAudioSources();
+    playSound(whistleAudioSrc);
+    if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+  }
+
+  // Keep unlockAudio for timer alarm (uses Web Audio as bonus)
   function unlockAudio() {
     if (audioUnlocked) return;
     try {
@@ -116,7 +240,7 @@
       source.start(0);
       if (audioCtx.state === 'suspended') audioCtx.resume();
       audioUnlocked = true;
-    } catch (e) { console.warn('Audio unlock:', e); }
+    } catch (e) {}
   }
 
   function ensureAudio() {
@@ -127,86 +251,6 @@
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
-  }
-
-  function playClicker() {
-    unlockAudio();
-    var ctx = ensureAudio();
-    if (!ctx) return;
-    if (ctx.state !== 'running') {
-      ctx.resume().then(function() { doPlayClicker(ctx); });
-      return;
-    }
-    doPlayClicker(ctx);
-  }
-
-  function doPlayClicker(ctx) {
-    try {
-      var now = ctx.currentTime;
-      var osc1 = ctx.createOscillator();
-      var gain1 = ctx.createGain();
-      osc1.type = 'square';
-      osc1.frequency.setValueAtTime(2500, now);
-      osc1.frequency.exponentialRampToValueAtTime(1500, now + 0.012);
-      gain1.gain.setValueAtTime(0.9, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-      osc1.connect(gain1); gain1.connect(ctx.destination);
-      osc1.start(now); osc1.stop(now + 0.05);
-
-      var osc2 = ctx.createOscillator();
-      var gain2 = ctx.createGain();
-      osc2.type = 'square';
-      osc2.frequency.setValueAtTime(2000, now + 0.06);
-      osc2.frequency.exponentialRampToValueAtTime(1200, now + 0.075);
-      gain2.gain.setValueAtTime(0.6, now + 0.06);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-      osc2.connect(gain2); gain2.connect(ctx.destination);
-      osc2.start(now + 0.06); osc2.stop(now + 0.12);
-      if (navigator.vibrate) navigator.vibrate(15);
-    } catch (e) { console.warn('Clicker:', e); }
-  }
-
-  function playWhistle() {
-    unlockAudio();
-    var ctx = ensureAudio();
-    if (!ctx) return;
-    if (ctx.state !== 'running') {
-      ctx.resume().then(function() { doPlayWhistle(ctx); });
-      return;
-    }
-    doPlayWhistle(ctx);
-  }
-
-  function doPlayWhistle(ctx) {
-    try {
-      var now = ctx.currentTime;
-      var dur = 0.5;
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1800, now);
-      osc.frequency.linearRampToValueAtTime(2800, now + dur * 0.35);
-      osc.frequency.linearRampToValueAtTime(2500, now + dur);
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-      gain.gain.setValueAtTime(0.5, now + dur - 0.08);
-      gain.gain.linearRampToValueAtTime(0.001, now + dur);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now); osc.stop(now + dur + 0.01);
-
-      var osc2 = ctx.createOscillator();
-      var gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(3600, now);
-      osc2.frequency.linearRampToValueAtTime(5600, now + dur * 0.35);
-      osc2.frequency.linearRampToValueAtTime(5000, now + dur);
-      gain2.gain.setValueAtTime(0.001, now);
-      gain2.gain.linearRampToValueAtTime(0.12, now + 0.02);
-      gain2.gain.linearRampToValueAtTime(0.001, now + dur);
-      osc2.connect(gain2); gain2.connect(ctx.destination);
-      osc2.start(now); osc2.stop(now + dur + 0.01);
-      if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
-    } catch (e) { console.warn('Whistle:', e); }
   }
 
   // ===== TOAST =====

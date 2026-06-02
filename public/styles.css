@@ -1605,6 +1605,138 @@ details .detail-content {
 }
 button:focus:not(:focus-visible) { outline: none; }
 
+/* ===== CLICKER & WHISTLE ===== */
+.clicker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.clicker-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1.5rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  transition: all 100ms var(--ease);
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.clicker-btn:active {
+  transform: scale(0.92);
+  box-shadow: var(--shadow-xs);
+}
+.clicker-btn.clicked {
+  transform: scale(0.88);
+}
+.clicker-blue {
+  border-color: #0ea5e9;
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+.clicker-blue:active, .clicker-blue.clicked {
+  background: #bae6fd;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
+}
+.clicker-yellow {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+}
+.clicker-yellow:active, .clicker-yellow.clicked {
+  background: #fde68a;
+  border-color: #d97706;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+}
+[data-theme="dark"] .clicker-blue {
+  background: linear-gradient(180deg, #0c2d48 0%, #0c1e30 100%);
+  border-color: #38bdf8;
+}
+[data-theme="dark"] .clicker-blue:active, [data-theme="dark"] .clicker-blue.clicked {
+  background: #0c4a6e;
+}
+[data-theme="dark"] .clicker-yellow {
+  background: linear-gradient(180deg, #422006 0%, #1c1917 100%);
+  border-color: #fbbf24;
+}
+[data-theme="dark"] .clicker-yellow:active, [data-theme="dark"] .clicker-yellow.clicked {
+  background: #78350f;
+}
+.clicker-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  transition: transform 100ms var(--ease);
+}
+.clicker-btn:active .clicker-icon {
+  transform: scale(0.85);
+}
+.clicker-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.clicker-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Timer ring */
+.timer-ring-container {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 0.75rem;
+}
+.timer-ring-container svg {
+  width: 100%;
+  height: 100%;
+}
+.timer-ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 6;
+}
+.timer-ring-progress {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 408.4;
+  stroke-dashoffset: 408.4;
+  transition: stroke-dashoffset 1s linear;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.timer-ring-progress.warning { stroke: var(--warning); }
+.timer-ring-progress.danger { stroke: var(--danger); }
+.timer-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.timer-center .timer-display {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  margin: 0;
+}
+.timer-center .timer-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 /* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

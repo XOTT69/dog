@@ -128,25 +128,43 @@
     return floatToWavDataUri(buffer, sampleRate);
   }
 
-  function generateWhistleWav() {
-    var sampleRate = 22050;
-    var duration = 0.45;
+    function generateWhistleWav() {
+    var sampleRate = 44100;
+    var duration = 0.7;
     var samples = Math.floor(sampleRate * duration);
     var buffer = new Float32Array(samples);
     
     for (var i = 0; i < samples; i++) {
       var t = i / sampleRate;
-      // Ascending frequency
-      var freq = 1800 + (1000 * Math.min(t / (duration * 0.35), 1));
-      if (t > duration * 0.35) freq = 2800 - 300 * ((t - duration * 0.35) / (duration * 0.65));
-      // Envelope
+      
+      // Основна частота — високий стабільний тон (як акме-свисток)
+      var freq = 2637; // E7 — класична частота свистка
+      
+      // Невеликий підйом на початку
+      if (t < 0.05) freq = 2400 + (237 * t / 0.05);
+      
+      // Легке вібрато для реалістичності
+      var vibrato = 1 + 0.003 * Math.sin(2 * Math.PI * 5 * t);
+      
+      // Envelope — різкий початок, стабільне тіло, плавний кінець
       var env = 0;
-      if (t < 0.02) env = t / 0.02;
-      else if (t > duration - 0.05) env = (duration - t) / 0.05;
-      else env = 1;
-      buffer[i] = 0.5 * env * Math.sin(2 * Math.PI * freq * t);
-      // Add harmonic
-      buffer[i] += 0.1 * env * Math.sin(2 * Math.PI * freq * 2 * t);
+      if (t < 0.01) env = t / 0.01; // attack 10ms
+      else if (t < duration - 0.08) env = 1.0; // sustain
+      else env = (duration - t) / 0.08; // release
+      
+      // Основний тон
+      var sample = 0.45 * Math.sin(2 * Math.PI * freq * vibrato * t);
+      
+      // Другий гармонік (чистіший звук)
+      sample += 0.15 * Math.sin(2 * Math.PI * freq * 2 * vibrato * t);
+      
+      // Третій гармонік (металевий відтінок)
+      sample += 0.05 * Math.sin(2 * Math.PI * freq * 3 * t);
+      
+      // Шум повітря (реалістичність свистка)
+      var noise = (Math.random() * 2 - 1) * 0.04;
+      
+      buffer[i] = env * (sample + noise);
     }
     return floatToWavDataUri(buffer, sampleRate);
   }

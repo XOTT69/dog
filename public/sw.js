@@ -1,5 +1,5 @@
 // Service Worker — push notifications + offline cache
-const CACHE = 'dogcoach-v4';
+const CACHE = 'dogcoach-v5';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/content.js', '/manifest.webmanifest'];
 
 // Install

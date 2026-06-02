@@ -43,3 +43,9 @@ self.addEventListener('notificationclick', e => {
     return clients.openWindow('/');
   }));
 });
+// Background sync for offline events (optional, progressive enhancement)
+self.addEventListener('sync', e => {
+  if (e.tag === 'sync-events') {
+    console.log('[SW] Background sync triggered');
+  }
+});

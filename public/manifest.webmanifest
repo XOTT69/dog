@@ -23,19 +23,5 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Швидкий запис",
-      "short_name": "Запис",
-      "url": "/?action=add",
-      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
-    },
-    {
-      "name": "AI Кінолог",
-      "short_name": "AI",
-      "url": "/?tab=courses",
-      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
-    }
   ]
 }

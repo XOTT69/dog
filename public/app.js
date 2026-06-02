@@ -123,11 +123,14 @@
     return m[detectPetSize()] || m.medium;
   }
 
-  // ===== AUDIO — CLICKER & WHISTLE =====
+   // ===== AUDIO — CLICKER & WHISTLE (iOS compatible) =====
   function getAudioContext() {
     if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
     }
+    // iOS requires resume on user gesture
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
@@ -135,67 +138,82 @@
   }
 
   function playClicker() {
-    try {
-      var ctx = getAudioContext();
-      var now = ctx.currentTime;
+    var ctx = getAudioContext();
+    if (!ctx) return;
 
-      // Click sound — sharp metallic click
-      var osc1 = ctx.createOscillator();
-      var gain1 = ctx.createGain();
-      osc1.type = 'square';
-      osc1.frequency.setValueAtTime(2500, now);
-      osc1.frequency.exponentialRampToValueAtTime(1800, now + 0.01);
-      gain1.gain.setValueAtTime(0.8, now);
-      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.05);
+    var now = ctx.currentTime;
 
-      // Second click (double-click feel)
-      var osc2 = ctx.createOscillator();
-      var gain2 = ctx.createGain();
-      osc2.type = 'square';
-      osc2.frequency.setValueAtTime(2200, now + 0.06);
-      osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.07);
-      gain2.gain.setValueAtTime(0.6, now + 0.06);
-      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.06);
-      osc2.stop(now + 0.12);
+    // First click — sharp
+    var osc1 = ctx.createOscillator();
+    var gain1 = ctx.createGain();
+    osc1.type = 'square';
+    osc1.frequency.setValueAtTime(2500, now);
+    osc1.frequency.exponentialRampToValueAtTime(1500, now + 0.015);
+    gain1.gain.setValueAtTime(1.0, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.06);
 
-      if (navigator.vibrate) navigator.vibrate(15);
-    } catch (e) { console.warn('Audio:', e); }
+    // Second click — softer
+    var osc2 = ctx.createOscillator();
+    var gain2 = ctx.createGain();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(2000, now + 0.07);
+    osc2.frequency.exponentialRampToValueAtTime(1200, now + 0.085);
+    gain2.gain.setValueAtTime(0.7, now + 0.07);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.07);
+    osc2.stop(now + 0.13);
+
+    if (navigator.vibrate) navigator.vibrate(15);
   }
 
   function playWhistle() {
-    try {
-      var ctx = getAudioContext();
-      var now = ctx.currentTime;
-      var duration = 0.6;
+    var ctx = getAudioContext();
+    if (!ctx) return;
 
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.type = 'sine';
-      // Whistle — ascending pitch
-      osc.frequency.setValueAtTime(1800, now);
-      osc.frequency.linearRampToValueAtTime(2800, now + duration * 0.3);
-      osc.frequency.setValueAtTime(2800, now + duration * 0.3);
-      osc.frequency.linearRampToValueAtTime(2400, now + duration);
+    var now = ctx.currentTime;
+    var duration = 0.5;
 
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-      gain.gain.setValueAtTime(0.5, now + duration - 0.1);
-      gain.gain.linearRampToValueAtTime(0, now + duration);
+    // Main whistle tone
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.linearRampToValueAtTime(2800, now + duration * 0.4);
+    osc.frequency.linearRampToValueAtTime(2500, now + duration);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration);
+    // Smooth envelope
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.6, now + 0.03);
+    gain.gain.setValueAtTime(0.6, now + duration - 0.1);
+    gain.gain.linearRampToValueAtTime(0.001, now + duration);
 
-      if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
-    } catch (e) { console.warn('Audio:', e); }
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.01);
+
+    // Add harmonic for richness
+    var osc2 = ctx.createOscillator();
+    var gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(3600, now);
+    osc2.frequency.linearRampToValueAtTime(5600, now + duration * 0.4);
+    osc2.frequency.linearRampToValueAtTime(5000, now + duration);
+    gain2.gain.setValueAtTime(0.001, now);
+    gain2.gain.linearRampToValueAtTime(0.15, now + 0.03);
+    gain2.gain.linearRampToValueAtTime(0.001, now + duration);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now);
+    osc2.stop(now + duration + 0.01);
+
+    if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
   }
 
   // ===== TOAST =====
@@ -480,44 +498,56 @@
     });
   }
 
-  // ===== CHART — FIXED =====
+    // ===== CHART — FIXED FOR MOBILE =====
   function renderChart(canvasId) {
-    var canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
+    var canvas = $(canvasId);
+    if (!canvas || !canvas.getContext) return;
 
-    // Wait for element to be visible and have dimensions
-    requestAnimationFrame(function() {
-      var rect = canvas.getBoundingClientRect();
-      if (!rect.width || rect.width < 50) {
-        // Retry after layout
-        setTimeout(function() { renderChartInternal(canvasId); }, 100);
-        return;
-      }
-      renderChartInternal(canvasId);
-    });
+    // Ensure parent is visible
+    var parent = canvas.parentElement;
+    if (!parent || parent.offsetHeight === 0) return;
+
+    // Use setTimeout to ensure layout is complete after tab switch
+    setTimeout(function() { renderChartInternal(canvasId); }, 60);
   }
 
   function renderChartInternal(canvasId) {
-    var canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
-    var rect = canvas.getBoundingClientRect();
-    if (!rect.width || rect.width < 50 || !rect.height || rect.height < 50) return;
+    var canvas = $(canvasId);
+    if (!canvas || !canvas.getContext) return;
+
+    // Force dimensions from parent
+    var parent = canvas.parentElement;
+    if (!parent) return;
+    var parentWidth = parent.clientWidth - 32; // padding
+    if (parentWidth < 100) parentWidth = 300;
+
+    var chartHeight = 180;
+    canvas.style.width = parentWidth + 'px';
+    canvas.style.height = chartHeight + 'px';
 
     var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = parentWidth * dpr;
+    canvas.height = chartHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var w = rect.width, h = rect.height;
+
+    var w = parentWidth, h = chartHeight;
     ctx.clearRect(0, 0, w, h);
 
-    // Gather data
+    // Gather 14 days of data
     var days = [];
+    var hasAnyData = false;
     for (var i = 13; i >= 0; i--) {
       var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
       var next = new Date(d); next.setDate(next.getDate() + 1);
-      var dayEv = eventsState.filter(function(e) { var ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; });
+      var dayEv = eventsState.filter(function(e) {
+        var ts = tsToDate(e.createdAt);
+        return ts && ts >= d && ts < next;
+      });
       var s = dayEv.filter(function(e) { return isToiletSuccess(e.eventType); }).length;
       var m = dayEv.filter(function(e) { return isToiletMiss(e.eventType); }).length;
       var t = s + m;
+      if (t > 0) hasAnyData = true;
       days.push({ date: d, pct: t ? Math.round(s / t * 100) : null, total: t, success: s, miss: m });
     }
 
@@ -528,30 +558,64 @@
     var muted = isDark ? '#6c757d' : '#adb5bd';
     var border = isDark ? '#2a2a4a' : '#e9ecef';
     var textColor = isDark ? '#adb5bd' : '#495057';
+    var bgColor = isDark ? '#1a1a2e' : '#ffffff';
 
-    var pad = { top: 16, right: 8, bottom: 28, left: 8 };
-    var cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
+    // If no data at all — show message
+    if (!hasAnyData) {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = muted;
+      ctx.font = '14px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('📝 Додайте записи горшика', w / 2, h / 2 - 10);
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillText('щоб побачити графік', w / 2, h / 2 + 14);
+      return;
+    }
+
+    var pad = { top: 24, right: 12, bottom: 32, left: 12 };
+    var cw = w - pad.left - pad.right;
+    var ch = h - pad.top - pad.bottom;
     var bw = cw / days.length;
 
-    // Grid lines
-    ctx.strokeStyle = border; ctx.lineWidth = 1;
+    // Grid lines (dashed)
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
     [0, 50, 100].forEach(function(v) {
       var y = pad.top + ch - (v / 100) * ch;
-      ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
     });
+    ctx.setLineDash([]);
 
-    // Draw bars
+    // Y-axis labels
+    ctx.fillStyle = muted;
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('100%', pad.left, pad.top - 4);
+    ctx.fillText('50%', pad.left, pad.top + ch / 2 - 4);
+    ctx.fillText('0%', pad.left, pad.top + ch + 10);
+
+    // Bars
     days.forEach(function(day, i) {
-      var x = pad.left + i * bw + bw * 0.15, barW = bw * 0.7;
+      var x = pad.left + i * bw + bw * 0.15;
+      var barW = bw * 0.65;
+
       if (day.pct == null) {
-        // No data — dot
-        ctx.fillStyle = muted; ctx.beginPath(); ctx.arc(x + barW / 2, pad.top + ch - 3, 3, 0, Math.PI * 2); ctx.fill();
+        // No data — small circle
+        ctx.fillStyle = muted;
+        ctx.beginPath();
+        ctx.arc(x + barW / 2, pad.top + ch - 2, 3, 0, Math.PI * 2);
+        ctx.fill();
       } else {
-        var barH = Math.max(6, (day.pct / 100) * ch);
+        var barH = Math.max(8, (day.pct / 100) * ch);
         var y = pad.top + ch - barH;
         var barColor = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
 
-        // Bar with rounded top
+        // Rounded bar
         ctx.fillStyle = barColor;
         var r = Math.min(4, barW / 2);
         ctx.beginPath();
@@ -564,26 +628,46 @@
         ctx.closePath();
         ctx.fill();
 
-        // Percentage on top
-        if (day.total >= 2) {
-          ctx.fillStyle = textColor; ctx.font = 'bold 9px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText(day.pct + '%', x + barW / 2, y - 4);
+        // Percentage label on top
+        if (day.total >= 1) {
+          ctx.fillStyle = textColor;
+          ctx.font = 'bold 9px -apple-system, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(day.pct + '%', x + barW / 2, y - 5);
         }
       }
 
-      // Date labels
+      // Date labels (every day since space is enough on 14 bars)
+      ctx.fillStyle = muted;
+      ctx.font = '9px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      var dateLabel = day.date.getDate() + '.' + (day.date.getMonth() + 1);
+      // Show every other label to avoid overlap
       if (i % 2 === 0 || i === days.length - 1) {
-        ctx.fillStyle = muted; ctx.font = '10px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(day.date.getDate() + '.' + (day.date.getMonth() + 1), x + barW / 2, h - 6);
+        ctx.fillText(dateLabel, x + barW / 2, h - 8);
       }
     });
 
-    // Legend
-    ctx.font = '10px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'left';
-    var lx = pad.left + 4, ly = pad.top + 4;
-    ctx.fillStyle = accent; ctx.fillRect(lx, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('≥70%', lx + 12, ly + 8);
-    ctx.fillStyle = warning; ctx.fillRect(lx + 48, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('40-69%', lx + 60, ly + 8);
-    ctx.fillStyle = danger; ctx.fillRect(lx + 108, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('<40%', lx + 120, ly + 8);
+    // Legend at top-right
+    var lx = w - pad.right - 160;
+    var ly = 8;
+    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+
+    ctx.fillStyle = accent;
+    ctx.fillRect(lx, ly, 10, 10);
+    ctx.fillStyle = textColor;
+    ctx.fillText('≥70%', lx + 14, ly + 9);
+
+    ctx.fillStyle = warning;
+    ctx.fillRect(lx + 52, ly, 10, 10);
+    ctx.fillStyle = textColor;
+    ctx.fillText('40-69%', lx + 66, ly + 9);
+
+    ctx.fillStyle = danger;
+    ctx.fillRect(lx + 116, ly, 10, 10);
+    ctx.fillStyle = textColor;
+    ctx.fillText('<40%', lx + 130, ly + 9);
   }
 
   // ===== WEEKLY REPORT =====

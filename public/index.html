@@ -104,6 +104,7 @@
 
         <div id="aiPlanCard" class="card ai-plan-card hidden"><div class="card-header"><h4>🧠 Персональний план</h4><button class="btn btn-ghost btn-sm" id="refreshPlanBtn" type="button">🔄</button></div><div id="aiPlanContent"><p class="text-muted">Генерується...</p></div></div>
 
+        <!-- STATS -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-ring">
@@ -165,6 +166,24 @@
         <!-- DAILY PLAN -->
         <div class="card"><div class="card-header"><h4>📋 План на сьогодні</h4><span id="dailyProgressBadge" class="badge">0/0</span></div><div id="dailyItems"></div></div>
 
+        <!-- BREED PROFILE -->
+        <div class="card" id="breedCard" style="display:none"></div>
+
+        <!-- PROBLEM PROTOCOLS -->
+        <div class="card" id="problemCards" style="display:none"></div>
+
+        <!-- RECOMMENDED COURSES -->
+        <div class="card" id="recommendedCourses" style="display:none"></div>
+
+        <!-- FIRST DAYS GUIDE -->
+        <div class="card" id="firstDaysCard" style="display:none"></div>
+
+        <!-- PUPPY BLUES -->
+        <div class="card" id="puppyBluesCard" style="display:none"></div>
+
+        <!-- FOOD GUIDE -->
+        <div class="card" id="foodGuideCard" style="display:none"></div>
+
         <!-- ACHIEVEMENTS -->
         <div class="card"><h4 class="card-title">🏆 Досягнення</h4><div id="achievementsGrid" class="achievements-grid"></div></div>
 
@@ -174,7 +193,7 @@
         <!-- REMINDERS -->
         <div class="card" id="remindersCard" style="display:none"><h4 class="card-title">🔔 Нагадування</h4><div id="remindersList"></div></div>
 
-        <!-- HEAT -->
+        <!-- HEAT / REPRODUCTIVE -->
         <div class="card" id="heatCard" style="display:none"><h4 class="card-title">🏥 Репродуктивне здоров'я</h4><div id="heatInfo"></div></div>
 
         <!-- AGE FOCUS -->
@@ -192,7 +211,7 @@
           <button class="chip" data-filter="health">🏥 Здоров'я</button>
           <button class="chip" data-filter="hygiene">🛁 Гігієна</button>
         </div>
-        <div class="card"><h4 class="card-title">🚽 Горшик за 14 днів</h4><canvas id="progressChartDiary" height="180" style="width:100%;display:block"></canvas>
+        <div class="card"><h4 class="card-title">🚽 Горшик за 14 днів</h4><canvas id="progressChartDiary" height="180" style="width:100%;display:block"></canvas></div>
         <div class="card" id="weightCard"><h4 class="card-title">⚖️ Вага</h4><div id="weightHistory"></div></div>
         <h4 class="section-title">Історія подій</h4>
         <div id="recentLogsDiary" class="feed"></div>
@@ -211,6 +230,7 @@
             <button class="chip" data-ai-prompt="Як на пелюшку?" type="button">Туалет</button>
             <button class="chip" data-ai-prompt="Не тягнути повідок" type="button">Повідок</button>
             <button class="chip" data-ai-prompt="Команда До мене" type="button">Підклик</button>
+            <button class="chip" data-ai-prompt="Puppy blues що робити" type="button">Puppy Blues</button>
           </div>
           <div id="aiChat" class="chat-box"></div>
           <form id="aiForm" class="chat-form">
@@ -224,7 +244,7 @@
         </div>
 
         <div class="filter-row" id="courseFilters">
-          <button class="chip active" data-course-level="all">Всі (21)</button>
+          <button class="chip active" data-course-level="all">Всі (35)</button>
           <button class="chip" data-course-level="базовий">🟢 Базовий</button>
           <button class="chip" data-course-level="середній">🟡 Середній</button>
           <button class="chip" data-course-level="просунутий">🔴 Просунутий</button>
@@ -255,7 +275,7 @@
               <div class="field"><label for="petBreed">Порода</label><input id="petBreed" type="text" placeholder="Той-тер'єр"></div>
               <div class="field"><label for="petWeight">Вага (кг)</label><input id="petWeight" type="number" step="0.1" placeholder="3.5"></div>
               <div class="field"><label for="petToiletMode">Режим туалету</label><select id="petToiletMode"><option value="pad">Пелюшка</option><option value="outdoor">Вулиця</option><option value="transition">Перехід</option></select></div>
-              <div class="field full"><label for="petIssues">🐾 Проблеми / над чим працюємо</label><textarea id="petIssues" rows="3" placeholder="Кусається, гавкає, боїться пилососа..."></textarea></div>
+              <div class="field full"><label for="petIssues">🐾 Проблеми / над чим працюємо</label><textarea id="petIssues" rows="3" placeholder="Кусається, гавкає, боїться пилососа, тягне повідок..."></textarea></div>
             </div>
             <button class="btn btn-primary full-width" type="submit">Зберегти</button>
           </form>

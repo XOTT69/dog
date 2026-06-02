@@ -522,11 +522,231 @@
 
   function renderSheetEvents(){var c=$('sheetEvents');if(!c)return;var cat=EVENT_CATEGORIES.find(function(x){return x.id===selectedSheetCategory;});if(!cat)return;c.innerHTML='<div class="actions-grid">'+cat.events.map(function(ev){return '<button type="button" class="action-btn '+(selectedEventType===ev.type?'selected':'')+(ev.tone==='success'?' green':ev.tone==='danger'?' red':'')+'" data-sheet-event="'+ev.type+'"><span class="action-icon">'+ev.icon+'</span>'+ev.label+'</button>';}).join('')+'</div>';$$('[data-sheet-event]').forEach(function(btn){btn.addEventListener('click',function(){selectedEventType=btn.dataset.sheetEvent;renderSheetEvents();show($('sheetExtraFields'));$('eventTime').value=nowTime();var conf=TYPE_CONFIG[selectedEventType];var vf=$('valueField');if(vf)vf.style.display=(conf&&conf.hasValue)?'':'none';haptic();});});}
 
+    // ===== BREED PROFILE =====
+  function getBreedProfile() {
+    if (!currentPet || !currentPet.breed) return null;
+    var breed = currentPet.breed.toLowerCase().trim();
+    var profiles = window.BREED_PROFILES || {};
+    for (var key in profiles) {
+      if (breed.includes(key) || key.includes(breed)) return profiles[key];
+    }
+    // Часткове співпадіння
+    for (var k in profiles) {
+      var words = k.split(/[\s-]+/);
+      for (var i = 0; i < words.length; i++) {
+        if (words[i].length > 3 && breed.includes(words[i])) return profiles[k];
+      }
+    }
+    return profiles['метис'] || null;
+  }
+
+  function renderBreedCard() {
+    var container = $('breedCard'); if (!container) return;
+    var profile = getBreedProfile();
+    if (!profile) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    var energyLabel = { low: '🟢 Низька', mid: '🟡 Середня', high: '🟠 Висока', very_high: '🔴 Дуже висока' };
+    var trainLabel = { low: '🟠 Складна', mid: '🟡 Середня', high: '🟢 Легка', very_high: '🟢 Дуже легка' };
+    container.innerHTML = '<h4 class="card-title">🐕 ' + profile.name + '</h4>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;font-size:0.82rem">' +
+      '<div>⚡ Енергія: ' + (energyLabel[profile.energy] || profile.energy) + '</div>' +
+      '<div>🎓 Навчання: ' + (trainLabel[profile.trainability] || profile.trainability) + '</div>' +
+      '<div>⚖️ Вага дор.: ' + (profile.adultWeight || '?') + '</div>' +
+      '<div>🏃 Активність: ' + (profile.activity || '?') + '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem">Характер:</strong> <span style="font-size:0.82rem;color:var(--text-secondary)">' + (profile.traits || []).join(', ') + '</span></div>' +
+      (profile.issues && profile.issues.length ? '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem">⚠️ Типові проблеми:</strong> <span style="font-size:0.82rem;color:var(--warning)">' + profile.issues.join(', ') + '</span></div>' : '') +
+      (profile.health && profile.health.length ? '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem">🏥 Ризики здоров\'я:</strong> <span style="font-size:0.82rem;color:var(--text-muted)">' + profile.health.join(', ') + '</span></div>' : '') +
+      '<div style="padding:0.6rem;background:var(--accent-subtle);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--text-secondary)">💡 ' + (profile.tips || '') + '</div>';
+  }
+
+  // ===== PROBLEM RECOMMENDATIONS =====
+  function getActiveProblems() {
+    var issues = (currentPet && currentPet.issues) || '';
+    if (!issues.trim()) return [];
+    var protocols = window.PROBLEM_PROTOCOLS || [];
+    var active = [];
+    var lower = issues.toLowerCase();
+    protocols.forEach(function(p) {
+      var keywords = {
+        'toilet_miss': ['горшик', 'пелюшк', 'мимо', 'калюж', 'писяє', 'какає не там'],
+        'biting': ['кусає', 'кусат', 'гризе руки', 'зуби'],
+        'barking': ['гавкає', 'гавкіт', 'виє', 'голосн'],
+        'separation': ['один', 'сам', 'розлук', 'скавчить', 'тривог'],
+        'leash_pulling': ['тягне', 'повідок', 'повідець'],
+        'jumping': ['стрибає', 'стрибати'],
+        'fear_sounds': ['боїться', 'страх', 'грім', 'пилосос', 'фейерверк'],
+        'resource_guarding': ['гарчить', 'охорон', 'агрес', 'миска'],
+        'destructive': ['гризе', 'руйнує', 'рве', 'меблі', 'взуття'],
+        'coprophagia': ['їсть какашк', 'фекалі', 'копрофаг'],
+        'reactivity_dogs': ['реактивн', 'на собак', 'агрес на собак'],
+        'puppy_blues': ['не справляюсь', 'жалкую', 'депрес'],
+        'marking': ['мітк', 'мітить'],
+      };
+      var kws = keywords[p.id] || [];
+      for (var i = 0; i < kws.length; i++) {
+        if (lower.includes(kws[i])) { active.push(p); break; }
+      }
+    });
+    return active;
+  }
+
+  function renderProblemCards() {
+    var container = $('problemCards'); if (!container) return;
+    var problems = getActiveProblems();
+    if (!problems.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    container.innerHTML = '<h4 class="card-title">🆘 Ваші проблеми → План</h4>' +
+      problems.map(function(p) {
+        return '<details style="margin-bottom:0.75rem"><summary style="font-weight:600;font-size:0.88rem;padding:0.5rem 0;cursor:pointer">' + p.icon + ' ' + p.name + ' <span style="font-size:0.72rem;color:var(--text-muted)">(' + p.duration + ')</span></summary>' +
+          '<div class="detail-content" style="padding:0.5rem 0 0.5rem 0.5rem">' +
+          '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem">Кроки:</strong></div>' +
+          '<ol style="padding-left:1.2rem;font-size:0.82rem;color:var(--text-secondary);line-height:1.7">' +
+          p.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+          '<div style="margin-top:0.75rem;padding:0.6rem;background:var(--surface-sunken);border-radius:var(--radius-sm)"><strong style="font-size:0.78rem">Щоденні завдання:</strong>' +
+          (p.dailyTasks || []).map(function(t) { return '<div style="font-size:0.8rem;color:var(--text-secondary);padding:0.2rem 0">• ' + t + '</div>'; }).join('') +
+          '</div></div></details>';
+      }).join('');
+  }
+
+  // ===== FIRST DAYS GUIDE =====
+  function renderFirstDaysGuide() {
+    var container = $('firstDaysCard'); if (!container) return;
+    var guide = window.FIRST_DAYS_GUIDE || [];
+    var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
+    // Show only if dog is young or recently added
+    var petCreated = currentPet && currentPet.createdAt;
+    var daysSinceCreated = petCreated ? daysBetween(tsToDate(petCreated) || new Date(), new Date()) : 999;
+    if (daysSinceCreated > 30 && (weeks == null || weeks > 16)) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    container.innerHTML = '<h4 class="card-title">📅 Гід перших днів</h4>' +
+      guide.map(function(g) {
+        return '<details style="margin-bottom:0.5rem"><summary style="font-weight:600;font-size:0.85rem;cursor:pointer">' + g.day + ' — ' + g.title + '</summary>' +
+          '<div class="detail-content" style="padding:0.5rem 0 0.5rem 0.5rem">' +
+          g.tasks.map(function(t) { return '<div style="font-size:0.82rem;color:var(--text-secondary);padding:0.2rem 0">✓ ' + t + '</div>'; }).join('') +
+          '<div style="margin-top:0.5rem;padding:0.5rem;background:var(--accent-subtle);border-radius:var(--radius-sm);font-size:0.8rem">💡 ' + g.tip + '</div>' +
+          '</div></details>';
+      }).join('');
+  }
+
+  // ===== PUPPY BLUES =====
+  function renderPuppyBlues() {
+    var container = $('puppyBluesCard'); if (!container) return;
+    var blues = window.PUPPY_BLUES;
+    if (!blues) { container.style.display = 'none'; return; }
+    var problems = getActiveProblems();
+    var hasPB = problems.some(function(p) { return p.id === 'puppy_blues'; });
+    var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
+    // Show if: explicitly mentioned OR very new puppy owner
+    var petCreated = currentPet && currentPet.createdAt;
+    var daysSince = petCreated ? daysBetween(tsToDate(petCreated) || new Date(), new Date()) : 999;
+    if (!hasPB && daysSince > 14) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    container.innerHTML = '<h4 class="card-title">😢 ' + blues.title + '</h4>' +
+      '<p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">' + blues.subtitle + '</p>' +
+      '<details><summary style="font-weight:600;font-size:0.82rem;cursor:pointer">📋 Симптоми</summary><div class="detail-content">' +
+      blues.symptoms.map(function(s) { return '<div style="font-size:0.8rem;padding:0.2rem 0;color:var(--text-secondary)">• ' + s + '</div>'; }).join('') + '</div></details>' +
+      '<details style="margin-top:0.5rem"><summary style="font-weight:600;font-size:0.82rem;cursor:pointer">📈 Таймлайн</summary><div class="detail-content">' +
+      blues.timeline.map(function(t) { return '<div style="padding:0.4rem 0;border-bottom:1px solid var(--border-light)"><strong style="font-size:0.8rem">' + t.period + '</strong> ' + t.state + '<div style="font-size:0.78rem;color:var(--accent)">' + t.advice + '</div></div>'; }).join('') + '</div></details>' +
+      '<div style="margin-top:0.75rem;padding:0.7rem;background:var(--success-light);border-radius:var(--radius-sm)">' +
+      blues.tips.slice(0, 3).map(function(t) { return '<div style="font-size:0.82rem;padding:0.2rem 0">💛 ' + t + '</div>'; }).join('') + '</div>';
+  }
+
+  // ===== PERSONALIZED RECOMMENDATIONS =====
+  function renderRecommendedCourses() {
+    var container = $('recommendedCourses'); if (!container) return;
+    if (!currentPet) { container.style.display = 'none'; return; }
+    var weeks = getAgeInWeeks(currentPet.birthDate);
+    var issues = (currentPet.issues || '').toLowerCase();
+    var breed = getBreedProfile();
+    var recommended = [];
+
+    // By age
+    if (weeks != null && weeks < 12) recommended.push('first-days', 'pee-pad', 'name-focus', 'hand-feeding');
+    else if (weeks != null && weeks < 24) recommended.push('sit-command', 'leash-walking', 'recall', 'bite-control');
+    else if (weeks != null && weeks < 72) recommended.push('impulse-control', 'alone-training', 'recall', 'nose-games');
+
+    // By problems
+    if (issues.includes('кусає') || issues.includes('кусат')) recommended.push('bite-control');
+    if (issues.includes('гавкає') || issues.includes('гавкіт')) recommended.push('settle-down');
+    if (issues.includes('тягне') || issues.includes('повідок')) recommended.push('leash-walking');
+    if (issues.includes('один') || issues.includes('розлук')) recommended.push('alone-training');
+    if (issues.includes('гризе') || issues.includes('руйнує')) recommended.push('nose-games');
+    if (issues.includes('стрибає')) recommended.push('impulse-control', 'guests-home');
+    if (issues.includes('боїться') || issues.includes('страх')) recommended.push('socialization');
+    if (issues.includes('собак') && issues.includes('агрес')) recommended.push('reactivity');
+
+    // By breed
+    if (breed && breed.energy === 'very_high') recommended.push('nose-games', 'settle-down');
+    if (breed && breed.trainability === 'low') recommended.push('hand-feeding', 'impulse-control');
+
+    // Deduplicate and limit
+    var unique = [];
+    recommended.forEach(function(id) { if (unique.indexOf(id) === -1) unique.push(id); });
+    unique = unique.slice(0, 5);
+
+    if (!unique.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    var courses = window.COURSES || [];
+    container.innerHTML = '<h4 class="card-title">🎯 Рекомендовані курси</h4>' +
+      '<div class="course-grid">' +
+      unique.map(function(id) {
+        var c = courses.find(function(x) { return x.id === id; });
+        if (!c) return '';
+        return '<button type="button" class="course-btn" data-rec-course="' + c.id + '"><span class="c-badge">' + c.badge + '</span><strong>' + c.title + '</strong><div class="c-meta">' + c.description + '</div></button>';
+      }).join('') + '</div>';
+
+    $$('[data-rec-course]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentCourseId = btn.dataset.recCourse;
+        setActiveTab('tabCourses');
+        renderCourses();
+        haptic();
+      });
+    });
+  }
+
+  // ===== FOOD RECOMMENDATION =====
+  function renderFoodGuide() {
+    var container = $('foodGuideCard'); if (!container) return;
+    if (!currentPet) { container.style.display = 'none'; return; }
+    var guide = window.FOOD_GUIDE;
+    if (!guide) { container.style.display = 'none'; return; }
+    var weeks = getAgeInWeeks(currentPet.birthDate);
+    var weight = parseFloat(currentPet.weight) || 0;
+    if (!weight) { container.style.display = 'none'; return; }
+
+    var isPuppy = weeks != null && weeks < 52;
+    var table = isPuppy ? guide.puppy : guide.adult;
+    var match = null;
+    for (var i = 0; i < table.length; i++) {
+      var range = table[i].weightRange;
+      var nums = range.match(/[\d.]+/g);
+      if (nums) {
+        var min = parseFloat(nums[0]) || 0;
+        var max = nums[1] ? parseFloat(nums[1]) : 999;
+        if (weight >= min && weight <= max) { match = table[i]; break; }
+      }
+    }
+    if (!match) match = table[table.length - 1];
+
+    container.style.display = '';
+    container.innerHTML = '<h4 class="card-title">🍖 Рекомендації по їжі</h4>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.85rem">' +
+      '<div style="padding:0.6rem;background:var(--surface-sunken);border-radius:var(--radius-sm);text-align:center"><div style="font-size:0.7rem;color:var(--text-muted)">Добова норма</div><strong>' + match.daily + '</strong></div>' +
+      '<div style="padding:0.6rem;background:var(--surface-sunken);border-radius:var(--radius-sm);text-align:center"><div style="font-size:0.7rem;color:var(--text-muted)">Прийомів</div><strong>' + match.meals + ' рази/день</strong></div>' +
+      '</div>' +
+      '<p style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted)">💡 ' + match.note + '</p>' +
+      '<p style="margin-top:0.3rem;font-size:0.75rem;color:var(--text-muted)">* Для корму ' + (isPuppy ? 'для цуценят' : 'для дорослих') + '. Точну норму дивіться на упаковці.</p>';
+  }
+
   // ===== RENDER ALL =====
-  function renderAll(){
+   function renderAll(){
     renderHeader();renderStreak();renderWeeklyReport();renderDailyTip();renderKpis();
     renderOneTap();renderDailyPlan();renderAgeFocus();renderHeatInfo();renderReminders();
     renderHeatmap();renderAchievements();
+    renderBreedCard();renderProblemCards();renderRecommendedCourses();
+    renderFirstDaysGuide();renderPuppyBlues();renderFoodGuide();
     renderFeed('recentLogsDiary',currentDiaryFilter);renderWeight();
     renderCourses();renderKnowledge();renderSocial();renderToiletGuide();
     renderMembers();renderWorkspaceMeta();fillPetForm();

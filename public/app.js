@@ -1,4 +1,4 @@
-/* ===== Dog Coach AI v4 — Premium 2026 ===== */
+/* ===== Dog Coach AI v4.1 ===== */
 (function () {
   'use strict';
 
@@ -44,10 +44,8 @@
   let timerSeconds = 0;
   let timerTotal = 0;
   let timerRunning = false;
-  let lastUndoId = null;
-  let undoTimeout = null;
-  let isOnline = navigator.onLine;
   let achievementsState = JSON.parse(localStorage.getItem('dc_achievements') || '{}');
+  let audioCtx = null;
 
   // ===== HELPERS =====
   var $ = function(id) { return document.getElementById(id); };
@@ -125,6 +123,81 @@
     return m[detectPetSize()] || m.medium;
   }
 
+  // ===== AUDIO — CLICKER & WHISTLE =====
+  function getAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function playClicker() {
+    try {
+      var ctx = getAudioContext();
+      var now = ctx.currentTime;
+
+      // Click sound — sharp metallic click
+      var osc1 = ctx.createOscillator();
+      var gain1 = ctx.createGain();
+      osc1.type = 'square';
+      osc1.frequency.setValueAtTime(2500, now);
+      osc1.frequency.exponentialRampToValueAtTime(1800, now + 0.01);
+      gain1.gain.setValueAtTime(0.8, now);
+      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.05);
+
+      // Second click (double-click feel)
+      var osc2 = ctx.createOscillator();
+      var gain2 = ctx.createGain();
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(2200, now + 0.06);
+      osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.07);
+      gain2.gain.setValueAtTime(0.6, now + 0.06);
+      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.06);
+      osc2.stop(now + 0.12);
+
+      if (navigator.vibrate) navigator.vibrate(15);
+    } catch (e) { console.warn('Audio:', e); }
+  }
+
+  function playWhistle() {
+    try {
+      var ctx = getAudioContext();
+      var now = ctx.currentTime;
+      var duration = 0.6;
+
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      // Whistle — ascending pitch
+      osc.frequency.setValueAtTime(1800, now);
+      osc.frequency.linearRampToValueAtTime(2800, now + duration * 0.3);
+      osc.frequency.setValueAtTime(2800, now + duration * 0.3);
+      osc.frequency.linearRampToValueAtTime(2400, now + duration);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
+      gain.gain.setValueAtTime(0.5, now + duration - 0.1);
+      gain.gain.linearRampToValueAtTime(0, now + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+
+      if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+    } catch (e) { console.warn('Audio:', e); }
+  }
+
   // ===== TOAST =====
   function toast(msg, type, undoCallback) {
     var box = $('toastContainer'); if (!box) return;
@@ -156,11 +229,10 @@
 
   // ===== ONLINE/OFFLINE =====
   function updateOnlineStatus() {
-    isOnline = navigator.onLine;
     var bar = $('offlineBar');
     if (bar) {
-      if (isOnline) { bar.classList.remove('visible'); }
-      else { bar.classList.add('visible'); }
+      if (navigator.onLine) bar.classList.remove('visible');
+      else bar.classList.add('visible');
     }
   }
 
@@ -175,9 +247,9 @@
     { id: 'events_100', icon: '⭐', label: '100 подій', condition: function() { return eventsState.length >= 100; } },
     { id: 'toilet_90', icon: '🚽', label: '90% горшик', condition: function() { var s = eventsState.filter(function(e) { return isToiletSuccess(e.eventType); }).length; var m = eventsState.filter(function(e) { return isToiletMiss(e.eventType); }).length; var t = s + m; return t >= 10 && (s / t) >= 0.9; } },
     { id: 'training_10', icon: '🎓', label: '10 тренувань', condition: function() { return eventsState.filter(function(e) { return e.eventType === 'training'; }).length >= 10; } },
+    { id: 'clicker_pro', icon: '🔵', label: 'Клікер-про', condition: function() { return parseInt(localStorage.getItem('dc_clicker_count') || '0') >= 50; } },
     { id: 'social_5', icon: '🌍', label: '5 соціалізацій', condition: function() { var done = JSON.parse(localStorage.getItem('dc_social') || '{}'); return Object.values(done).filter(Boolean).length >= 5; } },
-    { id: 'weight_track', icon: '⚖️', label: 'Слідкую за вагою', condition: function() { return eventsState.filter(function(e) { return e.eventType === 'weight'; }).length >= 3; } },
-    { id: 'ai_user', icon: '🤖', label: 'AI друг', condition: function() { return (localStorage.getItem('dc_ai_count') || 0) >= 5; } }
+    { id: 'ai_user', icon: '🤖', label: 'AI друг', condition: function() { return parseInt(localStorage.getItem('dc_ai_count') || '0') >= 5; } }
   ];
 
   function checkAchievements() {
@@ -190,10 +262,8 @@
     });
     if (newUnlocks.length > 0) {
       localStorage.setItem('dc_achievements', JSON.stringify(achievementsState));
-      newUnlocks.forEach(function(a) {
-        toast(a.icon + ' Досягнення: ' + a.label + '!', 'success');
-      });
-      if (newUnlocks.length > 0) showConfetti();
+      newUnlocks.forEach(function(a) { toast(a.icon + ' ' + a.label + '!', 'success'); });
+      showConfetti();
     }
   }
 
@@ -228,56 +298,67 @@
     timerTotal = seconds;
     timerSeconds = seconds;
     timerRunning = true;
-    updateTimerDisplay();
+    updateTimerUI();
     timerInterval = setInterval(function() {
       timerSeconds--;
-      updateTimerDisplay();
+      updateTimerUI();
       if (timerSeconds <= 0) {
         stopTimer();
         timerAlarm();
       }
     }, 1000);
-    var card = $('timerCard');
-    if (card) card.classList.add('active');
+    var card = $('timerCard'); if (card) card.classList.add('active');
+    var btn = $('timerStartBtn'); if (btn) btn.textContent = '⏸ Пауза';
   }
 
   function stopTimer() {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     timerRunning = false;
-    var card = $('timerCard');
-    if (card) card.classList.remove('active');
+    var card = $('timerCard'); if (card) card.classList.remove('active');
+    var btn = $('timerStartBtn'); if (btn) btn.textContent = '▶ Старт';
   }
 
   function resetTimer() {
     stopTimer();
     timerSeconds = 0;
     timerTotal = 0;
-    updateTimerDisplay();
+    updateTimerUI();
   }
 
-  function updateTimerDisplay() {
-    var display = $('timerDisplay');
-    if (!display) return;
+  function updateTimerUI() {
+    var display = $('timerDisplay'); if (!display) return;
     var m = Math.floor(timerSeconds / 60);
     var s = timerSeconds % 60;
     display.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-    // Update ring progress
     var ring = $('timerRingProgress');
     if (ring && timerTotal > 0) {
       var pct = timerSeconds / timerTotal;
-      var dashoffset = 408.4 * (1 - pct);
-      ring.style.strokeDashoffset = dashoffset;
+      ring.style.strokeDashoffset = String(408.4 * (1 - pct));
       ring.classList.remove('warning', 'danger');
-      if (pct < 0.2) ring.classList.add('danger');
-      else if (pct < 0.4) ring.classList.add('warning');
+      if (pct < 0.15) ring.classList.add('danger');
+      else if (pct < 0.35) ring.classList.add('warning');
+    } else if (ring) {
+      ring.style.strokeDashoffset = '408.4';
     }
   }
 
   function timerAlarm() {
-    toast('⏰ Час! Горшик для песика!', 'success');
+    toast('⏰ Час горшика! Ведіть на місце!', 'success');
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+    // Play alarm sound
+    try {
+      var ctx = getAudioContext(); var now = ctx.currentTime;
+      for (var i = 0; i < 3; i++) {
+        var osc = ctx.createOscillator(); var gain = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.4, now + i * 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.3 + 0.2);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now + i * 0.3); osc.stop(now + i * 0.3 + 0.25);
+      }
+    } catch (e) {}
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('⏰ Час горшика!', { body: 'Час вести на пелюшку/вулицю!', icon: '/icons/icon-192.png' });
+      new Notification('⏰ Час горшика!', { body: 'Ведіть на пелюшку/вулицю!', icon: '/icons/icon-192.png' });
     }
   }
 
@@ -299,11 +380,10 @@
 
   function renderStreak() {
     updateStreak();
-    var badge = $('streakBadge');
-    var card = $('streakCard');
+    var badge = $('streakBadge'); var card = $('streakCard');
     if (streakData.count > 0) {
       if (badge) { show(badge); $('streakCount').textContent = streakData.count; }
-      if (card) { show(card); $('streakText').textContent = streakData.count + (streakData.count === 1 ? ' день' : streakData.count < 5 ? ' дні' : ' днів') + ' поспіль!'; $('streakSub').textContent = streakData.count >= 30 ? '🏆 Легенда!' : streakData.count >= 14 ? '💎 Неймовірно!' : streakData.count >= 7 ? '🏆 Тижневий рекорд!' : streakData.count >= 3 ? '💪 Чудово!' : 'Так тримати!'; }
+      if (card) { show(card); $('streakText').textContent = streakData.count + (streakData.count === 1 ? ' день' : streakData.count < 5 ? ' дні' : ' днів') + ' поспіль!'; $('streakSub').textContent = streakData.count >= 30 ? '🏆 Легенда!' : streakData.count >= 7 ? '💎 Тижневий рекорд!' : streakData.count >= 3 ? '💪 Чудово!' : 'Так тримати!'; }
     } else {
       if (badge) hide(badge);
       if (card) hide(card);
@@ -317,7 +397,7 @@
     requestAnimationFrame(function() { renderQueued = false; renderAll(); });
   }
 
-  // ===== RENDER FUNCTIONS =====
+  // ===== RENDER HEADER =====
   function renderHeader() {
     var name = (currentPet && currentPet.name && currentPet.name.trim()) || 'Песик';
     var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
@@ -325,11 +405,12 @@
     $('petNameHeader').textContent = name;
     $('headerSub').textContent = weekLabel(weeks) + ' · ' + program.stage;
     $('profileName').textContent = name;
-    $('profileMeta').textContent = [(currentPet && currentPet.breed) || 'Порода?', weekLabel(weeks), (currentPet && currentPet.sex) || ''].filter(Boolean).join(' · ');
+    $('profileMeta').textContent = [(currentPet && currentPet.breed) || '', weekLabel(weeks), (currentPet && currentPet.sex) || ''].filter(Boolean).join(' · ');
     var av = $('userAvatar');
     if (av) av.innerHTML = (currentUser && currentUser.photoURL) ? '<img src="' + currentUser.photoURL + '" alt="">' : avatarLetter((currentUser && currentUser.displayName) || name);
   }
 
+  // ===== DAILY TIP =====
   function renderDailyTip() {
     var el = $('dailyTipText'); if (!el) return;
     var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
@@ -343,23 +424,24 @@
 
     var tips = [];
     if (rate !== null) {
-      if (rate >= 90) tips.push('🎉 ' + rate + '% горшик! Молодці!');
-      else if (rate >= 70) tips.push('📈 Горшик ' + rate + '% — прогрес!');
-      else if (rate >= 40) tips.push('💪 Горшик ' + rate + '%. Частіше виводьте!');
-      else if (t7 > 3) tips.push('🎯 Горшик ' + rate + '%. Менше простору!');
+      if (rate >= 90) tips.push('🎉 ' + rate + '% горшик за тиждень! Супер!');
+      else if (rate >= 70) tips.push('📈 Горшик ' + rate + '% — чудовий прогрес!');
+      else if (rate >= 40) tips.push('💪 Горшик ' + rate + '%. Частіше виводьте після сну/їжі!');
+      else if (t7 > 3) tips.push('🎯 Горшик ' + rate + '%. Спробуйте менше простору + таймер!');
     }
-    if (t7 === 0 && eventsState.length < 5) tips.push('📝 Записуйте туалет — побачите патерн!');
-    if (tr7 === 0) tips.push('🎓 0 тренувань! 2 хв/день = результат 💪');
+    if (t7 === 0 && eventsState.length < 5) tips.push('📝 Починайте записувати туалет — побачите патерн за 3 дні!');
+    if (tr7 === 0) tips.push('🎓 Сьогодні 0 тренувань. 2 хв достатньо! Використайте клікер 🔵');
 
     var pool = DAILY_TIPS.filter(function(t) { return t.condition === 'any'; });
     if (weeks != null && weeks < 16) pool = pool.concat(DAILY_TIPS.filter(function(t) { return t.condition === 'puppy'; }));
     if (weeks != null && weeks >= 24 && weeks < 72) pool = pool.concat(DAILY_TIPS.filter(function(t) { return t.condition === 'teen'; }));
     if (sex === 'дівчинка') pool = pool.concat(DAILY_TIPS.filter(function(t) { return t.condition === 'girl'; }));
 
-    if (tips.length > 0) { el.textContent = tips[new Date().getHours() < 12 ? 0 : Math.min(1, tips.length - 1)]; }
-    else { el.textContent = (pool[new Date().getDate() % pool.length] && pool[new Date().getDate() % pool.length].text) || 'Записуйте події! 📊'; }
+    if (tips.length > 0) { el.textContent = tips[Math.floor(Date.now() / 3600000) % tips.length]; }
+    else { el.textContent = (pool[new Date().getDate() % pool.length] && pool[new Date().getDate() % pool.length].text) || 'Натисніть + для запису 📝'; }
   }
 
+  // ===== KPIs =====
   function renderKpis() {
     var start = startOfToday();
     var todayEv = eventsState.filter(function(e) { var ts = tsToDate(e.createdAt); return ts && ts >= start; });
@@ -375,6 +457,7 @@
     if (ring) ring.style.strokeDashoffset = String(251.3 - (251.3 * pct / 100));
   }
 
+  // ===== ONE-TAP =====
   function renderOneTap() {
     var grid = $('onetapGrid'); if (!grid) return;
     var items = [
@@ -397,6 +480,113 @@
     });
   }
 
+  // ===== CHART — FIXED =====
+  function renderChart(canvasId) {
+    var canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
+
+    // Wait for element to be visible and have dimensions
+    requestAnimationFrame(function() {
+      var rect = canvas.getBoundingClientRect();
+      if (!rect.width || rect.width < 50) {
+        // Retry after layout
+        setTimeout(function() { renderChartInternal(canvasId); }, 100);
+        return;
+      }
+      renderChartInternal(canvasId);
+    });
+  }
+
+  function renderChartInternal(canvasId) {
+    var canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width || rect.width < 50 || !rect.height || rect.height < 50) return;
+
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Gather data
+    var days = [];
+    for (var i = 13; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+      var next = new Date(d); next.setDate(next.getDate() + 1);
+      var dayEv = eventsState.filter(function(e) { var ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; });
+      var s = dayEv.filter(function(e) { return isToiletSuccess(e.eventType); }).length;
+      var m = dayEv.filter(function(e) { return isToiletMiss(e.eventType); }).length;
+      var t = s + m;
+      days.push({ date: d, pct: t ? Math.round(s / t * 100) : null, total: t, success: s, miss: m });
+    }
+
+    var isDark = themeMode === 'dark';
+    var accent = isDark ? '#38bdf8' : '#0ea5e9';
+    var danger = isDark ? '#f87171' : '#ef4444';
+    var warning = isDark ? '#fbbf24' : '#f59e0b';
+    var muted = isDark ? '#6c757d' : '#adb5bd';
+    var border = isDark ? '#2a2a4a' : '#e9ecef';
+    var textColor = isDark ? '#adb5bd' : '#495057';
+
+    var pad = { top: 16, right: 8, bottom: 28, left: 8 };
+    var cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
+    var bw = cw / days.length;
+
+    // Grid lines
+    ctx.strokeStyle = border; ctx.lineWidth = 1;
+    [0, 50, 100].forEach(function(v) {
+      var y = pad.top + ch - (v / 100) * ch;
+      ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke(); ctx.setLineDash([]);
+    });
+
+    // Draw bars
+    days.forEach(function(day, i) {
+      var x = pad.left + i * bw + bw * 0.15, barW = bw * 0.7;
+      if (day.pct == null) {
+        // No data — dot
+        ctx.fillStyle = muted; ctx.beginPath(); ctx.arc(x + barW / 2, pad.top + ch - 3, 3, 0, Math.PI * 2); ctx.fill();
+      } else {
+        var barH = Math.max(6, (day.pct / 100) * ch);
+        var y = pad.top + ch - barH;
+        var barColor = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
+
+        // Bar with rounded top
+        ctx.fillStyle = barColor;
+        var r = Math.min(4, barW / 2);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top + ch);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.lineTo(x + barW - r, y);
+        ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+        ctx.lineTo(x + barW, pad.top + ch);
+        ctx.closePath();
+        ctx.fill();
+
+        // Percentage on top
+        if (day.total >= 2) {
+          ctx.fillStyle = textColor; ctx.font = 'bold 9px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(day.pct + '%', x + barW / 2, y - 4);
+        }
+      }
+
+      // Date labels
+      if (i % 2 === 0 || i === days.length - 1) {
+        ctx.fillStyle = muted; ctx.font = '10px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(day.date.getDate() + '.' + (day.date.getMonth() + 1), x + barW / 2, h - 6);
+      }
+    });
+
+    // Legend
+    ctx.font = '10px -apple-system, system-ui, sans-serif'; ctx.textAlign = 'left';
+    var lx = pad.left + 4, ly = pad.top + 4;
+    ctx.fillStyle = accent; ctx.fillRect(lx, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('≥70%', lx + 12, ly + 8);
+    ctx.fillStyle = warning; ctx.fillRect(lx + 48, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('40-69%', lx + 60, ly + 8);
+    ctx.fillStyle = danger; ctx.fillRect(lx + 108, ly, 8, 8); ctx.fillStyle = textColor; ctx.fillText('<40%', lx + 120, ly + 8);
+  }
+
+  // ===== WEEKLY REPORT =====
   function renderWeeklyReport() {
     var card = $('weeklyReport'); var content = $('weeklyContent'); if (!card || !content) return;
     var dismissed = localStorage.getItem('dc_weekly_dismissed') === todayKey();
@@ -415,12 +605,12 @@
     var lwt = lws + lwm; var lwRate = lwt > 0 ? Math.round(lws / lwt * 100) : null;
     var twTr = tw.filter(function(e) { return e.eventType === 'training'; }).length;
     var lwTr = lw.filter(function(e) { return e.eventType === 'training'; }).length;
-
     function ch(c, p) { if (p == null || c == null) return ''; var d = c - p; if (d > 0) return '<span class="ws-change up">+' + d + '↑</span>'; if (d < 0) return '<span class="ws-change down">' + d + '↓</span>'; return ''; }
     show(card);
-    content.innerHTML = '<div class="weekly-stat"><span class="ws-label">📊 Подій</span><span class="ws-value">' + tw.length + ch(tw.length, lw.length) + '</span></div>' + (twRate !== null ? '<div class="weekly-stat"><span class="ws-label">🚽 Горшик</span><span class="ws-value">' + twRate + '%' + ch(twRate, lwRate) + '</span></div>' : '') + '<div class="weekly-stat"><span class="ws-label">🎓 Тренувань</span><span class="ws-value">' + twTr + ch(twTr, lwTr) + '</span></div><div class="weekly-stat"><span class="ws-label">🔥 Streak</span><span class="ws-value">' + streakData.count + ' дн.</span></div>' + (twRate !== null && twRate >= 80 ? '<p style="margin-top:0.5rem;font-size:0.85rem;color:var(--success)">🎉 Чудовий тиждень!</p>' : '');
+    content.innerHTML = '<div class="weekly-stat"><span class="ws-label">📊 Подій</span><span class="ws-value">' + tw.length + ch(tw.length, lw.length) + '</span></div>' + (twRate !== null ? '<div class="weekly-stat"><span class="ws-label">🚽 Горшик</span><span class="ws-value">' + twRate + '%' + ch(twRate, lwRate) + '</span></div>' : '') + '<div class="weekly-stat"><span class="ws-label">🎓 Тренувань</span><span class="ws-value">' + twTr + ch(twTr, lwTr) + '</span></div><div class="weekly-stat"><span class="ws-label">🔥 Streak</span><span class="ws-value">' + streakData.count + ' дн.</span></div>';
   }
 
+  // ===== AI PLAN =====
   function generateAIPlan() {
     var card = $('aiPlanCard'); var content = $('aiPlanContent'); if (!card || !content) return;
     if (!currentPet || !currentPet.name) { hide(card); return; }
@@ -439,75 +629,59 @@
       var html = r.split('\n').filter(function(l) { return l.trim(); }).map(function(l) { return '<div class="ai-plan-item">' + l + '</div>'; }).join('');
       content.innerHTML = html || '<p class="text-muted">Спробуйте 🔄</p>';
       localStorage.setItem('dc_aiplan', JSON.stringify({ date: todayKey(), plan: html }));
-    }).catch(function() {
-      content.innerHTML = '<p class="text-muted">Натисніть 🔄</p>';
-    });
+    }).catch(function() { content.innerHTML = '<p class="text-muted">Натисніть 🔄</p>'; });
   }
-function renderDailyPlan() {
+
+  // ===== DAILY PLAN =====
+  function renderDailyPlan() {
     var list = $('dailyItems'); var badge = $('dailyProgressBadge'); if (!list || !badge) return;
     var plan = (getProgramByAge(getAgeInWeeks(currentPet && currentPet.birthDate)) || {}).plan || [];
     var key = todayKey(); var done = dailyDone[key] || {};
-    var doneCount = Object.values(done).filter(Boolean).length;
-    badge.textContent = doneCount + '/' + plan.length;
+    badge.textContent = Object.values(done).filter(Boolean).length + '/' + plan.length;
     list.innerHTML = plan.map(function(item, i) { return '<label class="daily-item ' + (done[i] ? 'done' : '') + '"><input type="checkbox" data-daily="' + i + '" ' + (done[i] ? 'checked' : '') + '><span>' + item + '</span></label>'; }).join('');
     $$('[data-daily]').forEach(function(cb) {
-      cb.addEventListener('change', function() {
-        var k = todayKey();
-        dailyDone[k] = dailyDone[k] || {};
-        dailyDone[k][cb.dataset.daily] = cb.checked;
-        localStorage.setItem('dc_daily', JSON.stringify(dailyDone));
-        haptic();
-        renderDailyPlan();
-      });
+      cb.addEventListener('change', function() { var k = todayKey(); dailyDone[k] = dailyDone[k] || {}; dailyDone[k][cb.dataset.daily] = cb.checked; localStorage.setItem('dc_daily', JSON.stringify(dailyDone)); haptic(); renderDailyPlan(); });
     });
   }
 
   function renderAgeFocus() {
     var p = getProgramByAge(getAgeInWeeks(currentPet && currentPet.birthDate));
     var box = $('periodFocus'); if (!box) return;
-    box.innerHTML = '<div class="plan-item"><strong>🎯 Пріоритети</strong>' + p.priorities.map(function(x) { return '<br>• ' + x; }).join('') + '</div><div class="plan-item"><strong>📋 План</strong>' + p.plan.map(function(x) { return '<br>• ' + x; }).join('') + '</div><div class="plan-item"><strong>💡</strong> ' + p.tip + '</div>';
+    box.innerHTML = '<div class="plan-item"><strong>🎯 Пріоритети</strong>' + p.priorities.map(function(x) { return '<br>• ' + x; }).join('') + '</div><div class="plan-item"><strong>💡</strong> ' + p.tip + '</div>';
   }
 
   function renderHeatInfo() {
-    var card = $('heatCard'); var info = $('heatInfo'); var field = $('heatDateField'); if (!card || !info) return;
-    var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
+    var card = $('heatCard'); var info = $('heatInfo'); var field = $('heatDateField');
+    if (!card || !info) return;
+    if (!currentPet || !currentPet.sex) { card.style.display = 'none'; if (field) field.style.display = 'none'; return; }
+    var weeks = getAgeInWeeks(currentPet.birthDate);
     var monthsAge = weeks != null ? Math.round(weeks / 4.345) : null;
     var size = detectPetSize(); var sizeLabel = getSizeLabel();
-
-    if (currentPet && currentPet.sex === 'хлопчик') {
+    if (currentPet.sex === 'хлопчик') {
       card.style.display = ''; if (field) field.style.display = 'none';
       var range = getNeuterAgeRange();
-      var h = '<div class="plan-item"><strong>✂️ Кастрація</strong><br>📏 ' + sizeLabel + '<br>📅 ' + range.label + '</div>';
-      if (monthsAge != null) {
-        if (monthsAge < range.min - 1) h += '<div class="plan-item">🕐 ' + monthsAge + ' міс — рано.</div>';
-        else if (monthsAge >= range.min - 1 && monthsAge <= range.max) h += '<div class="plan-item" style="color:var(--accent)">✅ ' + monthsAge + ' міс — час!</div>';
-        else h += '<div class="plan-item">ℹ️ Можна будь-коли.</div>';
+      info.innerHTML = '<div class="plan-item"><strong>✂️ Кастрація</strong><br>📏 ' + sizeLabel + ' · 📅 ' + range.label + '</div>' + (monthsAge != null && monthsAge >= range.min - 1 && monthsAge <= range.max ? '<div class="plan-item" style="color:var(--accent)">✅ Час обговорити з ветеринаром!</div>' : '') + '<p class="text-muted" style="margin-top:0.5rem;font-size:0.78rem">⚠️ Рішення — разом з ветеринаром.</p>';
+    } else if (currentPet.sex === 'дівчинка') {
+      card.style.display = ''; if (field) field.style.display = '';
+      var lastHeat = currentPet.lastHeat; var spayRange = getSpayAgeRange();
+      var expFirst = { tiny: 6, small: 7, medium: 10, large: 12, giant: 16 }[size] || 10;
+      var h = '';
+      if (lastHeat) {
+        var next = new Date(new Date(lastHeat).getTime() + HEAT_INFO.avgCycleDays * 86400000);
+        var du = daysBetween(new Date(), next);
+        if (du > 30) h += '<div class="plan-item">📅 Наступна ~' + next.toLocaleDateString('uk') + ' (' + du + ' дн.)</div>';
+        else if (du > 0) h += '<div class="plan-item" style="color:var(--warning)">⚠️ Тічка через ~' + du + ' днів!</div>';
+        else h += '<div class="plan-item" style="color:var(--danger)">🩸 Можливо зараз тічка!</div>';
+      } else if (monthsAge != null) {
+        var until = expFirst - monthsAge;
+        if (until <= 1) h += '<div class="plan-item" style="color:var(--warning)">⚠️ Перша тічка може бути скоро!</div>';
+        else if (until <= 3) h += '<div class="plan-item">📅 Перша через ~' + until + ' міс</div>';
       }
-      h += '<p class="text-muted" style="margin-top:0.5rem;font-size:0.78rem">⚠️ Рішення — з ветеринаром.</p>';
-      info.innerHTML = h; return;
-    }
-    if (!currentPet || !currentPet.sex || currentPet.sex !== 'дівчинка') { card.style.display = 'none'; if (field) field.style.display = 'none'; return; }
-    card.style.display = ''; if (field) field.style.display = '';
-    var lastHeat = currentPet.lastHeat; var spayRange = getSpayAgeRange();
-    var expFirst = { tiny: 6, small: 7, medium: 10, large: 12, giant: 16 }[size] || 10;
-    var h2 = '';
-    if (lastHeat) {
-      var next = new Date(new Date(lastHeat).getTime() + HEAT_INFO.avgCycleDays * 86400000);
-      var du = daysBetween(new Date(), next);
-      if (du > 30) h2 += '<div class="plan-item">📅 Наступна ~' + next.toLocaleDateString('uk') + ' (' + du + ' дн.) 😌</div>';
-      else if (du > 0) h2 += '<div class="plan-item" style="color:var(--warning)">⚠️ Тічка через ~' + du + ' днів!</div>';
-      else h2 += '<div class="plan-item" style="color:var(--danger)">🩸 Можливо зараз!</div>';
-    } else if (weeks == null) {
-      h2 += '<p class="text-muted">Вкажіть дату народження 📅</p>';
+      h += '<div class="plan-item"><strong>✂️ Стерилізація:</strong> ' + spayRange.label + '</div>';
+      info.innerHTML = h;
     } else {
-      var until = expFirst - monthsAge;
-      if (monthsAge >= 20) h2 += '<div class="plan-item">❓ Не зафіксована. Ветеринар?</div>';
-      else if (until <= 1) h2 += '<div class="plan-item" style="color:var(--warning)">⚠️ Перша скоро! (' + monthsAge + ' міс)</div>';
-      else if (until <= 3) h2 += '<div class="plan-item">📅 Через ~' + until + ' міс</div>';
-      else h2 += '<div class="plan-item">🕐 Ще далеко (~' + expFirst + ' міс)</div>';
+      card.style.display = 'none'; if (field) field.style.display = 'none';
     }
-    h2 += '<details style="margin-top:0.75rem"><summary style="cursor:pointer;font-weight:600;font-size:0.85rem">✂️ Стерилізація</summary><div class="detail-content"><div class="plan-item">📏 ' + sizeLabel + ' · 📅 ' + spayRange.label + '</div><div class="plan-item" style="color:var(--danger)">🚫 Не під час тічки!</div><p class="text-muted" style="font-size:0.78rem">⚠️ Рішення — з ветеринаром.</p></div></details>';
-    info.innerHTML = h2;
   }
 
   function renderReminders() {
@@ -517,95 +691,27 @@ function renderDailyPlan() {
     card.style.display = ''; var now = new Date();
     list.innerHTML = rem.map(function(r) {
       var d = new Date(r.nextDate); var days = daysBetween(now, d);
-      var cls = '', txt = '', statusCls = 'ok';
-      if (days < 0) { cls = 'danger'; txt = 'Прострочено (' + Math.abs(days) + ' дн.)'; statusCls = 'overdue'; }
-      else if (days === 0) { cls = 'warning'; txt = 'Сьогодні!'; statusCls = 'soon'; }
-      else if (days <= 3) { cls = 'warning'; txt = 'Через ' + days + ' дн.'; statusCls = 'soon'; }
-      else { txt = d.toLocaleDateString('uk'); }
-      return '<div class="reminder-setup-item"><div class="r-info"><div class="r-label">' + r.label + '</div><div class="r-date">' + txt + '</div></div><span class="r-status ' + statusCls + '">' + (statusCls === 'overdue' ? '⚠️' : statusCls === 'soon' ? '⏰' : '✓') + '</span></div>';
+      var cls = days < 0 ? 'danger' : days <= 3 ? 'warning' : '';
+      var txt = days < 0 ? '⚠️ Прострочено ' + Math.abs(days) + ' дн.' : days === 0 ? '⏰ Сьогодні!' : days <= 3 ? '⏰ Через ' + days + ' дн.' : d.toLocaleDateString('uk');
+      return '<div class="feed-item"><div><strong>' + r.label + '</strong><div class="meta ' + cls + '">' + txt + '</div></div></div>';
     }).join('');
   }
 
-  function renderRemindersSetup() {
-    var container = $('remindersSetup'); if (!container) return;
-    var rem = (currentPet && currentPet.reminders) || [];
-    if (!rem.length) {
-      container.innerHTML = '<p class="text-muted">Додайте нагадування для автоматичних сповіщень</p>';
-      return;
-    }
-    container.innerHTML = rem.map(function(r, i) {
-      var d = new Date(r.nextDate); var now = new Date(); var days = daysBetween(now, d);
-      var statusCls = days < 0 ? 'overdue' : days <= 3 ? 'soon' : 'ok';
-      var statusText = days < 0 ? 'Прострочено' : days === 0 ? 'Сьогодні' : days <= 3 ? 'Скоро' : d.toLocaleDateString('uk');
-      return '<div class="reminder-setup-item"><div class="r-info"><div class="r-label">' + r.label + '</div><div class="r-date">' + statusText + '</div></div><span class="r-status ' + statusCls + '">' + statusText + '</span><button type="button" class="btn btn-ghost btn-sm" data-remove-reminder="' + i + '">✕</button></div>';
-    }).join('');
-    $$('[data-remove-reminder]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var idx = parseInt(btn.dataset.removeReminder);
-        var reminders = (currentPet && currentPet.reminders) || [];
-        reminders.splice(idx, 1);
-        savePetProfile({ reminders: reminders });
-      });
-    });
-  }
-
-  function renderWeight() {
-    var c = $('weightHistory'); if (!c) return;
-    var we = eventsState.filter(function(e) { return e.eventType === 'weight' && e.value; }).slice(0, 20).reverse();
-    if (!we.length) { c.innerHTML = '<p class="text-muted">+ → Здоров\'я → ⚖️ Вага</p>'; return; }
-    var latest = we[we.length - 1]; var prev = we.length > 1 ? we[we.length - 2] : null;
-    var diff = prev ? (latest.value - prev.value).toFixed(1) : null;
-    var ds = diff ? (diff > 0 ? '+' + diff + ' кг ↑' : diff < 0 ? diff + ' кг ↓' : '=') : '';
-    var dc = diff > 0 ? 'var(--success)' : diff < 0 ? 'var(--warning)' : 'var(--text-muted)';
-    var html = '<div class="plan-item" style="margin-bottom:0.75rem"><strong>⚖️ ' + latest.value + ' кг</strong>' + (ds ? '<br><span style="color:' + dc + ';font-size:0.85rem">' + ds + '</span>' : '') + '</div>';
-    html += '<canvas id="weightChart" height="120" style="width:100%;margin-bottom:0.5rem"></canvas>';
-    html += we.slice().reverse().slice(0, 5).map(function(e) { var d = tsToDate(e.createdAt); return '<div style="display:flex;justify-content:space-between;padding:0.3rem 0;font-size:0.8rem;color:var(--text-secondary);border-bottom:1px solid var(--border-light)"><span>' + (d ? d.toLocaleDateString('uk') : '') + '</span><strong>' + e.value + ' кг</strong></div>'; }).join('');
-    c.innerHTML = html;
-    requestAnimationFrame(function() { renderWeightChart(we); });
-  }
-
-  function renderWeightChart(we) {
-    var canvas = $('weightChart'); if (!canvas || !canvas.getContext || we.length < 2) return;
-    var rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
-    var ctx = canvas.getContext('2d'); var dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var w = rect.width, h = rect.height; ctx.clearRect(0, 0, w, h);
-    var vals = we.map(function(e) { return e.value; });
-    var mn = Math.min.apply(null, vals) - 0.2, mx = Math.max.apply(null, vals) + 0.2, rng = mx - mn || 1;
-    var isDark = themeMode === 'dark';
-    var lc = isDark ? '#38bdf8' : '#0ea5e9'; var gc = isDark ? '#2a2a4a' : '#e9ecef'; var tc = isDark ? '#6c757d' : '#adb5bd';
-    var pad = { top: 12, right: 8, bottom: 20, left: 36 }; var cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
-    ctx.strokeStyle = gc; ctx.lineWidth = 1;
-    for (var i = 0; i <= 3; i++) { var y = pad.top + (i / 3) * ch; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke(); ctx.fillStyle = tc; ctx.font = '10px system-ui'; ctx.textAlign = 'right'; ctx.fillText((mx - (i / 3) * rng).toFixed(1), pad.left - 4, y + 3); }
-    var pts = vals.map(function(v, idx) { return { x: pad.left + (idx / (vals.length - 1)) * cw, y: pad.top + ch - ((v - mn) / rng) * ch }; });
-    // Fill gradient
-    var gradient = ctx.createLinearGradient(0, pad.top, 0, h - pad.bottom);
-    gradient.addColorStop(0, isDark ? 'rgba(56,189,248,0.15)' : 'rgba(14,165,233,0.1)');
-    gradient.addColorStop(1, 'transparent');
-    ctx.beginPath(); ctx.moveTo(pts[0].x, h - pad.bottom); pts.forEach(function(p) { ctx.lineTo(p.x, p.y); }); ctx.lineTo(pts[pts.length - 1].x, h - pad.bottom); ctx.closePath(); ctx.fillStyle = gradient; ctx.fill();
-    // Line
-    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-    for (var j = 1; j < pts.length; j++) { var cx = (pts[j - 1].x + pts[j].x) / 2; ctx.bezierCurveTo(cx, pts[j - 1].y, cx, pts[j].y, pts[j].x, pts[j].y); }
-    ctx.strokeStyle = lc; ctx.lineWidth = 2.5; ctx.stroke();
-    // Points
-    pts.forEach(function(p, idx) { ctx.beginPath(); ctx.arc(p.x, p.y, idx === pts.length - 1 ? 5 : 3, 0, Math.PI * 2); ctx.fillStyle = idx === pts.length - 1 ? lc : (isDark ? '#222240' : '#fff'); ctx.fill(); ctx.strokeStyle = lc; ctx.lineWidth = 2; ctx.stroke(); });
-  }
-
+  // ===== HEATMAP =====
   function renderHeatmap() {
     var container = $('heatmapGrid'); if (!container) return;
-    var cells = '';
-    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var cells = ''; var today = new Date(); today.setHours(0, 0, 0, 0);
     for (var i = 27; i >= 0; i--) {
       var d = new Date(today); d.setDate(d.getDate() - i);
       var next = new Date(d); next.setDate(next.getDate() + 1);
       var count = eventsState.filter(function(e) { var ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; }).length;
       var level = count === 0 ? '' : count <= 2 ? 'level-1' : count <= 4 ? 'level-2' : count <= 7 ? 'level-3' : 'level-4';
-      var isToday = i === 0 ? ' today' : '';
-      cells += '<div class="heatmap-cell ' + level + isToday + '" title="' + d.toLocaleDateString('uk') + ': ' + count + ' подій"></div>';
+      cells += '<div class="heatmap-cell ' + level + (i === 0 ? ' today' : '') + '" title="' + d.toLocaleDateString('uk') + ': ' + count + '"></div>';
     }
     container.innerHTML = cells;
   }
 
+  // ===== FEED (for Diary only) =====
   function renderFeed(targetId, filter) {
     filter = filter || 'all';
     var list = $(targetId); if (!list) return;
@@ -614,117 +720,66 @@ function renderDailyPlan() {
       var cat = EVENT_CATEGORIES.find(function(c) { return c.id === filter; });
       if (cat) { var types = cat.events.map(function(e) { return e.type; }); filtered = eventsState.filter(function(e) { return types.indexOf(e.eventType) >= 0; }); }
     }
-    if (!filtered.length) { list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-title">Поки що порожньо</div><div class="empty-state-desc">Натисніть + щоб додати першу подію</div></div>'; return; }
-    list.innerHTML = filtered.slice(0, 50).map(function(item) {
+    if (!filtered.length) { list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-title">Поки порожньо</div><div class="empty-state-desc">Натисніть + щоб додати подію</div></div>'; return; }
+    list.innerHTML = filtered.slice(0, 60).map(function(item) {
       var conf = TYPE_CONFIG[item.eventType] || { icon: '•', label: 'Подія' };
       var d = tsToDate(item.createdAt);
       var timeStr = d ? d.toLocaleString('uk', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
       var valStr = item.value ? ' · ' + item.value + (conf.unit || '') : '';
       var byStr = item.byName && membersState.length > 1 ? ' · ' + item.byName : '';
-      return '<div class="feed-item-wrapper"><div class="swipe-delete-bg">Видалити</div><div class="feed-item" data-event-id="' + item.id + '"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + timeStr + valStr + byStr + (item.note ? ' · ' + item.note : '') + '</div></div><button type="button" class="btn btn-ghost btn-sm" data-delete-event="' + item.id + '" aria-label="Видалити">✕</button></div></div>';
+      return '<div class="feed-item"><div><strong>' + conf.icon + ' ' + conf.label + '</strong><div class="meta">' + timeStr + valStr + byStr + (item.note ? ' · ' + item.note : '') + '</div></div><button type="button" class="btn btn-ghost btn-sm" data-delete-event="' + item.id + '">✕</button></div>';
     }).join('');
-
     $$('#' + targetId + ' [data-delete-event]').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        deleteEventWithUndo(btn.dataset.deleteEvent);
-      });
-    });
-
-    // Swipe to delete
-    initSwipeDelete(targetId);
-  }
-
-  function initSwipeDelete(containerId) {
-    var container = $(containerId); if (!container) return;
-    var wrappers = container.querySelectorAll('.feed-item-wrapper');
-    wrappers.forEach(function(wrapper) {
-      var feedItem = wrapper.querySelector('.feed-item');
-      if (!feedItem) return;
-      var startX = 0, currentX = 0, isDragging = false;
-
-      feedItem.addEventListener('touchstart', function(e) {
-        startX = e.touches[0].clientX;
-        isDragging = true;
-        feedItem.style.transition = 'none';
-      }, { passive: true });
-
-      feedItem.addEventListener('touchmove', function(e) {
-        if (!isDragging) return;
-        currentX = e.touches[0].clientX - startX;
-        if (currentX < 0) {
-          feedItem.style.transform = 'translateX(' + Math.max(currentX, -80) + 'px)';
-        }
-      }, { passive: true });
-
-      feedItem.addEventListener('touchend', function() {
-        isDragging = false;
-        feedItem.style.transition = 'transform 200ms var(--ease)';
-        if (currentX < -60) {
-          var eventId = feedItem.dataset.eventId;
-          if (eventId) deleteEventWithUndo(eventId);
-        }
-        feedItem.style.transform = '';
-        currentX = 0;
-      });
+      btn.addEventListener('click', function() { deleteEventWithUndo(btn.dataset.deleteEvent); });
     });
   }
+  function renderWeight() {
+    var c = $('weightHistory'); if (!c) return;
+    var we = eventsState.filter(function(e) { return e.eventType === 'weight' && e.value; }).slice(0, 20).reverse();
+    if (!we.length) { c.innerHTML = '<p class="text-muted">+ → Здоров\'я → ⚖️ Вага</p>'; return; }
+    var latest = we[we.length - 1]; var prev = we.length > 1 ? we[we.length - 2] : null;
+    var diff = prev ? (latest.value - prev.value).toFixed(1) : null;
+    var ds = diff ? (diff > 0 ? '+' + diff + ' кг ↑' : diff < 0 ? diff + ' кг ↓' : '= без змін') : '';
+    var dc = diff > 0 ? 'var(--success)' : diff < 0 ? 'var(--warning)' : 'var(--text-muted)';
+    var html = '<div style="text-align:center;margin-bottom:0.75rem"><div style="font-size:2rem;font-weight:800;color:var(--accent)">' + latest.value + ' кг</div>' + (ds ? '<div style="color:' + dc + ';font-size:0.85rem;font-weight:600">' + ds + '</div>' : '') + '</div>';
+    html += '<canvas id="weightChart" height="120" style="width:100%;margin-bottom:0.5rem"></canvas>';
+    c.innerHTML = html;
+    requestAnimationFrame(function() { renderWeightChart(we); });
+  }
 
-  function renderChart(canvasId) {
-    var canvas = $(canvasId); if (!canvas || !canvas.getContext) return;
-    var rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
+  function renderWeightChart(we) {
+    var canvas = $('weightChart'); if (!canvas || !canvas.getContext || we.length < 2) return;
+    var rect = canvas.getBoundingClientRect(); if (!rect.width || rect.width < 50) return;
     var ctx = canvas.getContext('2d'); var dpr = window.devicePixelRatio || 1;
     canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var w = rect.width, h = rect.height; ctx.clearRect(0, 0, w, h);
-    var days = [];
-    for (var i = 13; i >= 0; i--) {
-      var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
-      var next = new Date(d); next.setDate(next.getDate() + 1);
-      var dayEv = eventsState.filter(function(e) { var ts = tsToDate(e.createdAt); return ts && ts >= d && ts < next; });
-      var s = dayEv.filter(function(e) { return isToiletSuccess(e.eventType); }).length;
-      var m = dayEv.filter(function(e) { return isToiletMiss(e.eventType); }).length;
-      var t = s + m;
-      days.push({ date: d, pct: t ? Math.round(s / t * 100) : null, total: t });
-    }
+    var vals = we.map(function(e) { return e.value; });
+    var mn = Math.min.apply(null, vals) - 0.3, mx = Math.max.apply(null, vals) + 0.3, rng = mx - mn || 1;
     var isDark = themeMode === 'dark';
-    var accent = isDark ? '#38bdf8' : '#0ea5e9';
-    var danger = isDark ? '#f87171' : '#ef4444';
-    var warning = isDark ? '#fbbf24' : '#f59e0b';
-    var muted = isDark ? '#6c757d' : '#adb5bd';
-    var border = isDark ? '#2a2a4a' : '#e9ecef';
-    var p = { top: 10, right: 4, bottom: 24, left: 4 };
-    var cw = w - p.left - p.right, ch = h - p.top - p.bottom, bw = cw / days.length;
-
-    // Grid lines
-    ctx.strokeStyle = border; ctx.lineWidth = 1;
-    [0, 50, 100].forEach(function(v) { var y = p.top + ch - (v / 100) * ch; ctx.beginPath(); ctx.moveTo(p.left, y); ctx.lineTo(w - p.right, y); ctx.stroke(); });
-
-    // Bars
-    days.forEach(function(day, i) {
-      var x = p.left + i * bw + bw * 0.15, barW = bw * 0.7;
-      if (day.pct == null) {
-        ctx.fillStyle = muted; ctx.beginPath(); ctx.arc(x + barW / 2, p.top + ch - 3, 2.5, 0, Math.PI * 2); ctx.fill();
-      } else {
-        var barH = Math.max(4, (day.pct / 100) * ch), y = p.top + ch - barH;
-        // Gradient bar
-        var barGrad = ctx.createLinearGradient(x, y, x, y + barH);
-        var barColor = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
-        barGrad.addColorStop(0, barColor);
-        barGrad.addColorStop(1, barColor + '80');
-        ctx.fillStyle = barGrad;
-        var r = Math.min(4, barW / 2);
-        ctx.beginPath(); ctx.moveTo(x, y + barH); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.lineTo(x + barW - r, y); ctx.quadraticCurveTo(x + barW, y, x + barW, y + r); ctx.lineTo(x + barW, y + barH); ctx.closePath(); ctx.fill();
-        // Pct label on top
-        if (day.total >= 2) {
-          ctx.fillStyle = barColor; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
-          ctx.fillText(day.pct + '%', x + barW / 2, y - 3);
-        }
-      }
-      // Date labels
-      if (i % 2 === 0 || i === days.length - 1) { ctx.fillStyle = muted; ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.fillText(day.date.getDate() + '/' + (day.date.getMonth() + 1), x + barW / 2, h - 4); }
-    });
+    var lc = isDark ? '#38bdf8' : '#0ea5e9';
+    var gc = isDark ? '#2a2a4a' : '#e9ecef';
+    var tc = isDark ? '#6c757d' : '#adb5bd';
+    var pad = { top: 12, right: 8, bottom: 20, left: 38 };
+    var cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
+    // Grid
+    ctx.strokeStyle = gc; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    for (var i = 0; i <= 3; i++) { var y = pad.top + (i / 3) * ch; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke(); ctx.fillStyle = tc; ctx.font = '10px -apple-system, system-ui'; ctx.textAlign = 'right'; ctx.fillText((mx - (i / 3) * rng).toFixed(1), pad.left - 4, y + 3); }
+    ctx.setLineDash([]);
+    var pts = vals.map(function(v, idx) { return { x: pad.left + (idx / Math.max(vals.length - 1, 1)) * cw, y: pad.top + ch - ((v - mn) / rng) * ch }; });
+    // Fill
+    var gradient = ctx.createLinearGradient(0, pad.top, 0, h - pad.bottom);
+    gradient.addColorStop(0, isDark ? 'rgba(56,189,248,0.12)' : 'rgba(14,165,233,0.08)');
+    gradient.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.moveTo(pts[0].x, h - pad.bottom); pts.forEach(function(p) { ctx.lineTo(p.x, p.y); }); ctx.lineTo(pts[pts.length - 1].x, h - pad.bottom); ctx.closePath(); ctx.fillStyle = gradient; ctx.fill();
+    // Line
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var j = 1; j < pts.length; j++) { var cx = (pts[j - 1].x + pts[j].x) / 2; ctx.bezierCurveTo(cx, pts[j - 1].y, cx, pts[j].y, pts[j].x, pts[j].y); }
+    ctx.strokeStyle = lc; ctx.lineWidth = 2.5; ctx.stroke();
+    // Points
+    pts.forEach(function(p, idx) { ctx.beginPath(); ctx.arc(p.x, p.y, idx === pts.length - 1 ? 5 : 3, 0, Math.PI * 2); ctx.fillStyle = idx === pts.length - 1 ? lc : (isDark ? '#1a1a2e' : '#fff'); ctx.fill(); ctx.strokeStyle = lc; ctx.lineWidth = 2; ctx.stroke(); });
   }
 
+  // ===== COURSES =====
   function renderCourses() {
     var grid = $('courseGrid'); var viewer = $('selectedCourse'); if (!grid || !viewer) return;
     var filtered = currentCourseLevel === 'all' ? COURSES : COURSES.filter(function(c) { return c.level === currentCourseLevel; });
@@ -741,13 +796,11 @@ function renderDailyPlan() {
     $$('[data-course-check]').forEach(function(cb) {
       cb.addEventListener('change', function() {
         var parts = cb.dataset.courseCheck.split(':');
-        var cid = parts[0], idx = parts[1];
         var p = JSON.parse(localStorage.getItem('dc_course_progress') || '{}');
-        p[cid] = p[cid] || {};
-        p[cid][idx] = cb.checked;
+        p[parts[0]] = p[parts[0]] || {};
+        p[parts[0]][parts[1]] = cb.checked;
         localStorage.setItem('dc_course_progress', JSON.stringify(p));
-        haptic();
-        renderCourses();
+        haptic(); renderCourses();
       });
     });
   }
@@ -774,7 +827,7 @@ function renderDailyPlan() {
   }
 
   function renderToiletGuide() { var g = $('toiletGuide'); if (g) g.innerHTML = TOILET_GUIDE.map(function(s) { return '<div class="k-card"><strong>' + s.title + '</strong><p>' + s.text + '</p></div>'; }).join(''); }
-  function renderMembers() { var list = $('membersList'); if (!list) return; list.innerHTML = membersState.length ? membersState.map(function(m) { return '<div class="member-chip"><div class="m-avatar">' + (m.photoURL ? '<img src="' + m.photoURL + '" alt="">' : avatarLetter(m.displayName)) + '</div><span>' + (m.displayName || 'Учасник') + '</span></div>'; }).join('') : '<div class="empty">Поки тільки ви 👤</div>'; }
+  function renderMembers() { var list = $('membersList'); if (!list) return; list.innerHTML = membersState.length ? membersState.map(function(m) { return '<div class="member-chip"><div class="m-avatar">' + (m.photoURL ? '<img src="' + m.photoURL + '" alt="">' : avatarLetter(m.displayName)) + '</div><span>' + (m.displayName || 'Учасник') + '</span></div>'; }).join('') : '<p class="text-muted">Поки тільки ви 👤</p>'; }
   function renderWorkspaceMeta() { var el = $('inviteCodeView'); if (el) el.textContent = (workspaceData && workspaceData.inviteCode) || '—'; }
 
   function fillPetForm() {
@@ -791,13 +844,13 @@ function renderDailyPlan() {
     var hf = $('heatDateField'); if (hf) hf.style.display = (currentPet && currentPet.sex === 'дівчинка') ? '' : 'none';
     var ps = $('pushStatus');
     if (ps) {
-      if ('Notification' in window && Notification.permission === 'granted') ps.textContent = '✅ Увімкнені';
+      if ('Notification' in window && Notification.permission === 'granted') ps.textContent = '✅ Сповіщення увімкнені';
       else if ('Notification' in window && Notification.permission === 'denied') ps.textContent = '❌ Заблоковані в браузері';
       else ps.textContent = '';
     }
-    renderRemindersSetup();
   }
 
+  // ===== SHEET =====
   function renderSheetCategories() {
     var c = $('sheetCategories'); if (!c) return;
     c.innerHTML = EVENT_CATEGORIES.map(function(cat) { return '<button type="button" class="chip ' + (cat.id === selectedSheetCategory ? 'active' : '') + '" data-sheet-cat="' + cat.id + '">' + cat.icon + ' ' + cat.name + '</button>'; }).join('');
@@ -813,39 +866,37 @@ function renderDailyPlan() {
 
   // ===== RENDER ALL =====
   function renderAll() {
-    renderHeader(); renderStreak(); renderWeeklyReport(); renderDailyTip(); renderKpis(); renderOneTap();
-    renderDailyPlan(); renderAgeFocus(); renderHeatInfo(); renderReminders();
-    renderFeed('recentLogs'); renderFeed('recentLogsDiary', currentDiaryFilter); renderWeight();
+    renderHeader(); renderStreak(); renderWeeklyReport(); renderDailyTip(); renderKpis();
+    renderOneTap(); renderDailyPlan(); renderAgeFocus(); renderHeatInfo(); renderReminders();
     renderHeatmap(); renderAchievements();
+    renderFeed('recentLogsDiary', currentDiaryFilter); renderWeight();
     renderCourses(); renderKnowledge(); renderSocial(); renderToiletGuide();
     renderMembers(); renderWorkspaceMeta(); fillPetForm();
-    if (activeTab === 'tabDiary') requestAnimationFrame(function() { renderChart('progressChartDiary'); });
+    if (activeTab === 'tabDiary') { renderChart('progressChartDiary'); }
     generateAIPlan();
     checkAchievements();
   }
 
-  // ===== TABS & NAVIGATION =====
+  // ===== TABS =====
   function setActiveTab(id) {
     activeTab = id;
     $$('.tab').forEach(function(p) { p.classList.toggle('active', p.id === id); });
     $$('.nav-item').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
-    if (id === 'tabProfile') hide($('fabAddEvent'));
-    else show($('fabAddEvent'));
-    if (id === 'tabDiary') requestAnimationFrame(function() { renderChart('progressChartDiary'); });
-    // Scroll to top
+    if (id === 'tabProfile') hide($('fabAddEvent')); else show($('fabAddEvent'));
+    if (id === 'tabDiary') setTimeout(function() { renderChart('progressChartDiary'); }, 50);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function openSheet() { show($('eventSheet')); selectedEventType = null; selectedSheetCategory = 'toilet'; renderSheetCategories(); renderSheetEvents(); hide($('sheetExtraFields')); document.body.style.overflow = 'hidden'; }
   function closeSheet() { hide($('eventSheet')); document.body.style.overflow = ''; }
 
-  // ===== FIREBASE OPERATIONS =====
+  // ===== FIREBASE =====
   function savePetProfile(payload) {
     if (!currentUser || !workspaceId) { toast('Увійдіть', 'error'); return Promise.resolve(); }
     showLoading();
     return db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').set(
       Object.assign({}, currentPet || {}, payload, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }), { merge: true }
-    ).then(function() { toast('Збережено ✓', 'success'); }).catch(function(e) { console.error(e); toast('Помилка', 'error'); }).finally(function() { hideLoading(); });
+    ).then(function() { toast('Збережено ✓', 'success'); }).catch(function(e) { console.error(e); toast('Помилка збереження', 'error'); }).finally(hideLoading);
   }
 
   function addEvent(payload, withUndo) {
@@ -853,15 +904,14 @@ function renderDailyPlan() {
     var data = { eventType: payload.eventType, byUid: currentUser.uid, byName: currentUser.displayName || 'Я', note: payload.note || '', timeLabel: payload.timeLabel || nowTime(), createdAt: firebase.firestore.FieldValue.serverTimestamp() };
     if (payload.value) data.value = payload.value;
     return db.collection('workspaces').doc(workspaceId).collection('events').add(data).then(function(docRef) {
-      var conf = TYPE_CONFIG[payload.eventType] || { label: 'Подія' };
+      var conf = TYPE_CONFIG[payload.eventType] || { icon: '•', label: 'Подія' };
       if (withUndo) {
-        toast(conf.icon + ' ' + conf.label + ' додано', 'success', function() {
-          docRef.delete().then(function() { toast('Скасовано ✓', 'success'); });
-        });
-      } else {
-        toast('Додано ✓', 'success');
-      }
+        toast(conf.icon + ' ' + conf.label, 'success', function() { docRef.delete().then(function() { toast('Скасовано', 'success'); }); });
+      } else { toast('Додано ✓', 'success'); }
       haptic();
+      // Auto-reminders
+      if (['meal_morning', 'meal_day', 'meal_evening'].indexOf(payload.eventType) >= 0) scheduleLocalReminder(20, '🚽 Горшик!', 'Після їжі — пелюшка!');
+      if (payload.eventType === 'sleep') scheduleLocalReminder(5, '🚽 Прокинувся!', 'Одразу на пелюшку!');
     }).catch(function(e) { console.error(e); toast('Помилка', 'error'); });
   }
 
@@ -872,14 +922,11 @@ function renderDailyPlan() {
 
   function deleteEventWithUndo(id) {
     if (!workspaceId || !id) return;
-    // Find event data for undo
     var eventData = eventsState.find(function(e) { return e.id === id; });
-    if (!eventData) { deleteEvent(id); return; }
-
     db.collection('workspaces').doc(workspaceId).collection('events').doc(id).delete().then(function() {
       toast('Видалено', 'success', function() {
-        // Undo — re-add the event
-        var restoreData = { eventType: eventData.eventType, byUid: eventData.byUid, byName: eventData.byName || 'Я', note: eventData.note || '', timeLabel: eventData.timeLabel || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+        if (!eventData) return;
+        var restoreData = { eventType: eventData.eventType, byUid: eventData.byUid || currentUser.uid, byName: eventData.byName || 'Я', note: eventData.note || '', timeLabel: eventData.timeLabel || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
         if (eventData.value) restoreData.value = eventData.value;
         db.collection('workspaces').doc(workspaceId).collection('events').add(restoreData).then(function() { toast('Відновлено ✓', 'success'); });
       });
@@ -905,7 +952,7 @@ function renderDailyPlan() {
   function joinWorkspaceByInvite(code) {
     var clean = (code || '').trim().toUpperCase(); if (!clean) return Promise.reject(new Error('Введіть код'));
     return db.collection('workspaces').where('inviteCode', '==', clean).limit(1).get().then(function(snap) {
-      if (snap.empty) throw new Error('Не знайдено');
+      if (snap.empty) throw new Error('Код не знайдено');
       workspaceId = snap.docs[0].id; workspaceData = snap.docs[0].data();
       return db.collection('users').doc(currentUser.uid).set({ uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || '', photoURL: currentUser.photoURL || '', role: 'member', workspaceId: workspaceId }, { merge: true });
     }).then(function() {
@@ -921,10 +968,10 @@ function renderDailyPlan() {
   function loginGoogle() {
     showLoading();
     return auth.signInWithPopup(googleProvider).catch(function(e) {
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') { return auth.signInWithRedirect(googleProvider); }
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') return auth.signInWithRedirect(googleProvider);
       else if (e.code === 'auth/unauthorized-domain') toast('Домен не авторизовано', 'error');
       else toast(e.message || 'Помилка', 'error');
-    }).finally(function() { hideLoading(); });
+    }).finally(hideLoading);
   }
 
   function logout() {
@@ -935,7 +982,7 @@ function renderDailyPlan() {
     return auth.signOut().then(function() { currentUser = null; workspaceId = null; workspaceData = null; currentPet = null; eventsState = []; membersState = []; hide($('appContent')); show($('authScreen')); });
   }
 
-  // ===== AI CHAT =====
+  // ===== AI =====
   function addChatMessage(text, type) { var chat = $('aiChat'); if (!chat) return; var msg = document.createElement('div'); msg.className = 'ai-msg ' + type; msg.textContent = text; chat.appendChild(msg); chat.scrollTop = chat.scrollHeight; }
   function showTyping() { var chat = $('aiChat'); if (!chat) return; var el = document.createElement('div'); el.className = 'ai-msg loading'; el.id = 'typingIndicator'; el.textContent = 'Думаю'; chat.appendChild(el); chat.scrollTop = chat.scrollHeight; }
   function removeTyping() { var el = $('typingIndicator'); if (el) el.remove(); }
@@ -944,13 +991,12 @@ function renderDailyPlan() {
     var weeks = getAgeInWeeks(currentPet && currentPet.birthDate);
     var issues = (currentPet && currentPet.issues) || '';
     var petInfo = currentPet ? 'Собака: ' + (currentPet.name || '?') + ', ' + weekLabel(weeks) + ', ' + (currentPet.breed || '?') + ', ' + getSizeLabel() + (issues ? ', проблеми: ' + issues : '') : '';
-    var sys = 'Ти — професійний український кінолог (15р).\nПРАВИЛА:\n1. ТІЛЬКИ українською.\n2. 4-5 речень.\n3. До 3 міс — адаптація.\n4. Без покарань.\n5. Пронумеровані кроки.\n\n' + petInfo;
+    var sys = 'Ти — професійний український кінолог (15р).\nПРАВИЛА:\n1. ТІЛЬКИ українською.\n2. 4-5 речень.\n3. До 3 міс — тільки адаптація.\n4. Без покарань.\n5. Пронумеровані кроки.\n\n' + petInfo;
     return fetch('/api/proxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'groq/llama-3.3-70b-versatile', messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], temperature: 0.2, max_tokens: 400, stream: false }) })
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) {
       if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-        var t = data.choices[0].message.content.trim().replace(/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef]/g, '').replace(/\s{2,}/g, ' ').trim();
-        return t || getLocalFallback(prompt);
+        return data.choices[0].message.content.trim().replace(/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef]/g, '').replace(/\s{2,}/g, ' ').trim() || getLocalFallback(prompt);
       }
       throw new Error('Empty');
     }).catch(function(e) { console.warn('AI:', e.message); return getLocalFallback(prompt); });
@@ -958,104 +1004,49 @@ function renderDailyPlan() {
 
   function getLocalFallback(prompt) {
     var l = prompt.toLowerCase();
-    if (l.indexOf('команд') >= 0 || l.indexOf('сідати') >= 0 || l.indexOf('сидіти') >= 0) return '1) Ласощі біля носа.\n2) Руку вгору — сяде.\n3) "Так!" + ласощі.\n4) 5-8 разів/день по 2 хв.';
-    if (l.indexOf('гриз') >= 0) return '1) Приберіть цінне.\n2) Давайте жувальне.\n3) Своє гризе — маркер "Так!".\n4) Чуже — мовчки замініть.';
-    if (l.indexOf('гавк') >= 0) return '1) Визначте причину.\n2) Не кричіть у відповідь.\n3) Пауза в гавкоті → маркер.\n4) Розумове навантаження.';
-    if (l.indexOf('пелюшк') >= 0 || l.indexOf('туалет') >= 0) return '1) Менше простору — манеж.\n2) Після сну/їжі/гри — на пелюшку.\n3) Зробила — "Так!" + ласощі.\n4) Промах — мовчки прибрати.';
-    if (l.indexOf('повідець') >= 0 || l.indexOf('повідок') >= 0 || l.indexOf('тягне') >= 0) return '1) Тягне = зупинка.\n2) Вільний повідок = йдемо далі.\n3) Кожні 15 кроків — ласощі біля ноги.\n4) Ніяких рулеток!';
-    if (l.indexOf('кусає') >= 0 || l.indexOf('кусат') >= 0) return '1) Завмріть як статуя.\n2) "Ай" + пауза 5 сек.\n3) Дайте іграшку.\n4) Не зупиняється → вийдіть.';
-    if (l.indexOf('соціал') >= 0) return '1) Одне нове знайомство на день.\n2) Безпечна відстань.\n3) Цікавість = ласощі!\n4) Стрес = відходимо.';
-    if (l.indexOf('підклик') >= 0 || l.indexOf('до мене') >= 0) return '1) Слово "Сюди!" (не ім\'я).\n2) Вдома: слово → найсмачніше.\n3) Підхід = завжди свято!\n4) Ніколи не карати після підходу.';
+    if (l.indexOf('сидіти') >= 0 || l.indexOf('сідати') >= 0) return '1) Ласощі біля носа.\n2) Підніміть руку вгору — сяде.\n3) Клікер/маркер "Так!" + ласощі.\n4) 5-8 разів, по 2 хв/день.';
+    if (l.indexOf('гриз') >= 0) return '1) Приберіть цінне з доступу.\n2) Давайте жувальні іграшки.\n3) Гризе своє — клікер + похвала!\n4) Чуже — мовчки заберіть, дайте своє.';
+    if (l.indexOf('гавк') >= 0) return '1) Визначте тригер.\n2) Не кричіть у відповідь.\n3) Пауза в гавкоті → клікер + ласощі.\n4) Більше розумового навантаження.';
+    if (l.indexOf('пелюшк') >= 0 || l.indexOf('туалет') >= 0) return '1) Менше простору (манеж).\n2) Після сну/їжі — несіть на пелюшку.\n3) Зробила — клікер/маркер + ласощі!\n4) Промах — мовчки прибрати. Без емоцій.';
+    if (l.indexOf('повідок') >= 0 || l.indexOf('повідець') >= 0 || l.indexOf('тягне') >= 0) return '1) Тягне = ви зупиняєтесь.\n2) Повідок вільний = йдемо.\n3) Кожні 15 кроків — ласощі біля ноги.\n4) Рулетку — в смітник!';
+    if (l.indexOf('кусає') >= 0 || l.indexOf('кусат') >= 0) return '1) Завмріть як статуя.\n2) "Ай" + пауза 5 сек (ігноруємо).\n3) Дайте іграшку натомість.\n4) Не зупиняється → вийдіть з кімнати.';
+    if (l.indexOf('соціал') >= 0) return '1) Одне нове знайомство на день.\n2) Безпечна відстань!\n3) Цікавість → клікер + ласощі.\n4) Стрес → відходимо далі.';
+    if (l.indexOf('підклик') >= 0 || l.indexOf('до мене') >= 0) return '1) Слово "Сюди!" (не ім\'я).\n2) Вдома: слово → СУПЕРЛАСОЩІ.\n3) Підхід = завжди свято! Ніколи не карати.\n4) Свисток для підклику на відстані.';
     var prog = getProgramByAge(getAgeInWeeks(currentPet && currentPet.birthDate));
-    return (prog && prog.tip) || 'Запитайте конкретніше! Наприклад: "Як навчити сидіти?" або "Чому кусається?" 🐾';
+    return (prog && prog.tip) || 'Запитайте конкретніше! Наприклад: "Як навчити сидіти?" 🐾';
   }
 
   function handleAISubmit(prompt) {
     if (!prompt.trim()) return;
     addChatMessage(prompt, 'user'); showTyping();
-    // Count AI usage for achievement
     var count = parseInt(localStorage.getItem('dc_ai_count') || '0') + 1;
     localStorage.setItem('dc_ai_count', String(count));
-    fetchAIResponse(prompt).then(function(r) { removeTyping(); addChatMessage(r, 'assistant'); }).catch(function() { removeTyping(); addChatMessage('Помилка. Спробуйте ще раз 🔄', 'assistant'); });
+    fetchAIResponse(prompt).then(function(r) { removeTyping(); addChatMessage(r, 'assistant'); }).catch(function() { removeTyping(); addChatMessage('Помилка. Спробуйте ще 🔄', 'assistant'); });
   }
 
-  // ===== VOICE INPUT =====
+  // ===== VOICE =====
   function initVoiceInput() {
-    var voiceBtn = $('voiceBtn');
-    if (!voiceBtn) return;
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      voiceBtn.style.display = 'none';
-      return;
-    }
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    var recognition = new SpeechRecognition();
-    recognition.lang = 'uk-UA';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    var isRecording = false;
-
+    var voiceBtn = $('voiceBtn'); if (!voiceBtn) return;
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { voiceBtn.style.display = 'none'; return; }
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition = new SR();
+    recognition.lang = 'uk-UA'; recognition.continuous = false; recognition.interimResults = false;
+    var isRec = false;
     voiceBtn.addEventListener('click', function() {
-      if (isRecording) {
-        recognition.stop();
-        voiceBtn.classList.remove('recording');
-        isRecording = false;
-      } else {
-        recognition.start();
-        voiceBtn.classList.add('recording');
-        isRecording = true;
-        haptic();
-      }
+      if (isRec) { recognition.stop(); voiceBtn.classList.remove('recording'); isRec = false; }
+      else { recognition.start(); voiceBtn.classList.add('recording'); isRec = true; haptic(); }
     });
-
-    recognition.onresult = function(event) {
-      var transcript = event.results[0][0].transcript;
-      var input = $('aiInput');
-      if (input) { input.value = transcript; input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 100) + 'px'; }
-      voiceBtn.classList.remove('recording');
-      isRecording = false;
-    };
-
-    recognition.onerror = function() {
-      voiceBtn.classList.remove('recording');
-      isRecording = false;
-      toast('Не вдалося розпізнати', 'error');
-    };
-
-    recognition.onend = function() {
-      voiceBtn.classList.remove('recording');
-      isRecording = false;
-    };
+    recognition.onresult = function(e) { var t = e.results[0][0].transcript; var input = $('aiInput'); if (input) { input.value = t; input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 100) + 'px'; } voiceBtn.classList.remove('recording'); isRec = false; };
+    recognition.onerror = function() { voiceBtn.classList.remove('recording'); isRec = false; };
+    recognition.onend = function() { voiceBtn.classList.remove('recording'); isRec = false; };
   }
 
-  // ===== EXPORT DATA =====
-  function exportData() {
-    if (!currentPet && !eventsState.length) { toast('Немає даних', 'error'); return; }
-    var data = {
-      exportDate: new Date().toISOString(),
-      pet: currentPet || {},
-      events: eventsState.map(function(e) {
-        var ts = tsToDate(e.createdAt);
-        return { type: e.eventType, time: ts ? ts.toISOString() : null, note: e.note, value: e.value, by: e.byName };
-      }),
-      achievements: achievementsState,
-      social: JSON.parse(localStorage.getItem('dc_social') || '{}'),
-      courseProgress: JSON.parse(localStorage.getItem('dc_course_progress') || '{}')
-    };
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'dogcoach_' + (currentPet && currentPet.name || 'export') + '_' + todayKey() + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Експорт завершено ✓', 'success');
-  }
-  // ===== PUSH NOTIFICATIONS =====
+  // ===== PUSH =====
   function requestPushPermission() {
     if (!('Notification' in window)) { toast('Не підтримується', 'error'); return; }
     Notification.requestPermission().then(function(perm) {
       if (perm === 'granted') { subscribeToPush(); toast('Сповіщення увімкнені! 🔔', 'success'); }
-      else { toast('Відхилено браузером', 'error'); }
+      else toast('Відхилено', 'error');
       fillPetForm();
     });
   }
@@ -1068,205 +1059,24 @@ function renderDailyPlan() {
         if (!reg) return;
         return messaging.getToken({ vapidKey: 'BFvGyG-w5R68xO2RS6gQbYSyAPQaviGnVsHedxjzXajvxg1OUdL1Xe6e4M38j0mewG-Yt3qKgbUnMHmf98PaCiA', serviceWorkerRegistration: reg });
       }).then(function(token) {
-        if (token && currentUser && workspaceId) {
-          db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).update({ pushToken: token });
-        }
+        if (token && currentUser && workspaceId) db.collection('workspaces').doc(workspaceId).collection('members').doc(currentUser.uid).update({ pushToken: token });
       }).catch(function(e) { console.warn('Push:', e); });
     } catch (e) { console.warn('Push:', e); }
   }
 
   function scheduleLocalReminder(minutes, title, body) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    setTimeout(function() {
-      new Notification(title, { body: body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' });
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    }, minutes * 60 * 1000);
+    setTimeout(function() { new Notification(title, { body: body, icon: '/icons/icon-192.png' }); if (navigator.vibrate) navigator.vibrate([100, 50, 100]); }, minutes * 60 * 1000);
   }
 
-  // ===== ADD REMINDER =====
-  function showAddReminderDialog() {
-    var REMINDER_TEMPLATES = window.REMINDER_TEMPLATES || [];
-    var html = '<div class="sheet-handle"></div><h3>Додати нагадування</h3>';
-    html += '<div class="course-grid">';
-    REMINDER_TEMPLATES.forEach(function(tmpl) {
-      html += '<button type="button" class="course-btn" data-reminder-template="' + tmpl.id + '"><strong>' + tmpl.label + '</strong><div class="c-meta">Кожні ' + tmpl.defaultInterval + ' дн.</div></button>';
-    });
-    html += '</div>';
-    html += '<div id="reminderCustom" class="hidden" style="margin-top:1rem"><div class="form-grid"><div class="field full"><label>Назва</label><input id="reminderLabel" type="text" placeholder="Назва"></div><div class="field"><label>Наступна дата</label><input id="reminderDate" type="date"></div><div class="field"><label>Інтервал (днів)</label><input id="reminderInterval" type="number" value="30" min="1"></div></div><button class="btn btn-primary full-width" id="saveReminderBtn" type="button">Зберегти</button></div>';
-
-    var sheet = $('eventSheet');
-    var sheetContent = sheet.querySelector('.sheet-content');
-    sheetContent.innerHTML = html;
-    show(sheet);
-    document.body.style.overflow = 'hidden';
-
-    // Bind template clicks
-    $$('[data-reminder-template]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var tmplId = btn.dataset.reminderTemplate;
-        var tmpl = REMINDER_TEMPLATES.find(function(t) { return t.id === tmplId; });
-        if (!tmpl) return;
-        show($('reminderCustom'));
-        $('reminderLabel').value = tmpl.label;
-        var nextDate = new Date();
-        nextDate.setDate(nextDate.getDate() + tmpl.defaultInterval);
-        $('reminderDate').value = nextDate.toISOString().slice(0, 10);
-        $('reminderInterval').value = tmpl.defaultInterval;
-        haptic();
-      });
-    });
-
-    // Wait for DOM then bind save
-    requestAnimationFrame(function() {
-      var saveBtn = $('saveReminderBtn');
-      if (saveBtn) {
-        saveBtn.addEventListener('click', function() {
-          var label = ($('reminderLabel') && $('reminderLabel').value.trim()) || '';
-          var date = ($('reminderDate') && $('reminderDate').value) || '';
-          var interval = parseInt(($('reminderInterval') && $('reminderInterval').value) || '30');
-          if (!label || !date) { toast('Заповніть поля', 'error'); return; }
-          var reminders = (currentPet && currentPet.reminders) || [];
-          reminders.push({ label: label, nextDate: date, intervalDays: interval });
-          savePetProfile({ reminders: reminders }).then(function() { closeSheet(); restoreSheetContent(); });
-        });
-      }
-    });
-
-    // Backdrop click
-    var backdrop = document.createElement('div');
-    backdrop.className = 'sheet-bg';
-    backdrop.style.position = 'absolute';
-    backdrop.style.inset = '0';
-    backdrop.addEventListener('click', function() { closeSheet(); restoreSheetContent(); });
-    sheetContent.parentNode.insertBefore(backdrop, sheetContent);
-  }
-
-  function restoreSheetContent() {
-    // Restore original sheet HTML
-    var sheet = $('eventSheet');
-    if (!sheet) return;
-    var existingBg = sheet.querySelector('.sheet-bg:not(#sheetBackdrop)');
-    if (existingBg) existingBg.remove();
-    var sheetContent = sheet.querySelector('.sheet-content');
-    sheetContent.innerHTML = '<div class="sheet-handle"></div><h3>Нова подія</h3><div class="sheet-categories" id="sheetCategories"></div><div class="sheet-events" id="sheetEvents"></div><div id="sheetExtraFields" class="sheet-extra hidden"><div class="form-grid"><div class="field" id="valueField" style="display:none"><label for="eventValue">Значення</label><input id="eventValue" type="number" step="0.1" placeholder="0"></div><div class="field"><label for="eventTime">Час</label><input id="eventTime" type="time"></div><div class="field full"><label for="eventNote">Нотатка</label><textarea id="eventNote" rows="2" placeholder="Деталі..."></textarea></div></div><button class="btn btn-primary full-width" id="saveEventBtn" type="button">Зберегти</button></div>';
-    bindSaveEvent();
-  }
-
-  function bindSaveEvent() {
-    var saveBtn = $('saveEventBtn');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', function() {
-        if (!selectedEventType) { toast('Оберіть тип', 'error'); return; }
-        var payload = { eventType: selectedEventType, timeLabel: ($('eventTime') && $('eventTime').value) || nowTime(), note: ($('eventNote') && $('eventNote').value && $('eventNote').value.trim()) || '' };
-        var val = $('eventValue') && $('eventValue').value; if (val) payload.value = parseFloat(val);
-        addEvent(payload).then(function() {
-          if (['meal_morning', 'meal_day', 'meal_evening'].indexOf(payload.eventType) >= 0) scheduleLocalReminder(20, '🚽 Горшик!', 'Після їжі — час на пелюшку!');
-          if (payload.eventType === 'sleep') scheduleLocalReminder(5, '🚽 Прокинувся!', 'Одразу на пелюшку!');
-          if ($('eventNote')) $('eventNote').value = '';
-          if ($('eventValue')) $('eventValue').value = '';
-          closeSheet();
-        });
-      });
-    }
-  }
-
-  // ===== PHOTO UPLOAD =====
-  function initPhotoUpload() {
-    var photoUpload = $('petPhotoUpload');
-    var photoInput = $('petPhotoInput');
-    if (!photoUpload || !photoInput) return;
-
-    photoUpload.addEventListener('click', function() { photoInput.click(); });
-    photoInput.addEventListener('change', function(e) {
-      var file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 500000) { toast('Фото завелике (макс 500KB)', 'error'); return; }
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        var img = new Image();
-        img.onload = function() {
-          // Resize to 200x200
-          var canvas = document.createElement('canvas');
-          canvas.width = 200; canvas.height = 200;
-          var ctx = canvas.getContext('2d');
-          var size = Math.min(img.width, img.height);
-          var sx = (img.width - size) / 2, sy = (img.height - size) / 2;
-          ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
-          var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          savePetProfile({ photo: dataUrl }).then(function() { renderPetPhoto(); });
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function renderPetPhoto() {
-    var container = $('petPhotoUpload');
-    if (!container) return;
-    var photo = currentPet && currentPet.photo;
-    if (photo) {
-      container.innerHTML = '<img src="' + photo + '" alt="Фото песика"><div class="photo-overlay">📷 Змінити</div><input type="file" id="petPhotoInput" accept="image/*">';
-    } else {
-      container.innerHTML = '<div class="photo-placeholder">🐕</div><div class="photo-overlay">📷 Додати</div><input type="file" id="petPhotoInput" accept="image/*">';
-    }
-    initPhotoUpload();
-
-    // Also update pet card
-    var petEmoji = document.querySelector('.pet-emoji');
-    if (petEmoji && photo) {
-      petEmoji.innerHTML = '<img src="' + photo + '" class="pet-photo" alt="">';
-    } else if (petEmoji) {
-      petEmoji.textContent = '🐾';
-    }
-  }
-
-  // ===== PULL TO REFRESH =====
-  function initPullToRefresh() {
-    var indicator = $('ptrIndicator');
-    if (!indicator) return;
-    var startY = 0, pullDistance = 0, isPulling = false, threshold = 80;
-
-    var main = document.querySelector('.main');
-    if (!main) return;
-
-    main.addEventListener('touchstart', function(e) {
-      if (window.scrollY === 0 && activeTab === 'tabHome') {
-        startY = e.touches[0].clientY;
-        isPulling = true;
-      }
-    }, { passive: true });
-
-    main.addEventListener('touchmove', function(e) {
-      if (!isPulling) return;
-      pullDistance = e.touches[0].clientY - startY;
-      if (pullDistance > 0 && pullDistance < 150) {
-        indicator.classList.add('visible');
-        if (pullDistance > threshold) {
-          indicator.classList.add('ready');
-        } else {
-          indicator.classList.remove('ready');
-        }
-      }
-    }, { passive: true });
-
-    main.addEventListener('touchend', function() {
-      if (!isPulling) return;
-      isPulling = false;
-      if (pullDistance > threshold) {
-        indicator.classList.add('refreshing');
-        indicator.classList.remove('ready');
-        // Refresh data
-        queueRender();
-        setTimeout(function() {
-          indicator.classList.remove('visible', 'refreshing');
-          toast('Оновлено ✓', 'success');
-        }, 800);
-      } else {
-        indicator.classList.remove('visible', 'ready');
-      }
-      pullDistance = 0;
-    });
+  // ===== EXPORT =====
+  function exportData() {
+    if (!eventsState.length) { toast('Немає даних', 'error'); return; }
+    var data = { exportDate: new Date().toISOString(), pet: currentPet || {}, events: eventsState.map(function(e) { var ts = tsToDate(e.createdAt); return { type: e.eventType, time: ts ? ts.toISOString() : null, note: e.note, value: e.value }; }) };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'dogcoach_' + todayKey() + '.json'; a.click();
+    toast('Експортовано ✓', 'success');
   }
 
   // ===== ONBOARDING =====
@@ -1283,145 +1093,85 @@ function renderDailyPlan() {
     $('obFinish') && $('obFinish').addEventListener('click', function() {
       showLoading();
       savePetProfile({ name: $('obName').value.trim(), birthDate: $('obBirthDate').value, sex: $('obSex').value, breed: $('obBreed').value.trim() }).then(function() {
-        localStorage.setItem('dc_onboarded', 'true'); hideOnboarding(); toast(($('obName').value.trim()) + ' додано! 🎉', 'success'); showConfetti(); queueRender();
-      }).catch(function() { toast('Помилка', 'error'); }).finally(function() { hideLoading(); });
+        localStorage.setItem('dc_onboarded', 'true'); hideOnboarding(); toast($('obName').value.trim() + ' додано! 🎉', 'success'); showConfetti(); queueRender();
+      }).catch(function() { toast('Помилка', 'error'); }).finally(hideLoading);
     });
   }
 
-  // ===== BIND ALL EVENTS =====
+  // ===== BIND EVENTS =====
   function bindEvents() {
     setTheme(themeMode);
-
-    // Online/offline
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     updateOnlineStatus();
 
-    // Theme toggle
     $$('[data-theme-toggle]').forEach(function(b) { b.addEventListener('click', function() { setTheme(themeMode === 'dark' ? 'light' : 'dark'); haptic(); }); });
-
-    // Auth
     $('googleLoginBtn') && $('googleLoginBtn').addEventListener('click', loginGoogle);
-    $('logoutBtn') && $('logoutBtn').addEventListener('click', function() { if (confirm('Вийти з акаунту?')) logout(); });
-
-    // Navigation
+    $('logoutBtn') && $('logoutBtn').addEventListener('click', function() { if (confirm('Вийти?')) logout(); });
     $$('.nav-item').forEach(function(b) { b.addEventListener('click', function() { setActiveTab(b.dataset.tab); haptic(); }); });
 
-    // FAB
     $('fabAddEvent') && $('fabAddEvent').addEventListener('click', function() { openSheet(); haptic(); });
     $('sheetBackdrop') && $('sheetBackdrop').addEventListener('click', closeSheet);
     $('showAllActionsBtn') && $('showAllActionsBtn').addEventListener('click', openSheet);
 
-    // Save event (initial binding)
-    bindSaveEvent();
+    $('saveEventBtn') && $('saveEventBtn').addEventListener('click', function() {
+      if (!selectedEventType) { toast('Оберіть тип', 'error'); return; }
+      var payload = { eventType: selectedEventType, timeLabel: ($('eventTime') && $('eventTime').value) || nowTime(), note: ($('eventNote') && $('eventNote').value && $('eventNote').value.trim()) || '' };
+      var val = $('eventValue') && $('eventValue').value; if (val) payload.value = parseFloat(val);
+      addEvent(payload).then(function() { if ($('eventNote')) $('eventNote').value = ''; if ($('eventValue')) $('eventValue').value = ''; closeSheet(); });
+    });
 
-    // Pet profile form
-    $('petProfileForm') && $('petProfileForm').addEventListener('submit', function(e) { e.preventDefault(); savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), weight: $('petWeight').value, toiletMode: $('petToiletMode').value, issues: ($('petIssues') && $('petIssues').value && $('petIssues').value.trim()) || '' }); });
+    // CLICKER & WHISTLE
+    $('clickerBtn') && $('clickerBtn').addEventListener('click', function() {
+      playClicker();
+      var count = parseInt(localStorage.getItem('dc_clicker_count') || '0') + 1;
+      localStorage.setItem('dc_clicker_count', String(count));
+      var el = $('clickerBtn'); if (el) { el.classList.add('clicked'); setTimeout(function() { el.classList.remove('clicked'); }, 200); }
+    });
+    $('whistleBtn') && $('whistleBtn').addEventListener('click', function() {
+      playWhistle();
+      var el = $('whistleBtn'); if (el) { el.classList.add('clicked'); setTimeout(function() { el.classList.remove('clicked'); }, 600); }
+    });
+
+    // Pet form
+    $('petProfileForm') && $('petProfileForm').addEventListener('submit', function(e) { e.preventDefault(); savePetProfile({ name: $('petName').value.trim(), birthDate: $('petBirthDate').value, sex: $('petSex').value, breed: $('petBreed').value.trim(), weight: $('petWeight').value, toiletMode: $('petToiletMode').value, issues: ($('petIssues') && $('petIssues').value.trim()) || '' }); });
     $('saveHealthBtn') && $('saveHealthBtn').addEventListener('click', function() { savePetProfile({ lastVaccine: $('petLastVaccine').value, lastDeworming: $('petLastDeworming').value, lastHeat: ($('petLastHeat') && $('petLastHeat').value) || '' }); });
     $('petSex') && $('petSex').addEventListener('change', function() { var f = $('heatDateField'); if (f) f.style.display = $('petSex').value === 'дівчинка' ? '' : 'none'; });
 
     // Diary filters
     $$('#diaryFilters .chip').forEach(function(btn) { btn.addEventListener('click', function() { currentDiaryFilter = btn.dataset.filter; $$('#diaryFilters .chip').forEach(function(b) { b.classList.toggle('active', b === btn); }); renderFeed('recentLogsDiary', currentDiaryFilter); haptic(); }); });
-
     // Course filters
     $$('#courseFilters [data-course-level]').forEach(function(btn) { btn.addEventListener('click', function() { currentCourseLevel = btn.dataset.courseLevel; $$('#courseFilters [data-course-level]').forEach(function(b) { b.classList.toggle('active', b === btn); }); renderCourses(); haptic(); }); });
 
-    // Invite / workspace
-    $('copyInviteBtn') && $('copyInviteBtn').addEventListener('click', function() { if (!workspaceData || !workspaceData.inviteCode) return; navigator.clipboard.writeText(workspaceData.inviteCode).then(function() { toast('Скопійовано ✓', 'success'); haptic(); }).catch(function() { toast('Помилка', 'error'); }); });
+    // Workspace
+    $('copyInviteBtn') && $('copyInviteBtn').addEventListener('click', function() { if (!workspaceData || !workspaceData.inviteCode) return; navigator.clipboard.writeText(workspaceData.inviteCode).then(function() { toast('Скопійовано ✓', 'success'); haptic(); }); });
     $('joinWorkspaceForm') && $('joinWorkspaceForm').addEventListener('submit', function(e) { e.preventDefault(); joinWorkspaceByInvite($('inviteCodeInput').value).then(function() { $('inviteCodeInput').value = ''; toast('Приєдналися! 🎉', 'success'); }).catch(function(err) { toast(err.message, 'error'); }); });
 
-    // AI Chat
+    // AI
     $('aiForm') && $('aiForm').addEventListener('submit', function(e) { e.preventDefault(); var input = $('aiInput'); var msg = input.value.trim(); if (!msg) return; input.value = ''; input.style.height = 'auto'; handleAISubmit(msg); });
     $$('[data-ai-prompt]').forEach(function(b) { b.addEventListener('click', function() { handleAISubmit(b.dataset.aiPrompt); haptic(); }); });
-    $('clearChatBtn') && $('clearChatBtn').addEventListener('click', function() { var c = $('aiChat'); if (c) c.innerHTML = ''; haptic(); });
-
-    // AI Input auto-resize
+    $('clearChatBtn') && $('clearChatBtn').addEventListener('click', function() { var c = $('aiChat'); if (c) c.innerHTML = ''; });
     var aiInput = $('aiInput');
-    if (aiInput) {
-      aiInput.addEventListener('input', function() { aiInput.style.height = 'auto'; aiInput.style.height = Math.min(aiInput.scrollHeight, 100) + 'px'; });
-      aiInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('aiForm').dispatchEvent(new Event('submit')); } });
-    }
+    if (aiInput) { aiInput.addEventListener('input', function() { aiInput.style.height = 'auto'; aiInput.style.height = Math.min(aiInput.scrollHeight, 100) + 'px'; }); aiInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('aiForm').dispatchEvent(new Event('submit')); } }); }
 
-    // Weekly report close
+    // Weekly / Plan
     $('closeWeeklyBtn') && $('closeWeeklyBtn').addEventListener('click', function() { hide($('weeklyReport')); localStorage.setItem('dc_weekly_dismissed', todayKey()); });
     $('refreshPlanBtn') && $('refreshPlanBtn').addEventListener('click', function() { localStorage.removeItem('dc_aiplan'); generateAIPlan(); haptic(); });
 
-    // Push
+    // Push / Timer / Export
     $('enablePushBtn') && $('enablePushBtn').addEventListener('click', requestPushPermission);
-
-    // Reminders
-    $('addReminderBtn') && $('addReminderBtn').addEventListener('click', showAddReminderDialog);
-
-    // Timer
-    $('timerStartBtn') && $('timerStartBtn').addEventListener('click', function() {
-      if (timerRunning) { stopTimer(); updateTimerDisplay(); }
-      else {
-        var mins = parseInt($('timerMinutes') && $('timerMinutes').value) || 60;
-        startTimer(mins * 60);
-      }
-      haptic();
-    });
-    $('timerResetBtn') && $('timerResetBtn').addEventListener('click', function() { resetTimer(); haptic(); });
-
-    // Timer presets
-    $$('[data-timer-preset]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var mins = parseInt(btn.dataset.timerPreset);
-        if (mins) startTimer(mins * 60);
-        haptic();
-      });
-    });
-
-    // Export
     $('exportDataBtn') && $('exportDataBtn').addEventListener('click', exportData);
+    $('timerStartBtn') && $('timerStartBtn').addEventListener('click', function() { if (timerRunning) { stopTimer(); } else { startTimer((timerTotal || 60) * (timerTotal ? 1 : 60)); } haptic(); });
+    $('timerResetBtn') && $('timerResetBtn').addEventListener('click', function() { resetTimer(); haptic(); });
+    $$('[data-timer-preset]').forEach(function(btn) { btn.addEventListener('click', function() { startTimer(parseInt(btn.dataset.timerPreset) * 60); haptic(); }); });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeSheet();
-      // Ctrl+1-4 for tabs
-      if (e.ctrlKey && e.key === '1') setActiveTab('tabHome');
-      if (e.ctrlKey && e.key === '2') setActiveTab('tabDiary');
-      if (e.ctrlKey && e.key === '3') setActiveTab('tabCourses');
-      if (e.ctrlKey && e.key === '4') setActiveTab('tabProfile');
-    });
+    // Keyboard
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSheet(); });
+    // Resize
+    var rt; window.addEventListener('resize', function() { clearTimeout(rt); rt = setTimeout(function() { if (activeTab === 'tabDiary') renderChart('progressChartDiary'); }, 200); });
 
-    // Resize for charts
-    var rt;
-    window.addEventListener('resize', function() { clearTimeout(rt); rt = setTimeout(function() { if (activeTab === 'tabDiary') renderChart('progressChartDiary'); }, 200); });
-
-    // Touch swipe for sheet close
-    var sheetContent = document.querySelector('.sheet-content');
-    if (sheetContent) {
-      var sheetStartY = 0, sheetDragging = false;
-      sheetContent.addEventListener('touchstart', function(e) {
-        if (sheetContent.scrollTop === 0) { sheetStartY = e.touches[0].clientY; sheetDragging = true; }
-      }, { passive: true });
-      sheetContent.addEventListener('touchmove', function(e) {
-        if (!sheetDragging) return;
-        var diff = e.touches[0].clientY - sheetStartY;
-        if (diff > 100) { closeSheet(); sheetDragging = false; }
-      }, { passive: true });
-      sheetContent.addEventListener('touchend', function() { sheetDragging = false; });
-    }
-
-    // Bind onboarding
     bindOnboarding();
-
-    // Voice input
     initVoiceInput();
-
-    // Photo upload
-    initPhotoUpload();
-
-    // Pull to refresh
-    initPullToRefresh();
-
-    // Auto dark mode sync
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-      if (!localStorage.getItem('dc_theme')) {
-        setTheme(e.matches ? 'dark' : 'light');
-      }
-    });
   }
 
   // ===== BOOT =====
@@ -1432,22 +1182,16 @@ function renderDailyPlan() {
       hide($('authScreen')); showLoading();
       ensureWorkspaceForUser(currentUser).then(function() {
         subscribePet(); subscribeMembers(); subscribeEvents();
-        return new Promise(function(resolve) {
-          var unsub = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(s) {
-            currentPet = s.exists ? s.data() : null; unsub(); resolve();
-          });
-        });
+        return new Promise(function(resolve) { var unsub = db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').onSnapshot(function(s) { currentPet = s.exists ? s.data() : null; unsub(); resolve(); }); });
       }).then(function() {
         if (checkOnboarding()) { hideLoading(); showOnboarding(); }
-        else { show($('appContent')); hideLoading(); queueRender(); renderPetPhoto(); }
+        else { show($('appContent')); hideLoading(); queueRender(); }
         if ('Notification' in window && Notification.permission === 'granted') subscribeToPush();
-      }).catch(function(e) { console.error('Boot:', e); toast('Помилка завантаження', 'error'); hideLoading(); show($('authScreen')); });
+      }).catch(function(e) { console.error('Boot:', e); toast('Помилка', 'error'); hideLoading(); show($('authScreen')); });
     });
   }
 
-  // ===== INIT =====
   bindEvents();
   bootAuth();
-  auth.getRedirectResult().then(function(r) { if (r && r.user) console.log('Redirect auth OK'); }).catch(function(e) { if (e.code && e.code !== 'auth/no-auth-event') toast('Помилка входу', 'error'); });
-
+  auth.getRedirectResult().catch(function(e) { if (e.code && e.code !== 'auth/no-auth-event') toast('Помилка входу', 'error'); });
 })();

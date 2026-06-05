@@ -33,13 +33,13 @@
     {
       "source": "/(.+\\.js)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
     },
     {
       "source": "/(.+\\.css)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
     },
     {
@@ -50,7 +50,7 @@
       ]
     },
     {
-      "source": "/icons/(.*)",
+      "source": "/assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=2592000" }
       ]

@@ -1,29 +1,22 @@
-import admin from 'firebase-admin';
-
-// Init Firebase Admin (для відправки FCM)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'dogs-55f5e',
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
-const messaging = admin.messaging();
+import { getAdmin } from './_firebase-admin.js';
 
 export default async function handler(req, res) {
   // Verify cron secret (security)
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
+    const admin = getAdmin();
+    const db = admin.firestore();
+    const messaging = admin.messaging();
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
+    const today = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-');
     const notifications = [];
 
     // Get all workspaces with push tokens
@@ -95,7 +88,7 @@ export default async function handler(req, res) {
           token: notif.token,
           notification: { title: notif.title, body: notif.body },
           webpush: {
-            notification: { icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', vibrate: [100, 50, 100] },
+            notification: { icon: '/assets/icon-192.png', badge: '/assets/icon-192.png', vibrate: [100, 50, 100] },
             fcmOptions: { link: '/' }
           }
         });

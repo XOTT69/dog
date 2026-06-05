@@ -2,8 +2,13 @@ export const config = {
   runtime: "nodejs"
 };
 
-function json(res, status, data) {
-  return res.status(status).json(data);
+import { json, verifyAuthHeader } from './_firebase-admin.js';
+
+function setCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 const PROVIDERS = {
@@ -132,15 +137,14 @@ async function callProvider(cfg, messages, options) {
 }
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
 
   try {
+    await verifyAuthHeader(req);
+
     const {
       model,
       messages,
@@ -225,6 +229,9 @@ export default async function handler(req, res) {
       tried: model
     });
   } catch (error) {
+    if (error.statusCode) {
+      return json(res, error.statusCode, { error: error.message });
+    }
     if (error.name === "AbortError") {
       return json(res, 504, { error: "Request timeout (25s)" });
     }

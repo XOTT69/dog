@@ -12,7 +12,7 @@
   "categories": ["productivity", "lifestyle", "education"],
   "screenshots": [
     {
-      "src": "/icons/icon-512.png",
+      "src": "/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow"
@@ -20,13 +20,13 @@
   ],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -38,7 +38,7 @@
       "short_name": "Запис",
       "description": "Додати подію",
       "url": "/?action=add",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -2,14 +2,19 @@
  * @fileoverview Application entry point — boots auth, binds global events, coordinates modules
  */
 
-import { state, batch, subscribe, persistTheme } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers } from './firebase.js';
+import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
 import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { playClicker, playWhistle, unlock as unlockAudio } from './audio.js';
 import { preloadAll } from './content-loader.js';
-import { $, $$, haptic, show, hide } from './utils.js';
-import { STORAGE_KEYS } from './state.js';
+import { haptic } from './utils.js';
+import { showConfetti } from './achievements.js';
+
+const $ = (id) => document.getElementById(id);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+const show = (el) => el?.classList.remove('hidden');
+const hide = (el) => el?.classList.add('hidden');
 
 // ===== BOOT =====
 
@@ -57,7 +62,6 @@ function initAuthFlow() {
 
         // Subscribe push if allowed
         if ('Notification' in window && Notification.permission === 'granted') {
-          const { subscribePush } = await import('./firebase.js');
           subscribePush();
         }
       }
@@ -77,15 +81,22 @@ function waitForData() {
   return new Promise((resolve) => {
     let resolved = false;
 
-    const unsub = subscribe(['pet', 'events'], () => {
-      if (!state.pet.loading || !state.events.loading) {
-        if (!resolved) { resolved = true; unsub(); resolve(); }
+    const check = () => {
+      if (!resolved && (!state.pet.loading || !state.events.loading)) {
+        resolved = true;
+        resolve();
       }
-    });
+    };
+
+    const unsub = subscribe(['pet', 'events'], check);
 
     // Fallback timeout
     setTimeout(() => {
-      if (!resolved) { resolved = true; unsub(); resolve(); }
+      if (!resolved) {
+        resolved = true;
+        unsub();
+        resolve();
+      }
     }, 3000);
   });
 }
@@ -114,25 +125,33 @@ function showOnboarding() {
 
 function setOnboardingStep(step) {
   $$('.onboarding-step').forEach(s => s.classList.add('hidden'));
-  show($(`onboardingStep${step}`));
+  const stepEl = $(`onboardingStep${step}`);
+  if (stepEl) stepEl.classList.remove('hidden');
   $$('.ob-dot').forEach(d => d.classList.toggle('active', parseInt(d.dataset.step) === step));
 }
 
 function bindOnboarding() {
   $('obNext1')?.addEventListener('click', () => {
-    if (!$('obName')?.value.trim()) { toast("Введіть ім'я 🐾", 'error'); return; }
+    if (!$('obName')?.value.trim()) {
+      toast("Введіть ім'я 🐾", 'error');
+      return;
+    }
     setOnboardingStep(2);
     haptic();
   });
 
   $('obBack2')?.addEventListener('click', () => setOnboardingStep(1));
-  $('obNext2')?.addEventListener('click', () => { setOnboardingStep(3); haptic(); });
+
+  $('obNext2')?.addEventListener('click', () => {
+    setOnboardingStep(3);
+    haptic();
+  });
+
   $('obBack3')?.addEventListener('click', () => setOnboardingStep(2));
 
   $('obFinish')?.addEventListener('click', async () => {
     showLoading();
     try {
-      const { savePetProfile } = await import('./firebase.js');
       await savePetProfile({
         name: $('obName')?.value.trim() || '',
         birthDate: $('obBirthDate')?.value || '',
@@ -144,11 +163,13 @@ function bindOnboarding() {
       hide($('onboardingScreen'));
       show($('appContent'));
       toast(`${$('obName')?.value.trim()} додано! 🎉`, 'success');
-
-      const { showConfetti } = await import('./achievements.js');
       showConfetti();
       scheduleRender();
-    } catch {
+
+      // Preload content
+      setTimeout(() => preloadAll(), 500);
+    } catch (e) {
+      console.error('[Onboarding] Error:', e);
       toast('Помилка', 'error');
     } finally {
       hideLoading();
@@ -156,11 +177,45 @@ function bindOnboarding() {
   });
 }
 
+// ===== SHEET =====
+
+async function openSheet() {
+  const sheetEl = $('eventSheet');
+  if (sheetEl) sheetEl.classList.remove('hidden');
+  state.ui.sheetOpen = true;
+  state.ui.selectedEventType = null;
+  state.ui.selectedSheetCategory = 'toilet';
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const sheetModule = await import('./renders/sheet.js');
+    sheetModule.render();
+  } catch (e) {
+    console.error('[Sheet] Load error:', e);
+  }
+}
+
+async function closeSheet() {
+  try {
+    const sheetModule = await import('./renders/sheet.js');
+    sheetModule.closeSheet();
+  } catch (e) {
+    // Fallback: close manually
+    hide($('eventSheet'));
+    state.ui.sheetOpen = false;
+    document.body.style.overflow = '';
+  }
+}
+
 // ===== GLOBAL EVENTS =====
 
 function bindGlobalEvents() {
   // Audio unlock on first touch (iOS PWA)
-  const unlockHandler = () => { unlockAudio(); document.removeEventListener('touchstart', unlockHandler); document.removeEventListener('click', unlockHandler); };
+  const unlockHandler = () => {
+    unlockAudio();
+    document.removeEventListener('touchstart', unlockHandler);
+    document.removeEventListener('click', unlockHandler);
+  };
   document.addEventListener('touchstart', unlockHandler, { once: true });
   document.addEventListener('click', unlockHandler, { once: true });
 
@@ -176,10 +231,14 @@ function bindGlobalEvents() {
     haptic();
   }));
 
-  // Auth buttons
+  // Auth
   $('googleLoginBtn')?.addEventListener('click', async () => {
     showLoading();
-    try { await loginGoogle(); } catch (e) { toast(e.message || 'Помилка', 'error'); }
+    try {
+      await loginGoogle();
+    } catch (e) {
+      toast(e.message || 'Помилка входу', 'error');
+    }
     hideLoading();
   });
 
@@ -199,22 +258,45 @@ function bindGlobalEvents() {
   }));
 
   // FAB
-  $('fabAddEvent')?.addEventListener('click', () => { openSheet(); haptic(); });
-  $('sheetBackdrop')?.addEventListener('click', closeSheet);
-  $('showAllActionsBtn')?.addEventListener('click', openSheet);
+  $('fabAddEvent')?.addEventListener('click', () => {
+    openSheet();
+    haptic();
+  });
 
-  // Clicker
+  // Sheet backdrop
+  $('sheetBackdrop')?.addEventListener('click', closeSheet);
+
+  // "More actions" button
+  $('showAllActionsBtn')?.addEventListener('click', () => {
+    openSheet();
+    haptic();
+  });
+
+  // Clicker & Whistle
   bindClickerEvents();
 
   // Timer
-  $('timerStartBtn')?.addEventListener('click', () => { toggleTimer(); haptic(); });
-  $('timerResetBtn')?.addEventListener('click', () => { resetTimer(); haptic(); });
+  $('timerStartBtn')?.addEventListener('click', () => {
+    toggleTimer();
+    haptic();
+  });
+
+  $('timerResetBtn')?.addEventListener('click', () => {
+    resetTimer();
+    haptic();
+  });
+
   $$('[data-timer-preset]').forEach(btn => {
-    btn.addEventListener('click', () => { startTimer(parseInt(btn.dataset.timerPreset) * 60); haptic(); });
+    btn.addEventListener('click', () => {
+      startTimer(parseInt(btn.dataset.timerPreset) * 60);
+      haptic();
+    });
   });
 
   // Keyboard
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSheet();
+  });
 
   // Resize → re-render chart
   let resizeTimeout;
@@ -222,7 +304,9 @@ function bindGlobalEvents() {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       if (state.ui.activeTab === 'tabDiary') {
-        import('./renders/diary.js').then(m => m.invalidateChart());
+        import('./renders/diary.js').then(m => {
+          if (m.invalidateChart) m.invalidateChart();
+        }).catch(() => {});
       }
     }, 200);
   });
@@ -279,8 +363,11 @@ function bindClickerEvents() {
       clickerBtn.classList.add('clicked');
       setTimeout(() => clickerBtn.classList.remove('clicked'), 150);
     };
+
     clickerBtn.addEventListener('touchend', handleClicker);
-    clickerBtn.addEventListener('click', (e) => { if (!('ontouchend' in window)) handleClicker(e); });
+    clickerBtn.addEventListener('click', (e) => {
+      if (!('ontouchend' in window)) handleClicker(e);
+    });
   }
 
   if (whistleBtn) {
@@ -290,38 +377,21 @@ function bindClickerEvents() {
       whistleBtn.classList.add('clicked');
       setTimeout(() => whistleBtn.classList.remove('clicked'), 500);
     };
+
     whistleBtn.addEventListener('touchend', handleWhistle);
-    whistleBtn.addEventListener('click', (e) => { if (!('ontouchend' in window)) handleWhistle(e); });
+    whistleBtn.addEventListener('click', (e) => {
+      if (!('ontouchend' in window)) handleWhistle(e);
+    });
   }
 }
-
-// ===== SHEET =====
-
-function openSheet() {
-  show($('eventSheet'));
-  state.ui.sheetOpen = true;
-  state.ui.selectedEventType = null;
-  state.ui.selectedSheetCategory = 'toilet';
-  document.body.style.overflow = 'hidden';
-
-  import('./renders/sheet.js').then(m => m.render());
-}
-
-function closeSheet() {
-  hide($('eventSheet'));
-  state.ui.sheetOpen = false;
-  document.body.style.overflow = '';
-}
-
-// Export for sheet module
-export { closeSheet };
 
 // ===== THEME =====
 
 function applyTheme() {
-  document.documentElement.setAttribute('data-theme', state.ui.theme);
+  const theme = state.ui.theme;
+  document.documentElement.setAttribute('data-theme', theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = state.ui.theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
+  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
 }
 
 // ===== ONLINE STATUS =====

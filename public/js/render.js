@@ -3,16 +3,15 @@
  */
 
 import { state, subscribe } from './state.js';
-import { $ } from './utils.js';
+import { weekLabel, getAgeInWeeks, avatarLetter, escapeHtml } from './utils.js';
+
+const $ = (id) => document.getElementById(id);
 
 // Lazy-loaded render modules
 let homeRenderer = null;
 let diaryRenderer = null;
 let coursesRenderer = null;
 let profileRenderer = null;
-
-/** @type {Set<string>} */
-const dirtyTabs = new Set(['tabHome', 'tabDiary', 'tabCourses', 'tabProfile']);
 
 /** @type {boolean} */
 let renderScheduled = false;
@@ -26,26 +25,19 @@ let renderScheduled = false;
 export function setActiveTab(tabId) {
   state.ui.activeTab = tabId;
 
-  // Toggle tab panels
   document.querySelectorAll('.tab').forEach(panel => {
     panel.classList.toggle('active', panel.id === tabId);
   });
 
-  // Toggle nav items
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
   });
 
-  // Show/hide FAB
   const fab = $('fabAddEvent');
-  if (fab) {
-    fab.classList.toggle('hidden', tabId === 'tabProfile');
-  }
+  if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile');
 
-  // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Render active tab immediately
   renderActiveTab();
 }
 
@@ -55,7 +47,6 @@ export function setActiveTab(tabId) {
  * Schedule a render for the active tab (batched via rAF)
  */
 export function scheduleRender() {
-  dirtyTabs.add(state.ui.activeTab);
   if (renderScheduled) return;
   renderScheduled = true;
   requestAnimationFrame(() => {
@@ -70,43 +61,45 @@ export function scheduleRender() {
 async function renderActiveTab() {
   const tab = state.ui.activeTab;
 
-  // Always render header (lightweight)
+  // Always render header (lightweight, sync)
   renderHeader();
 
-  switch (tab) {
-    case 'tabHome':
-      if (!homeRenderer) {
-        homeRenderer = await import('./renders/home.js');
-      }
-      homeRenderer.render();
-      break;
+  try {
+    switch (tab) {
+      case 'tabHome':
+        if (!homeRenderer) {
+          homeRenderer = await import('./renders/home.js');
+        }
+        homeRenderer.render();
+        break;
 
-    case 'tabDiary':
-      if (!diaryRenderer) {
-        diaryRenderer = await import('./renders/diary.js');
-      }
-      diaryRenderer.render();
-      break;
+      case 'tabDiary':
+        if (!diaryRenderer) {
+          diaryRenderer = await import('./renders/diary.js');
+        }
+        diaryRenderer.render();
+        break;
 
-    case 'tabCourses':
-      if (!coursesRenderer) {
-        coursesRenderer = await import('./renders/courses.js');
-      }
-      coursesRenderer.render();
-      break;
+      case 'tabCourses':
+        if (!coursesRenderer) {
+          coursesRenderer = await import('./renders/courses.js');
+        }
+        coursesRenderer.render();
+        break;
 
-    case 'tabProfile':
-      if (!profileRenderer) {
-        profileRenderer = await import('./renders/profile.js');
-      }
-      profileRenderer.render();
-      break;
+      case 'tabProfile':
+        if (!profileRenderer) {
+          profileRenderer = await import('./renders/profile.js');
+        }
+        profileRenderer.render();
+        break;
+    }
+  } catch (e) {
+    console.error('[Render] Failed to load tab module:', tab, e);
   }
-
-  dirtyTabs.delete(tab);
 }
 
-// ===== HEADER (always visible) =====
+// ===== HEADER (sync, no await) =====
 
 function renderHeader() {
   const pet = state.pet.data;
@@ -117,23 +110,25 @@ function renderHeader() {
   const avatarEl = $('userAvatar');
   const streakBadge = $('streakBadge');
   const streakCount = $('streakCount');
+  const profileName = $('profileName');
+  const profileMeta = $('profileMeta');
 
-  if (nameEl) {
-    nameEl.textContent = pet?.name?.trim() || 'Песик';
-  }
+  const petName = pet?.name?.trim() || 'Песик';
+  const weeks = getAgeInWeeks(pet?.birthDate);
+  const ageStr = weekLabel(weeks);
 
-  if (subEl) {
-    const { weekLabel, getAgeInWeeks } = await import('./utils.js');
-    const weeks = getAgeInWeeks(pet?.birthDate);
-    subEl.textContent = `${weekLabel(weeks)} · Горшик`;
+  if (nameEl) nameEl.textContent = petName;
+  if (subEl) subEl.textContent = `${ageStr} · ${pet?.breed || 'Песик'}`;
+  if (profileName) profileName.textContent = petName;
+  if (profileMeta) {
+    profileMeta.textContent = [pet?.breed || '', ageStr, pet?.sex || ''].filter(Boolean).join(' · ');
   }
 
   if (avatarEl) {
     if (user?.photoURL) {
-      avatarEl.innerHTML = `<img src="${user.photoURL}" alt="" loading="lazy">`;
+      avatarEl.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="" loading="lazy">`;
     } else {
-      const { avatarLetter } = await import('./utils.js');
-      avatarEl.textContent = avatarLetter(user?.displayName || pet?.name);
+      avatarEl.textContent = avatarLetter(user?.displayName || petName);
     }
   }
 
@@ -154,7 +149,7 @@ function renderHeader() {
 /**
  * Show toast notification
  * @param {string} msg
- * @param {'success'|'error'|''} type
+ * @param {'success'|'error'|''} [type]
  * @param {Function} [undoCallback]
  */
 export function toast(msg, type = '', undoCallback = null) {
@@ -188,16 +183,17 @@ export function toast(msg, type = '', undoCallback = null) {
 // ===== LOADING =====
 
 export function showLoading() {
-  $('loadingOverlay')?.classList.remove('hidden');
+  const el = $('loadingOverlay');
+  if (el) el.classList.remove('hidden');
 }
 
 export function hideLoading() {
-  $('loadingOverlay')?.classList.add('hidden');
+  const el = $('loadingOverlay');
+  if (el) el.classList.add('hidden');
 }
 
 // ===== SUBSCRIBE TO STATE =====
 
-// Re-render when state changes
 subscribe(['events', 'pet', 'gamification'], () => {
   scheduleRender();
 });

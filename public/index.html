@@ -13,7 +13,6 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐕</text></svg>">
   <link rel="apple-touch-icon" href="/assets/icon-192.png">
 
-  <!-- Critical CSS (inline for fast FCP) -->
   <style>
     body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#f8f9fa;color:#1a1a2e}
     .auth-screen{min-height:100dvh;display:grid;place-items:center;padding:2rem}
@@ -32,17 +31,11 @@
 
   <link rel="stylesheet" href="/styles.css">
 
-  <!-- Firebase Modular SDK via importmap -->
-  <script type="importmap">
-  {
-    "imports": {
-      "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
-      "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
-      "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js",
-      "firebase/messaging": "https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging.js"
-    }
-  }
-  </script>
+  <!-- Firebase Compat SDK (works without bundler) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
 
   <!-- App entry point -->
   <script type="module" src="/js/main.js"></script>
@@ -140,12 +133,11 @@
       </div>
     </header>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN -->
     <main class="main">
 
       <!-- ===== HOME TAB ===== -->
       <section id="tabHome" class="tab active">
-        <!-- Hero / Pet Card -->
         <div class="pet-card">
           <div class="pet-emoji">🐾</div>
           <div class="pet-info">
@@ -154,7 +146,6 @@
           </div>
         </div>
 
-        <!-- Streak -->
         <div id="streakCard" class="streak-card hidden">
           <div class="streak-fire">🔥</div>
           <div class="streak-info">
@@ -163,7 +154,6 @@
           </div>
         </div>
 
-        <!-- Weekly Report -->
         <div id="weeklyReport" class="card weekly-report hidden">
           <div class="card-header">
             <h4>📊 Тижневий звіт</h4>
@@ -172,13 +162,11 @@
           <div id="weeklyContent"></div>
         </div>
 
-        <!-- Daily Tip -->
         <div class="suggestion-card">
           <div class="suggestion-badge">💡 Порада дня</div>
           <p id="dailyTipText">Завантаження...</p>
         </div>
 
-        <!-- AI Plan -->
         <div id="aiPlanCard" class="card ai-plan-card hidden">
           <div class="card-header">
             <h4>🧠 Персональний план</h4>
@@ -191,7 +179,6 @@
           </div>
         </div>
 
-        <!-- Stats KPIs -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-ring">
@@ -209,7 +196,6 @@
           <div class="stat-card"><div class="stat-number" id="kpiTotal">0</div><span class="stat-label">📊 Всього</span></div>
         </div>
 
-        <!-- Clicker & Whistle -->
         <h4 class="section-title">🎯 Інструменти тренера</h4>
         <div class="clicker-grid">
           <button type="button" class="clicker-btn clicker-blue" id="clickerBtn">
@@ -224,7 +210,6 @@
           </button>
         </div>
 
-        <!-- Timer -->
         <div class="timer-card" id="timerCard">
           <div class="timer-label">⏱️ Таймер горшика</div>
           <div class="timer-ring-container">
@@ -249,10 +234,8 @@
           </div>
         </div>
 
-        <!-- One-Tap Quick Actions -->
         <h4 class="section-title">⚡ Швидкий запис</h4>
         <div class="onetap-grid" id="onetapGrid">
-          <!-- Rendered by JS -->
           <div class="skeleton skeleton-row"></div>
           <div class="skeleton skeleton-row"></div>
           <div class="skeleton skeleton-row"></div>
@@ -260,7 +243,6 @@
         </div>
         <button class="btn btn-ghost full-width" id="showAllActionsBtn" type="button">Більше дій →</button>
 
-        <!-- Daily Plan -->
         <div class="card">
           <div class="card-header">
             <h4>📋 План на сьогодні</h4>
@@ -273,31 +255,18 @@
           </div>
         </div>
 
-        <!-- Breed Card (rendered by JS) -->
         <div class="card" id="breedCard" style="display:none"></div>
-
-        <!-- Problem Protocols -->
         <div class="card" id="problemCards" style="display:none"></div>
-
-        <!-- Recommended Courses -->
         <div class="card" id="recommendedCourses" style="display:none"></div>
-
-        <!-- First Days Guide -->
         <div class="card" id="firstDaysCard" style="display:none"></div>
-
-        <!-- Puppy Blues -->
         <div class="card" id="puppyBluesCard" style="display:none"></div>
-
-        <!-- Food Guide -->
         <div class="card" id="foodGuideCard" style="display:none"></div>
 
-        <!-- Achievements -->
         <div class="card">
           <h4 class="card-title">🏆 Досягнення</h4>
           <div id="achievementsGrid" class="achievements-grid"></div>
         </div>
 
-        <!-- Heatmap -->
         <div class="card">
           <h4 class="card-title">📅 Активність (28 днів)</h4>
           <div id="heatmapGrid" class="heatmap-grid"></div>
@@ -312,19 +281,16 @@
           </div>
         </div>
 
-        <!-- Reminders -->
         <div class="card" id="remindersCard" style="display:none">
           <h4 class="card-title">🔔 Нагадування</h4>
           <div id="remindersList"></div>
         </div>
 
-        <!-- Heat / Reproductive -->
         <div class="card" id="heatCard" style="display:none">
           <h4 class="card-title">🏥 Репродуктивне здоров'я</h4>
           <div id="heatInfo"></div>
         </div>
 
-        <!-- Age Focus -->
         <div class="card">
           <h4 class="card-title">🎯 Фокус по віку</h4>
           <div id="periodFocus">
@@ -337,7 +303,6 @@
       <!-- ===== DIARY TAB ===== -->
       <section id="tabDiary" class="tab">
         <h3 class="page-title">📈 Щоденник</h3>
-
         <div class="filter-row" id="diaryFilters">
           <button class="chip active" data-filter="all">Все</button>
           <button class="chip" data-filter="toilet">🚽 Горшик</button>
@@ -346,19 +311,14 @@
           <button class="chip" data-filter="health">🏥 Здоров'я</button>
           <button class="chip" data-filter="hygiene">🛁 Гігієна</button>
         </div>
-
         <div class="card">
           <h4 class="card-title">🚽 Горшик за 14 днів</h4>
           <canvas id="progressChartDiary" height="180" style="width:100%;display:block"></canvas>
         </div>
-
         <div class="card" id="weightCard">
           <h4 class="card-title">⚖️ Вага</h4>
-          <div id="weightHistory">
-            <div class="skeleton"></div>
-          </div>
+          <div id="weightHistory"><div class="skeleton"></div></div>
         </div>
-
         <h4 class="section-title">Історія подій</h4>
         <div id="recentLogsDiary" class="feed">
           <div class="skeleton skeleton-row"></div>
@@ -370,8 +330,6 @@
       <!-- ===== COURSES TAB ===== -->
       <section id="tabCourses" class="tab">
         <h3 class="page-title">🎓 Навчання</h3>
-
-        <!-- AI Chat -->
         <div class="card ai-section">
           <h4 class="card-title">🤖 AI Кінолог</h4>
           <div class="ai-prompts">
@@ -398,44 +356,32 @@
             <button class="btn btn-ghost btn-sm" id="clearChatBtn" type="button">Очистити чат</button>
           </form>
         </div>
-
-        <!-- Course Filters -->
         <div class="filter-row" id="courseFilters">
           <button class="chip active" data-course-level="all">Всі</button>
           <button class="chip" data-course-level="базовий">🟢 Базовий</button>
           <button class="chip" data-course-level="середній">🟡 Середній</button>
           <button class="chip" data-course-level="просунутий">🔴 Просунутий</button>
         </div>
-
         <div id="courseGrid" class="course-grid">
           <div class="skeleton skeleton-card"></div>
           <div class="skeleton skeleton-card"></div>
         </div>
         <div id="selectedCourse"></div>
-
         <h4 class="section-title mt-lg">📚 База знань</h4>
         <div id="knowledgeGrid" class="knowledge-grid">
           <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
         </div>
-
         <h4 class="section-title mt-lg">🌍 Соціалізація</h4>
         <div id="socialGrid" class="checklist-grid">
           <div class="skeleton skeleton-row"></div>
-          <div class="skeleton skeleton-row"></div>
         </div>
-
         <h4 class="section-title mt-lg">🚽 Алгоритм туалету</h4>
-        <div id="toiletGuide" class="knowledge-grid">
-          <div class="skeleton skeleton-card"></div>
-        </div>
+        <div id="toiletGuide" class="knowledge-grid"></div>
       </section>
 
       <!-- ===== PROFILE TAB ===== -->
       <section id="tabProfile" class="tab">
         <h3 class="page-title">👤 Профіль</h3>
-
-        <!-- Pet Data -->
         <div class="card">
           <h4 class="card-title">🐕 Дані собаки</h4>
           <form id="petProfileForm">
@@ -446,13 +392,11 @@
               <div class="field"><label for="petBreed">Порода</label><input id="petBreed" type="text" placeholder="Той-тер'єр"></div>
               <div class="field"><label for="petWeight">Вага (кг)</label><input id="petWeight" type="number" step="0.1" placeholder="3.5" min="0" max="150"></div>
               <div class="field"><label for="petToiletMode">Режим туалету</label><select id="petToiletMode"><option value="pad">🧻 Пелюшка</option><option value="outdoor">🌳 Вулиця</option><option value="transition">🔄 Перехід</option></select></div>
-              <div class="field full"><label for="petIssues">🐾 Проблеми / над чим працюємо</label><textarea id="petIssues" rows="3" placeholder="Кусається, гавкає, боїться пилососа, тягне повідок..." maxlength="500"></textarea></div>
+              <div class="field full"><label for="petIssues">🐾 Проблеми / над чим працюємо</label><textarea id="petIssues" rows="3" placeholder="Кусається, гавкає, боїться пилососа..." maxlength="500"></textarea></div>
             </div>
             <button class="btn btn-primary full-width" type="submit">Зберегти</button>
           </form>
         </div>
-
-        <!-- Health -->
         <div class="card">
           <h4 class="card-title">🏥 Здоров'я</h4>
           <div class="form-grid">
@@ -462,16 +406,12 @@
           </div>
           <button class="btn btn-primary full-width" id="saveHealthBtn" type="button">Зберегти здоров'я</button>
         </div>
-
-        <!-- Push Notifications -->
         <div class="card">
           <h4 class="card-title">📲 Сповіщення</h4>
           <p class="text-muted" style="margin-bottom:0.75rem">Нагадування навіть коли застосунок закритий.</p>
           <button class="btn btn-primary full-width" id="enablePushBtn" type="button">🔔 Увімкнути сповіщення</button>
           <p id="pushStatus" class="text-muted" style="margin-top:0.5rem"></p>
         </div>
-
-        <!-- Team -->
         <div class="card">
           <h4 class="card-title">👥 Команда</h4>
           <div class="invite-row">
@@ -485,8 +425,6 @@
           </form>
           <div id="membersList" class="members-list"></div>
         </div>
-
-        <!-- Export -->
         <div class="card">
           <h4 class="card-title">📦 Дані</h4>
           <button class="btn btn-ghost full-width" id="exportDataBtn" type="button">📥 Експорт даних (JSON)</button>
@@ -519,7 +457,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
 
-    <!-- EVENT SHEET (Bottom Sheet) -->
+    <!-- EVENT SHEET -->
     <div id="eventSheet" class="sheet hidden">
       <div id="sheetBackdrop" class="sheet-bg"></div>
       <div class="sheet-content">
@@ -551,10 +489,10 @@
   <!-- SERVICE WORKER -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      window.addEventListener('load', function() {
         navigator.serviceWorker.register('/sw.js')
-          .then(r => console.log('[SW] Scope:', r.scope))
-          .catch(e => console.warn('[SW] Error:', e));
+          .then(function(r) { console.log('[SW] Scope:', r.scope); })
+          .catch(function(e) { console.warn('[SW] Error:', e); });
       });
     }
   </script>

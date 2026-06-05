@@ -1,48 +1,24 @@
 /**
- * @fileoverview Firebase initialization with modular SDK + all Firestore operations
+ * @fileoverview Firebase operations using compat SDK (works without bundler)
+ * firebase global is loaded via <script> tags in index.html
  */
 
 import { state, batch } from './state.js';
 import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, VAPID_KEY } from './constants.js';
-import { tsToDate, nowTime, escapeHtml } from './utils.js';
-
-// ===== SDK Imports (from CDN via importmap in HTML) =====
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  signInWithRedirect, 
-  getRedirectResult,
-  GoogleAuthProvider, 
-  signOut 
-} from 'firebase/auth';
-import {
-  getFirestore,
-  doc, collection, collectionGroup,
-  getDoc, setDoc, addDoc, deleteDoc, updateDoc,
-  query, orderBy, limit, where, onSnapshot,
-  serverTimestamp, enableMultiTabIndexedDbPersistence,
-  Timestamp
-} from 'firebase/firestore';
-import { getMessaging, getToken } from 'firebase/messaging';
+import { nowTime } from './utils.js';
 
 // ===== INIT =====
-const app = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const app = firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Enable offline persistence
-enableMultiTabIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('[Firestore] Multiple tabs open, persistence enabled in first tab only');
-  } else if (err.code === 'unimplemented') {
-    console.warn('[Firestore] Browser does not support persistence');
-  }
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  console.warn('[Firestore] Persistence:', err.code);
 });
-
-const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // ===== Unsubscribe holders =====
 let unsubPet = null;
@@ -52,11 +28,11 @@ let unsubMembers = null;
 // ===== AUTH =====
 
 /**
- * Start auth state listener. Sets state.auth.user.
+ * Start auth state listener
  * @param {Function} onReady - Called once user state is determined
  */
 export function initAuth(onReady) {
-  onAuthStateChanged(auth, async (user) => {
+  auth.onAuthStateChanged((user) => {
     batch(() => {
       state.auth.user = user ? {
         uid: user.uid,
@@ -69,8 +45,7 @@ export function initAuth(onReady) {
     onReady(user);
   });
 
-  // Handle redirect result (for iOS PWA)
-  getRedirectResult(auth).catch((e) => {
+  auth.getRedirectResult().catch((e) => {
     if (e.code && e.code !== 'auth/no-auth-event') {
       console.error('[Auth] Redirect error:', e);
     }
@@ -82,10 +57,10 @@ export function initAuth(onReady) {
  */
 export async function loginGoogle() {
   try {
-    await signInWithPopup(auth, googleProvider);
+    await auth.signInWithPopup(googleProvider);
   } catch (e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      await signInWithRedirect(auth, googleProvider);
+      await auth.signInWithRedirect(googleProvider);
     } else {
       throw e;
     }
@@ -93,11 +68,11 @@ export async function loginGoogle() {
 }
 
 /**
- * Sign out and clean up subscriptions
+ * Sign out
  */
 export async function logout() {
   unsubAll();
-  await signOut(auth);
+  await auth.signOut();
   batch(() => {
     state.auth.user = null;
     state.workspace.id = null;
@@ -109,7 +84,7 @@ export async function logout() {
 }
 
 /**
- * Get current user's ID token for API calls
+ * Get current user's ID token
  * @returns {Promise<string>}
  */
 export async function getIdToken() {
@@ -121,34 +96,33 @@ export async function getIdToken() {
 // ===== WORKSPACE =====
 
 /**
- * Ensure user has a workspace (create if needed)
+ * Ensure user has a workspace
  * @param {Object} user - Firebase auth user
  */
 export async function ensureWorkspace(user) {
-  const userRef = doc(db, 'users', user.uid);
-  const userDoc = await getDoc(userRef);
+  const userDoc = await db.collection('users').doc(user.uid).get();
 
-  if (userDoc.exists() && userDoc.data().workspaceId) {
+  if (userDoc.exists && userDoc.data().workspaceId) {
     const wsId = userDoc.data().workspaceId;
     state.workspace.id = wsId;
-
-    const wsDoc = await getDoc(doc(db, 'workspaces', wsId));
-    state.workspace.data = wsDoc.exists() ? wsDoc.data() : null;
+    const wsDoc = await db.collection('workspaces').doc(wsId).get();
+    state.workspace.data = wsDoc.exists ? wsDoc.data() : null;
     return;
   }
 
   // Create new workspace
-  const wsRef = doc(collection(db, 'workspaces'));
+  const wsRef = db.collection('workspaces').doc();
   const inviteCode = generateInviteCode();
   const wsData = {
     name: (user.displayName || 'Мій').split(' ')[0],
     ownerId: user.uid,
     inviteCode,
-    createdAt: serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
-  await setDoc(wsRef, wsData);
-  await setDoc(userRef, {
+  await wsRef.set(wsData);
+
+  await db.collection('users').doc(user.uid).set({
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || '',
@@ -157,16 +131,16 @@ export async function ensureWorkspace(user) {
     workspaceId: wsRef.id,
   }, { merge: true });
 
-  await setDoc(doc(db, 'workspaces', wsRef.id, 'members', user.uid), {
+  await wsRef.collection('members').doc(user.uid).set({
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || '',
     photoURL: user.photoURL || '',
     role: 'owner',
-    createdAt: serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 
-  await setDoc(doc(db, 'workspaces', wsRef.id, 'dogs', 'primary'), {
+  await wsRef.collection('dogs').doc('primary').set({
     name: '',
     birthDate: '',
     sex: 'хлопчик',
@@ -174,8 +148,8 @@ export async function ensureWorkspace(user) {
     toiletMode: 'pad',
     weight: '',
     issues: '',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 
   state.workspace.id = wsRef.id;
@@ -184,71 +158,49 @@ export async function ensureWorkspace(user) {
 
 // ===== SUBSCRIPTIONS =====
 
-/**
- * Subscribe to real-time pet data
- */
 export function subscribePet() {
   if (unsubPet) unsubPet();
   const wsId = state.workspace.id;
   if (!wsId) return;
 
-  unsubPet = onSnapshot(
-    doc(db, 'workspaces', wsId, 'dogs', 'primary'),
-    (snap) => {
+  unsubPet = db.collection('workspaces').doc(wsId).collection('dogs').doc('primary')
+    .onSnapshot((snap) => {
       batch(() => {
-        state.pet.data = snap.exists() ? snap.data() : null;
+        state.pet.data = snap.exists ? snap.data() : null;
         state.pet.loading = false;
       });
-    },
-    (err) => console.error('[Firestore] Pet subscription error:', err)
-  );
+    }, (err) => console.error('[Firestore] Pet error:', err));
 }
 
-/**
- * Subscribe to real-time events
- */
 export function subscribeEvents() {
   if (unsubEvents) unsubEvents();
   const wsId = state.workspace.id;
   if (!wsId) return;
 
-  const q = query(
-    collection(db, 'workspaces', wsId, 'events'),
-    orderBy('createdAt', 'desc'),
-    limit(MAX_EVENTS_QUERY)
-  );
-
-  unsubEvents = onSnapshot(
-    q,
-    (snap) => {
+  unsubEvents = db.collection('workspaces').doc(wsId).collection('events')
+    .orderBy('createdAt', 'desc')
+    .limit(MAX_EVENTS_QUERY)
+    .onSnapshot((snap) => {
       const items = [];
       snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
       batch(() => {
         state.events.items = items;
         state.events.loading = false;
       });
-    },
-    (err) => console.error('[Firestore] Events subscription error:', err)
-  );
+    }, (err) => console.error('[Firestore] Events error:', err));
 }
 
-/**
- * Subscribe to workspace members
- */
 export function subscribeMembers() {
   if (unsubMembers) unsubMembers();
   const wsId = state.workspace.id;
   if (!wsId) return;
 
-  unsubMembers = onSnapshot(
-    collection(db, 'workspaces', wsId, 'members'),
-    (snap) => {
+  unsubMembers = db.collection('workspaces').doc(wsId).collection('members')
+    .onSnapshot((snap) => {
       const items = [];
       snap.forEach((d) => items.push(d.data()));
       state.members.items = items;
-    },
-    (err) => console.error('[Firestore] Members subscription error:', err)
-  );
+    }, (err) => console.error('[Firestore] Members error:', err));
 }
 
 function unsubAll() {
@@ -260,24 +212,21 @@ function unsubAll() {
 // ===== MUTATIONS =====
 
 /**
- * Save pet profile fields
- * @param {Object} payload - Fields to merge
+ * Save pet profile
+ * @param {Object} payload
  */
 export async function savePetProfile(payload) {
   const wsId = state.workspace.id;
   if (!wsId) throw new Error('No workspace');
 
-  await setDoc(
-    doc(db, 'workspaces', wsId, 'dogs', 'primary'),
-    { ...payload, updatedAt: serverTimestamp() },
-    { merge: true }
-  );
+  await db.collection('workspaces').doc(wsId).collection('dogs').doc('primary')
+    .set({ ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
 }
 
 /**
- * Add an event
- * @param {Object} payload - { eventType, note?, value?, timeLabel? }
- * @returns {Promise<string>} Document ID
+ * Add event
+ * @param {Object} payload
+ * @returns {Promise<string>} doc id
  */
 export async function addEvent(payload) {
   const wsId = state.workspace.id;
@@ -290,30 +239,27 @@ export async function addEvent(payload) {
     byName: user.displayName || 'Я',
     note: payload.note || '',
     timeLabel: payload.timeLabel || nowTime(),
-    createdAt: serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   if (payload.value != null) data.value = payload.value;
 
-  const docRef = await addDoc(
-    collection(db, 'workspaces', wsId, 'events'),
-    data
-  );
+  const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return docRef.id;
 }
 
 /**
- * Delete an event
+ * Delete event
  * @param {string} eventId
  */
 export async function deleteEvent(eventId) {
   const wsId = state.workspace.id;
   if (!wsId || !eventId) return;
-  await deleteDoc(doc(db, 'workspaces', wsId, 'events', eventId));
+  await db.collection('workspaces').doc(wsId).collection('events').doc(eventId).delete();
 }
 
 /**
- * Restore a deleted event
- * @param {Object} eventData - Original event data
+ * Restore deleted event
+ * @param {Object} eventData
  * @returns {Promise<string>}
  */
 export async function restoreEvent(eventData) {
@@ -326,45 +272,42 @@ export async function restoreEvent(eventData) {
     byName: eventData.byName || 'Я',
     note: eventData.note || '',
     timeLabel: eventData.timeLabel || '',
-    createdAt: serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   if (eventData.value != null) data.value = eventData.value;
 
-  const ref = await addDoc(collection(db, 'workspaces', wsId, 'events'), data);
+  const ref = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return ref.id;
 }
 
 // ===== PUSH =====
 
-/**
- * Subscribe to push notifications
- */
 export async function subscribePush() {
   try {
-    const messaging = getMessaging(app);
+    if (!firebase.messaging) return;
+    const messaging = firebase.messaging();
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return;
 
-    const token = await getToken(messaging, {
+    const token = await messaging.getToken({
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: reg,
     });
 
     if (token && state.workspace.id && state.auth.user) {
-      await updateDoc(
-        doc(db, 'workspaces', state.workspace.id, 'members', state.auth.user.uid),
-        { pushToken: token }
-      );
+      await db.collection('workspaces').doc(state.workspace.id)
+        .collection('members').doc(state.auth.user.uid)
+        .update({ pushToken: token });
     }
   } catch (e) {
-    console.warn('[Push] Registration failed:', e);
+    console.warn('[Push] Failed:', e);
   }
 }
 
 // ===== HELPERS =====
 
 function generateInviteCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/1/I
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];

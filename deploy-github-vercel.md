@@ -16,4 +16,10 @@ git push -u origin main
 1. Зайди на Vercel.
 2. Import Git Repository.
 3. Обери створений GitHub repo.
-4. Deploy.
+4. Додай Environment Variables з `.env.example`:
+   - `GROQ_API_KEY` або інший AI provider key.
+   - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`.
+   - `CRON_SECRET` для `/api/send-push`.
+5. Deploy.
+
+Після першого деплою також задеплой Firestore rules з папки `firebase/`.

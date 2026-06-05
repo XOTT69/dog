@@ -3,9 +3,13 @@
  */
 
 import { state } from '../state.js';
-import { $, $$, nowTime, haptic, show, hide } from '../utils.js';
+import { nowTime, haptic, escapeHtml } from '../utils.js';
 import { addEvent } from '../firebase.js';
 import { toast } from '../render.js';
+
+const $ = (id) => document.getElementById(id);
+const show = (el) => el?.classList.remove('hidden');
+const hide = (el) => el?.classList.add('hidden');
 
 const EVENT_CATEGORIES = [
   { id: 'toilet', name: 'Горшик', icon: '🚽', events: [
@@ -15,45 +19,63 @@ const EVENT_CATEGORIES = [
     { type: 'poo_miss', icon: '💩', label: 'Мимо', tone: 'danger' },
   ]},
   { id: 'food', name: 'Їжа', icon: '🍖', events: [
-    { type: 'meal_morning', icon: '🍖', label: 'Сніданок' },
-    { type: 'meal_day', icon: '🍖', label: 'Обід' },
-    { type: 'meal_evening', icon: '🍖', label: 'Вечеря' },
-    { type: 'treat', icon: '🦴', label: 'Ласощі' },
-    { type: 'water', icon: '💧', label: 'Вода' },
+    { type: 'meal_morning', icon: '🍖', label: 'Сніданок', tone: '' },
+    { type: 'meal_day', icon: '🍖', label: 'Обід', tone: '' },
+    { type: 'meal_evening', icon: '🍖', label: 'Вечеря', tone: '' },
+    { type: 'treat', icon: '🦴', label: 'Ласощі', tone: '' },
+    { type: 'water', icon: '💧', label: 'Вода', tone: '' },
   ]},
   { id: 'activity', name: 'Активність', icon: '🎾', events: [
-    { type: 'walk', icon: '🚶', label: 'Прогулянка' },
-    { type: 'play', icon: '🎾', label: 'Гра' },
-    { type: 'training', icon: '🎓', label: 'Тренування' },
-    { type: 'nose_game', icon: '👃', label: 'Нюхова гра' },
-    { type: 'social', icon: '🐕', label: 'Соціалізація' },
+    { type: 'walk', icon: '🚶', label: 'Прогулянка', tone: '' },
+    { type: 'play', icon: '🎾', label: 'Гра', tone: '' },
+    { type: 'training', icon: '🎓', label: 'Тренування', tone: '' },
+    { type: 'nose_game', icon: '👃', label: 'Нюхова гра', tone: '' },
+    { type: 'social', icon: '🐕', label: 'Соціалізація', tone: '' },
   ]},
   { id: 'health', name: "Здоров'я", icon: '🏥', events: [
-    { type: 'weight', icon: '⚖️', label: 'Вага', hasValue: true },
-    { type: 'medicine', icon: '💊', label: 'Ліки' },
-    { type: 'vaccine', icon: '💉', label: 'Вакцина' },
-    { type: 'vet_visit', icon: '🏥', label: 'Ветеринар' },
-    { type: 'heat', icon: '🩸', label: 'Тічка' },
-    { type: 'symptom', icon: '🤒', label: 'Симптом' },
+    { type: 'weight', icon: '⚖️', label: 'Вага', tone: '', hasValue: true },
+    { type: 'medicine', icon: '💊', label: 'Ліки', tone: '' },
+    { type: 'vaccine', icon: '💉', label: 'Вакцина', tone: '' },
+    { type: 'vet_visit', icon: '🏥', label: 'Ветеринар', tone: '' },
+    { type: 'heat', icon: '🩸', label: 'Тічка', tone: '' },
+    { type: 'symptom', icon: '🤒', label: 'Симптом', tone: '' },
   ]},
   { id: 'hygiene', name: 'Гігієна', icon: '🛁', events: [
-    { type: 'bath', icon: '🛁', label: 'Купання' },
-    { type: 'nails', icon: '✂️', label: 'Нігті' },
-    { type: 'ears', icon: '👂', label: 'Вуха' },
-    { type: 'teeth', icon: '🦷', label: 'Зуби' },
-    { type: 'grooming', icon: '✨', label: 'Грумінг' },
+    { type: 'bath', icon: '🛁', label: 'Купання', tone: '' },
+    { type: 'nails', icon: '✂️', label: 'Нігті', tone: '' },
+    { type: 'ears', icon: '👂', label: 'Вуха', tone: '' },
+    { type: 'teeth', icon: '🦷', label: 'Зуби', tone: '' },
+    { type: 'grooming', icon: '✨', label: 'Грумінг', tone: '' },
   ]},
   { id: 'other', name: 'Інше', icon: '📝', events: [
-    { type: 'sleep', icon: '😴', label: 'Сон' },
-    { type: 'note', icon: '📝', label: 'Нотатка' },
+    { type: 'sleep', icon: '😴', label: 'Сон', tone: '' },
+    { type: 'note', icon: '📝', label: 'Нотатка', tone: '' },
   ]},
 ];
 
+/** @type {boolean} */
+let saveButtonBound = false;
+
+/**
+ * Render sheet content
+ */
 export function render() {
   renderCategories();
   renderEvents();
   hide($('sheetExtraFields'));
+  bindSaveButton();
 }
+
+/**
+ * Close the sheet
+ */
+export function closeSheet() {
+  hide($('eventSheet'));
+  state.ui.sheetOpen = false;
+  document.body.style.overflow = '';
+}
+
+// ===== CATEGORIES =====
 
 function renderCategories() {
   const container = $('sheetCategories');
@@ -77,6 +99,8 @@ function renderCategories() {
   });
 }
 
+// ===== EVENTS =====
+
 function renderEvents() {
   const container = $('sheetEvents');
   if (!container) return;
@@ -84,11 +108,13 @@ function renderEvents() {
   const cat = EVENT_CATEGORIES.find(c => c.id === state.ui.selectedSheetCategory);
   if (!cat) return;
 
-  container.innerHTML = `<div class="actions-grid">${cat.events.map(ev =>
-    `<button type="button" class="action-btn ${state.ui.selectedEventType === ev.type ? 'selected' : ''}${ev.tone === 'success' ? ' green' : ev.tone === 'danger' ? ' red' : ''}" data-sheet-event="${ev.type}">
+  container.innerHTML = `<div class="actions-grid">${cat.events.map(ev => {
+    const selected = state.ui.selectedEventType === ev.type ? 'selected' : '';
+    const toneClass = ev.tone === 'success' ? ' green' : ev.tone === 'danger' ? ' red' : '';
+    return `<button type="button" class="action-btn ${selected}${toneClass}" data-sheet-event="${ev.type}">
       <span class="action-icon">${ev.icon}</span>${ev.label}
-    </button>`
-  ).join('')}</div>`;
+    </button>`;
+  }).join('')}</div>`;
 
   container.querySelectorAll('[data-sheet-event]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -110,14 +136,21 @@ function renderEvents() {
   });
 }
 
-// ===== SAVE EVENT (bind once) =====
+// ===== SAVE BUTTON =====
 
-const saveBtn = $('saveEventBtn');
-if (saveBtn && !saveBtn.dataset.bound) {
-  saveBtn.dataset.bound = 'true';
+function bindSaveButton() {
+  if (saveButtonBound) return;
+  const saveBtn = $('saveEventBtn');
+  if (!saveBtn) return;
+
+  saveButtonBound = true;
+
   saveBtn.addEventListener('click', async () => {
     const eventType = state.ui.selectedEventType;
-    if (!eventType) { toast('Оберіть тип', 'error'); return; }
+    if (!eventType) {
+      toast('Оберіть тип', 'error');
+      return;
+    }
 
     const payload = {
       eventType,
@@ -133,13 +166,15 @@ if (saveBtn && !saveBtn.dataset.bound) {
       toast('Додано ✓', 'success');
 
       // Clear fields
-      if ($('eventNote')) $('eventNote').value = '';
-      if ($('eventValue')) $('eventValue').value = '';
+      const noteEl = $('eventNote');
+      const valEl = $('eventValue');
+      if (noteEl) noteEl.value = '';
+      if (valEl) valEl.value = '';
 
       // Close sheet
-      const { closeSheet } = await import('../main.js');
       closeSheet();
-    } catch {
+    } catch (e) {
+      console.error('[Sheet] Save error:', e);
       toast('Помилка', 'error');
     }
   });

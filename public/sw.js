@@ -1,6 +1,3 @@
-/**
- * Service Worker v2 — Improved caching strategy + background sync
- */
 const CACHE_VERSION = 'dogcoach-v2';
 const STATIC_ASSETS = [
   '/',
@@ -23,22 +20,13 @@ const STATIC_ASSETS = [
 ];
 
 const CONTENT_CACHE = 'dogcoach-content-v1';
-const CONTENT_ASSETS = [
-  '/content/courses.json',
-  '/content/knowledge.json',
-  '/content/social.json',
-  '/content/breeds.json',
-  '/content/protocols.json',
-  '/content/tips.json',
-];
 
 // ===== INSTALL =====
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    Promise.all([
-      caches.open(CACHE_VERSION).then((cache) => cache.addAll(STATIC_ASSETS)),
-      caches.open(CONTENT_CACHE).then((cache) => cache.addAll(CONTENT_ASSETS)),
-    ]).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -58,6 +46,8 @@ self.addEventListener('activate', (e) => {
 // ===== FETCH =====
 self.addEventListener('fetch', (e) => {
   const req = e.request;
+
+  // Only handle GET requests from our origin
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
@@ -81,22 +71,22 @@ self.addEventListener('fetch', (e) => {
   // Content JSON: stale-while-revalidate
   if (url.pathname.startsWith('/content/')) {
     e.respondWith(
-      caches.match(req).then((cached) => {
-        const fetchPromise = fetch(req).then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CONTENT_CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        }).catch(() => cached);
-
-        return cached || fetchPromise;
-      })
+      caches.open(CONTENT_CACHE).then((cache) =>
+        cache.match(req).then((cached) => {
+          const fetchPromise = fetch(req)
+            .then((res) => {
+              if (res.ok) cache.put(req, res.clone());
+              return res;
+            })
+            .catch(() => cached);
+          return cached || fetchPromise;
+        })
+      )
     );
     return;
   }
 
-  // Static assets: cache-first
+  // All other static assets: cache-first
   e.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
@@ -106,7 +96,7 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
         }
         return res;
-      }).catch(() => new Response('', { status: 503 }));
+      });
     })
   );
 });
@@ -150,16 +140,3 @@ self.addEventListener('notificationclick', (e) => {
     })
   );
 });
-
-// ===== BACKGROUND SYNC (for offline events) =====
-self.addEventListener('sync', (e) => {
-  if (e.tag === 'sync-events') {
-    e.waitUntil(syncOfflineEvents());
-  }
-});
-
-async function syncOfflineEvents() {
-  // Implementation: read from IndexedDB queue and POST to Firestore
-  // This is a placeholder — full implementation requires IndexedDB wrapper
-  console.log('[SW] Background sync triggered');
-}

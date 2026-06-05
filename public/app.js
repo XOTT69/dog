@@ -173,11 +173,88 @@
   // ===== RENDER HEADER =====
   function renderHeader() { var name=(currentPet&&currentPet.name&&currentPet.name.trim())||'Песик'; var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate); var program=getProgramByAge(weeks); $('petNameHeader').textContent=name; $('headerSub').textContent=weekLabel(weeks)+' · '+program.stage; $('profileName').textContent=name; $('profileMeta').textContent=[(currentPet&&currentPet.breed)||'',weekLabel(weeks),(currentPet&&currentPet.sex)||''].filter(Boolean).join(' · '); var av=$('userAvatar'); if(av) av.innerHTML=(currentUser&&currentUser.photoURL)?'<img src="'+currentUser.photoURL+'" alt="">':avatarLetter((currentUser&&currentUser.displayName)||name); }
 
-  function renderDailyTip() { var el=$('dailyTipText'); if(!el)return; var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate); var sex=(currentPet&&currentPet.sex)||''; var last7=eventsState.filter(function(e){var ts=tsToDate(e.createdAt);return ts&&ts>=new Date(Date.now()-7*86400000);}); var s7=last7.filter(function(e){return isToiletSuccess(e.eventType);}).length; var m7=last7.filter(function(e){return isToiletMiss(e.eventType);}).length; var t7=s7+m7; var rate=t7>0?Math.round(s7/t7*100):null; var tr7=last7.filter(function(e){return e.eventType==='training';}).length; var tips=[]; if(rate!==null){if(rate>=90)tips.push('🎉 '+rate+'% горшик! Супер!');else if(rate>=70)tips.push('📈 Горшик '+rate+'% — прогрес!');else if(rate>=40)tips.push('💪 Горшик '+rate+'%. Частіше після сну/їжі!');else if(t7>3)tips.push('🎯 Горшик '+rate+'%. Менше простору + таймер!');} if(t7===0&&eventsState.length<5)tips.push('📝 Записуйте туалет — побачите патерн за 3 дні!'); if(tr7===0)tips.push('🎓 0 тренувань. 2 хв + клікер = результат! 🔵'); var pool=DAILY_TIPS.filter(function(t){return t.condition==='any';}); if(weeks!=null&&weeks<16)pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='puppy';})); if(weeks!=null&&weeks>=24&&weeks<72)pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='teen';})); if(sex==='дівчинка')pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='girl';})); if(tips.length>0)el.textContent=tips[Math.floor(Date.now()/3600000)%tips.length]; else el.textContent=(pool[new Date().getDate()%pool.length]&&pool[new Date().getDate()%pool.length].text)||'Натисніть + для запису 📝'; }
+    function renderDailyTip() {
+    var el=$('dailyTipText'); if(!el)return;
+    var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate);
+    var sex=(currentPet&&currentPet.sex)||'';
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    var last7=eventsState.filter(function(e){var ts=tsToDate(e.createdAt);return ts&&ts>=new Date(Date.now()-7*86400000);});
+    var s7=last7.filter(function(e){return isToiletSuccess(e.eventType);}).length;
+    var m7=last7.filter(function(e){return isToiletMiss(e.eventType);}).length;
+    var t7=s7+m7; var rate=t7>0?Math.round(s7/t7*100):null;
+    var tr7=last7.filter(function(e){return e.eventType==='training';}).length;
+
+    var tips=[];
+
+    // Контекстні поради по режиму туалету
+    if(toiletMode==='transition'){
+      if(rate!==null&&rate<70) tips.push('🌳 Перехід на вулицю: виходьте в "правильні" моменти — після сну і їжі!');
+      else tips.push('🌳 Перехід: хваліть НА ВУЛИЦІ в 10 разів більше ніж за пелюшку!');
+    } else if(toiletMode==='outdoor'){
+      tips.push('🚶 Графік прогулянок = графік туалету. Виходьте в однакові часи!');
+      if(rate!==null&&rate<80) tips.push('🌳 Мало успіхів? Частіше виходьте: кожні 2–3 години.');
+    } else {
+      if(rate!==null&&rate>=90) tips.push('🎉 '+rate+'% горшик! Можна починати перехід на вулицю!');
+      else if(rate!==null&&rate>=70) tips.push('📈 Горшик '+rate+'% — прогрес! Зменшуйте кількість пелюшок.');
+      else if(rate!==null&&rate>=40) tips.push('💪 Горшик '+rate+'%. Менше простору + таймер!');
+      else if(t7>3) tips.push('🎯 '+rate+'% — обмежте простір до 1 кімнати + манеж!');
+    }
+
+    if(t7===0&&eventsState.length<5) tips.push('📝 Записуйте туалет — побачите патерн за 3 дні!');
+    if(tr7===0) tips.push('🎓 0 тренувань. 2 хв + клікер = результат! 🔵');
+
+    // Поради по породі
+    var breed=getBreedProfile();
+    if(breed&&breed.energy==='very_high'&&tr7<3) tips.push('⚡ '+breed.name+' потребує більше навантаження! Нюхові ігри!');
+
+    var pool=DAILY_TIPS.filter(function(t){return t.condition==='any';});
+    if(weeks!=null&&weeks<16) pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='puppy';}));
+    if(weeks!=null&&weeks>=24&&weeks<72) pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='teen';}));
+    if(sex==='дівчинка') pool=pool.concat(DAILY_TIPS.filter(function(t){return t.condition==='girl';}));
+
+    if(tips.length>0) el.textContent=tips[Math.floor(Date.now()/3600000)%tips.length];
+    else el.textContent=(pool[new Date().getDate()%pool.length]&&pool[new Date().getDate()%pool.length].text)||'Натисніть + для запису 📝';
+  }
 
   function renderKpis() { var start=startOfToday(); var todayEv=eventsState.filter(function(e){var ts=tsToDate(e.createdAt);return ts&&ts>=start;}); var s=todayEv.filter(function(e){return isToiletSuccess(e.eventType);}).length; var m=todayEv.filter(function(e){return isToiletMiss(e.eventType);}).length; var t=s+m; var pct=t>0?Math.round(s/t*100):0; $('kpiSuccess').textContent=s; $('kpiMiss').textContent=m; $('kpiTotal').textContent=todayEv.length; $('ringPct').textContent=pct+'%'; var ring=$('ringFill'); if(ring) ring.style.strokeDashoffset=String(251.3-(251.3*pct/100)); }
 
-  function renderOneTap() { var grid=$('onetapGrid'); if(!grid)return; var items=[{type:'pee_success',icon:'💛',label:'Пописяла ✓',cls:'success'},{type:'pee_miss',icon:'💛',label:'Мимо',cls:'danger'},{type:'poo_success',icon:'💩',label:'Покакала ✓',cls:'success'},{type:'poo_miss',icon:'💩',label:'Мимо',cls:'danger'},{type:'training',icon:'🎓',label:'Тренування',cls:''},{type:'walk',icon:'🚶',label:'Прогулянка',cls:''}]; grid.innerHTML=items.map(function(i){return '<button type="button" class="onetap-btn '+i.cls+'" data-onetap="'+i.type+'"><span class="onetap-icon">'+i.icon+'</span>'+i.label+'</button>';}).join(''); $$('[data-onetap]').forEach(function(btn){btn.addEventListener('click',function(){if(btn.classList.contains('logged'))return;btn.classList.add('logged');haptic();addEvent({eventType:btn.dataset.onetap,timeLabel:nowTime()},true);setTimeout(function(){btn.classList.remove('logged');},2500);});}); }
+    function renderOneTap() {
+    var grid=$('onetapGrid'); if(!grid)return;
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    var items=[];
+
+    if(toiletMode==='outdoor'){
+      items=[
+        {type:'pee_success',icon:'💛',label:'Пописяла на вулиці ✓',cls:'success'},
+        {type:'pee_miss',icon:'💛',label:'Пописяла вдома',cls:'danger'},
+        {type:'poo_success',icon:'💩',label:'Покакала на вулиці ✓',cls:'success'},
+        {type:'poo_miss',icon:'💩',label:'Покакала вдома',cls:'danger'},
+        {type:'walk',icon:'🚶',label:'Прогулянка',cls:''},
+        {type:'training',icon:'🎓',label:'Тренування',cls:''}
+      ];
+    } else if(toiletMode==='transition'){
+      items=[
+        {type:'pee_success',icon:'💛',label:'На вулиці ✓',cls:'success'},
+        {type:'pee_miss',icon:'💛',label:'На пелюшці',cls:''},
+        {type:'poo_success',icon:'💩',label:'На вулиці ✓',cls:'success'},
+        {type:'poo_miss',icon:'💩',label:'Мимо',cls:'danger'},
+        {type:'walk',icon:'🚶',label:'Прогулянка',cls:''},
+        {type:'training',icon:'🎓',label:'Тренування',cls:''}
+      ];
+    } else {
+      items=[
+        {type:'pee_success',icon:'💛',label:'На пелюшці ✓',cls:'success'},
+        {type:'pee_miss',icon:'💛',label:'Мимо',cls:'danger'},
+        {type:'poo_success',icon:'💩',label:'На пелюшці ✓',cls:'success'},
+        {type:'poo_miss',icon:'💩',label:'Мимо',cls:'danger'},
+        {type:'training',icon:'🎓',label:'Тренування',cls:''},
+        {type:'walk',icon:'🚶',label:'Прогулянка',cls:''}
+      ];
+    }
+
+    grid.innerHTML=items.map(function(i){return '<button type="button" class="onetap-btn '+i.cls+'" data-onetap="'+i.type+'"><span class="onetap-icon">'+i.icon+'</span>'+i.label+'</button>';}).join('');
+    $$('[data-onetap]').forEach(function(btn){btn.addEventListener('click',function(){if(btn.classList.contains('logged'))return;btn.classList.add('logged');haptic();addEvent({eventType:btn.dataset.onetap,timeLabel:nowTime()},true);setTimeout(function(){btn.classList.remove('logged');},2500);});});
+  }
 
   // ===== CHART =====
   function renderChart(canvasId) { var canvas=$(canvasId); if(!canvas||!canvas.getContext)return; var parent=canvas.parentElement; if(!parent||parent.offsetHeight===0)return; setTimeout(function(){renderChartInternal(canvasId);},60); }
@@ -219,18 +296,49 @@
   }
 
   // ===== RECOMMENDED COURSES =====
-  function renderRecommendedCourses() {
-    var container=$('recommendedCourses'); if(!container)return; if(!currentPet){container.style.display='none';return;}
-    var weeks=getAgeInWeeks(currentPet.birthDate); var issues=(currentPet.issues||'').toLowerCase(); var breed=getBreedProfile(); var rec=[];
-    if(weeks!=null&&weeks<12)rec.push('first-days','pee-pad','name-focus','hand-feeding');
-    else if(weeks!=null&&weeks<24)rec.push('sit-command','leash-walking','recall','bite-control');
-    else if(weeks!=null&&weeks<72)rec.push('impulse-control','alone-training','recall','nose-games');
-    if(issues.includes('кусає'))rec.push('bite-control'); if(issues.includes('гавкає'))rec.push('settle-down'); if(issues.includes('тягне'))rec.push('leash-walking'); if(issues.includes('один')||issues.includes('розлук'))rec.push('alone-training'); if(issues.includes('гризе'))rec.push('nose-games'); if(issues.includes('стрибає'))rec.push('impulse-control','guests-home'); if(issues.includes('боїться'))rec.push('socialization'); if(issues.includes('собак')&&issues.includes('агрес'))rec.push('reactivity');
-    if(breed&&breed.energy==='very_high')rec.push('nose-games','settle-down'); if(breed&&breed.trainability==='low')rec.push('hand-feeding');
-    var unique=[]; rec.forEach(function(id){if(unique.indexOf(id)===-1)unique.push(id);}); unique=unique.slice(0,5);
+    function renderRecommendedCourses() {
+    var container=$('recommendedCourses'); if(!container)return;
+    if(!currentPet){container.style.display='none';return;}
+    var weeks=getAgeInWeeks(currentPet.birthDate);
+    var issues=(currentPet.issues||'').toLowerCase();
+    var breed=getBreedProfile();
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    var rec=[];
+
+    // По режиму туалету
+    if(toiletMode==='pad') rec.push('pee-pad');
+    else if(toiletMode==='transition') rec.push('outdoor-switch');
+    else if(toiletMode==='outdoor') rec.push('food-from-ground');
+
+    // По віку
+    if(weeks!=null&&weeks<12) rec.push('first-days','name-focus','hand-feeding','crate-place');
+    else if(weeks!=null&&weeks<24) rec.push('sit-command','leash-walking','recall','bite-control','impulse-control');
+    else if(weeks!=null&&weeks<72) rec.push('recall','alone-training','nose-games','settle-down');
+    else rec.push('nose-games','cafe-training','settle-down');
+
+    // По проблемах
+    if(issues.includes('кусає')||issues.includes('кусат')) rec.push('bite-control');
+    if(issues.includes('гавкає')||issues.includes('гавкіт')) rec.push('settle-down');
+    if(issues.includes('тягне')||issues.includes('повідок')) rec.push('leash-walking');
+    if(issues.includes('один')||issues.includes('розлук')||issues.includes('скавчить')) rec.push('alone-training','howling-alone');
+    if(issues.includes('гризе')||issues.includes('руйнує')) rec.push('nose-games');
+    if(issues.includes('стрибає')) rec.push('impulse-control','guests-home');
+    if(issues.includes('боїться')||issues.includes('страх')) rec.push('socialization','fear-vet');
+    if(issues.includes('собак')&&(issues.includes('агрес')||issues.includes('гавкає'))) rec.push('reactivity');
+    if(issues.includes('дітьми')||issues.includes('дитин')) rec.push('child-dog');
+
+    // По породі
+    if(breed){
+      if(breed.energy==='very_high') rec.push('nose-games','settle-down');
+      if(breed.trainability==='low') rec.push('hand-feeding','impulse-control');
+      if(breed.issues&&breed.issues.some(function(i){return i.toLowerCase().includes('гавкіт');})) rec.push('settle-down');
+    }
+
+    // Deduplicate і limit
+    var unique=[]; rec.forEach(function(id){if(unique.indexOf(id)===-1)unique.push(id);}); unique=unique.slice(0,6);
     if(!unique.length){container.style.display='none';return;} container.style.display='';
     var courses=window.COURSES||[];
-    container.innerHTML='<h4 class="card-title">🎯 Рекомендовані курси</h4><div class="course-grid">'+unique.map(function(id){var c=courses.find(function(x){return x.id===id;});if(!c)return '';return '<button type="button" class="course-btn" data-rec-course="'+c.id+'"><span class="c-badge">'+c.badge+'</span><strong>'+c.title+'</strong><div class="c-meta">'+c.description+'</div></button>';}).join('')+'</div>';
+    container.innerHTML='<h4 class="card-title">🎯 Рекомендовані для вас</h4><div class="course-grid">'+unique.map(function(id){var c=courses.find(function(x){return x.id===id;});if(!c)return '';var progress=getCourseProgress(c.id);return '<button type="button" class="course-btn" data-rec-course="'+c.id+'"><span class="c-badge">'+c.badge+'</span><strong>'+c.title+'</strong><div class="c-meta">'+c.description+'</div>'+(progress>0?'<div class="progress-bar"><div class="progress-bar-fill" style="width:'+progress+'%"></div></div>':'')+'</button>';}).join('')+'</div>';
     $$('[data-rec-course]').forEach(function(btn){btn.addEventListener('click',function(){currentCourseId=btn.dataset.recCourse;setActiveTab('tabCourses');renderCourses();haptic();});});
   }
 
@@ -315,9 +423,19 @@
   function renderSheetEvents(){var c=$('sheetEvents');if(!c)return;var cat=EVENT_CATEGORIES.find(function(x){return x.id===selectedSheetCategory;});if(!cat)return;c.innerHTML='<div class="actions-grid">'+cat.events.map(function(ev){return '<button type="button" class="action-btn '+(selectedEventType===ev.type?'selected':'')+(ev.tone==='success'?' green':ev.tone==='danger'?' red':'')+'" data-sheet-event="'+ev.type+'"><span class="action-icon">'+ev.icon+'</span>'+ev.label+'</button>';}).join('')+'</div>';$$('[data-sheet-event]').forEach(function(btn){btn.addEventListener('click',function(){selectedEventType=btn.dataset.sheetEvent;renderSheetEvents();show($('sheetExtraFields'));$('eventTime').value=nowTime();var conf=TYPE_CONFIG[selectedEventType];var vf=$('valueField');if(vf)vf.style.display=(conf&&conf.hasValue)?'':'none';haptic();});});}
 
   // ===== RENDER ALL =====
+    function renderTimerLabel(){
+    var label=$('timerCard');if(!label)return;
+    var timerLabel=label.querySelector('.timer-label');if(!timerLabel)return;
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    if(toiletMode==='outdoor') timerLabel.textContent='⏱️ Таймер до прогулянки';
+    else if(toiletMode==='transition') timerLabel.textContent='⏱️ Таймер — час на вулицю!';
+    else timerLabel.textContent='⏱️ Таймер горшика';
+  }
+  
   function renderAll(){
     renderHeader();renderStreak();renderWeeklyReport();renderDailyTip();renderKpis();
-    renderOneTap();renderDailyPlan();renderAgeFocus();renderHeatInfo();renderReminders();
+    renderOneTap();renderTimerLabel();renderDailyPlan();
+    renderAgeFocus();renderHeatInfo();renderReminders();
     renderHeatmap();renderAchievements();
     renderBreedCard();renderProblemCards();renderRecommendedCourses();
     renderFirstDaysGuide();renderPuppyBlues();renderFoodGuide();
@@ -359,9 +477,70 @@
   function showTyping(){var chat=$('aiChat');if(!chat)return;var el=document.createElement('div');el.className='ai-msg loading';el.id='typingIndicator';el.textContent='Думаю';chat.appendChild(el);chat.scrollTop=chat.scrollHeight;}
   function removeTyping(){var el=$('typingIndicator');if(el)el.remove();}
 
-  function fetchAIResponse(prompt){var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate);var issues=(currentPet&&currentPet.issues)||'';var petInfo=currentPet?'Собака: '+(currentPet.name||'?')+', '+weekLabel(weeks)+', '+(currentPet.breed||'?')+', '+getSizeLabel()+(issues?', проблеми: '+issues:''):'';var sys='Ти — професійний український кінолог (15р).\nПРАВИЛА:\n1. ТІЛЬКИ українською.\n2. 4-5 речень.\n3. Пронумеровані кроки.\n4. Без покарань.\n\n'+petInfo;return fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'groq/llama-3.3-70b-versatile',messages:[{role:'system',content:sys},{role:'user',content:prompt}],temperature:0.2,max_tokens:400,stream:false})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){if(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content){return data.choices[0].message.content.trim()||getLocalFallback(prompt);}throw new Error('Empty');}).catch(function(e){console.warn('AI:',e.message);return getLocalFallback(prompt);});}
+    function fetchAIResponse(prompt){
+    var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate);
+    var issues=(currentPet&&currentPet.issues)||'';
+    var breed=getBreedProfile();
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    var toiletLabel={pad:'пелюшка вдома',outdoor:'вулиця',transition:'перехід з пелюшки на вулицю'}[toiletMode]||'пелюшка';
 
-  function getLocalFallback(prompt){var l=prompt.toLowerCase();if(l.indexOf('сидіти')>=0||l.indexOf('сідати')>=0)return '1) Ласощі біля носа.\n2) Руку вгору — сяде.\n3) Клікер + ласощі.\n4) 5-8 разів по 2 хв/день.';if(l.indexOf('гриз')>=0)return '1) Приберіть цінне.\n2) Жувальні іграшки.\n3) Своє гризе — клікер!\n4) Чуже — мовчки замініть.';if(l.indexOf('гавк')>=0)return '1) Визначте причину.\n2) Не кричіть.\n3) Пауза → клікер.\n4) Розумове навантаження.';if(l.indexOf('пелюшк')>=0||l.indexOf('туалет')>=0)return '1) Менше простору.\n2) Після сну/їжі.\n3) Клікер + ласощі!\n4) Промах — мовчки.';if(l.indexOf('повідок')>=0||l.indexOf('тягне')>=0)return '1) Тягне = стоп.\n2) Вільний = йдемо.\n3) Ласощі біля ноги.\n4) Без рулетки!';if(l.indexOf('кусає')>=0)return '1) Завмріть.\n2) Пауза 5 сек.\n3) Дайте іграшку.\n4) Не зупиняється → вийдіть.';if(l.indexOf('соціал')>=0)return '1) Одне нове/день.\n2) Безпечна відстань.\n3) Цікавість → клікер!\n4) Стрес → відходимо.';if(l.indexOf('підклик')>=0||l.indexOf('до мене')>=0)return '1) "Сюди!" (не ім\'я).\n2) Слово → СУПЕРЛАСОЩІ.\n3) Підхід = свято!\n4) Свисток для відстані.';if(l.indexOf('blues')>=0||l.indexOf('не справляюсь')>=0)return '1) Це НОРМАЛЬНО! 70% відчувають.\n2) Буде легше через 2–4 тижні.\n3) Просіть допомогу.\n4) Маленькі перемоги!';var prog=getProgramByAge(getAgeInWeeks(currentPet&&currentPet.birthDate));return (prog&&prog.tip)||'Запитайте конкретніше! 🐾';}
+    var petContext='';
+    if(currentPet){
+      petContext='Собака: '+(currentPet.name||'?')+', '+weekLabel(weeks)+', '+(currentPet.breed||'метис')+', '+getSizeLabel()+', стать: '+(currentPet.sex||'?')+', туалет: '+toiletLabel;
+      if(issues) petContext+=', проблеми: '+issues;
+      if(breed) petContext+=', енергія: '+breed.energy+', навчання: '+breed.trainability;
+
+      // Додаємо статистику
+      var last7=eventsState.filter(function(e){var ts=tsToDate(e.createdAt);return ts&&ts>=new Date(Date.now()-7*86400000);});
+      var s7=last7.filter(function(e){return isToiletSuccess(e.eventType);}).length;
+      var m7=last7.filter(function(e){return isToiletMiss(e.eventType);}).length;
+      if(s7+m7>0) petContext+=', горшик за тиждень: '+Math.round(s7/(s7+m7)*100)+'%';
+      var tr=last7.filter(function(e){return e.eventType==='training';}).length;
+      petContext+=', тренувань за тиждень: '+tr;
+    }
+
+    var sys='Ти — професійний український кінолог з 15-річним досвідом.\n\n'+
+      'ОБОВ\'ЯЗКОВІ ПРАВИЛА:\n'+
+      '1. Відповідай ТІЛЬКИ українською мовою, грамотно.\n'+
+      '2. Давай конкретні покрокові інструкції (3–6 кроків).\n'+
+      '3. Кожен крок — одне речення, зрозуміле навіть новачку.\n'+
+      '4. Враховуй вік, породу, розмір, режим туалету, проблеми.\n'+
+      '5. Для цуценят до 16 тижнів — ТІЛЬКИ адаптація і соціалізація, без вимог.\n'+
+      '6. Ніяких покарань, крику, фізичного впливу.\n'+
+      '7. Використовуй клікер/маркер "Так!" як основний інструмент.\n'+
+      '8. Якщо проблема серйозна (агресія з кров\'ю, травми) — рекомендуй кінолога.\n\n'+
+      petContext;
+
+    return fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'groq/llama-3.3-70b-versatile',messages:[{role:'system',content:sys},{role:'user',content:prompt}],temperature:0.3,max_tokens:500,stream:false})})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(data){if(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content){return data.choices[0].message.content.trim()||getLocalFallback(prompt);}throw new Error('Empty');})
+    .catch(function(e){console.warn('AI:',e.message);return getLocalFallback(prompt);});
+  }
+
+    function getLocalFallback(prompt){
+    var l=prompt.toLowerCase();
+    var toiletMode=(currentPet&&currentPet.toiletMode)||'pad';
+    var weeks=getAgeInWeeks(currentPet&&currentPet.birthDate);
+
+    if(l.indexOf('сидіти')>=0||l.indexOf('сідати')>=0) return '1. Візьміть ласощі в руку, покажіть собаці.\n2. Повільно підніміть руку над головою — собака сяде автоматично.\n3. В момент коли сіла — клікер/маркер "Так!" + ласощі.\n4. Повторіть 5–8 разів. Перерва 30 хв.\n5. Коли стабільно сідає за рукою — додайте слово "Сидіти" перед жестом.\n6. Тренуйте 2–3 рази на день по 2 хвилини.';
+    if(l.indexOf('гриз')>=0) return '1. Приберіть ВСЕ цінне з доступу собаки.\n2. Залиште 3–4 безпечні жувальні іграшки (конг, ріг, канат).\n3. Гризе СВОЄ — клікер + "Молодець!" (підкріплюємо правильне).\n4. Гризе ЧУЖЕ — мовчки забрати, дати свою іграшку.\n5. Нудьга = руйнування. Додайте нюхову гру 10 хв/день.\n6. Конг з замороженим йогуртом = 20–30 хв спокою.';
+    if(l.indexOf('гавк')>=0) return '1. Визначте що тригерить гавкіт (двері, вікно, самотність, увага).\n2. Не кричіть "тихо!" — для собаки це ви "гавкаєте разом".\n3. Зачекайте ПАУЗУ в гавкоті (хоч 1 секунду) → клікер + ласощі.\n4. Перенаправте увагу ДО початку: побачила тригер → кличте до себе.\n5. Закрийте візуальний доступ до тригера (штори, плівка).\n6. Розумове навантаження зменшує потребу гавкати: нюхові ігри 15 хв/день.';
+
+    if(l.indexOf('пелюшк')>=0||l.indexOf('туалет')>=0){
+      if(toiletMode==='transition') return '1. Визначте час коли собака зазвичай ходить в туалет (після сну, їжі, гри).\n2. В ЦІ моменти — одразу на вулицю. Не чекайте.\n3. На вулиці стійте тихо в одному місці до 5 хвилин.\n4. Зробила НА ВУЛИЦІ → свято! Клікер + суперласощі + голос!\n5. На пелюшку вдома — без реакції (не хвалити, не карати).\n6. Пелюшку НЕ забирайте різко. Зменшуйте поступово.';
+      if(toiletMode==='outdoor') return '1. Виходьте за графіком: після сну, через 20 хв після їжі, після гри.\n2. Завжди в одне й те саме місце — запах допомагає.\n3. Стійте тихо, не гуляйте поки не зробить.\n4. Зробила → СВЯТО! Клікер + ласощі + похвала голосом.\n5. Зробила вдома → мовчки прибрати ензимним засобом.\n6. Записуйте час — знайдете патерн за 3–5 днів.';
+      return '1. Обмежте простір: манеж або одна кімната.\n2. Після сну/їжі/гри — мовчки несіть на пелюшку.\n3. Стійте тихо поруч, чекайте до 5 хвилин.\n4. Зробила → ОДРАЗУ клікер + ласощі + свято!\n5. Промах → 0 емоцій. Мовчки прибрати ензимним засобом.\n6. Записуйте час кожного туалету. Через 3 дні побачите патерн.';
+    }
+
+    if(l.indexOf('повідок')>=0||l.indexOf('повідець')>=0||l.indexOf('тягне')>=0) return '1. Тягне = ви ЗУПИНЯЄТЕСЬ. Стоїте як стовп.\n2. Повідок провис (вільний) = йдемо далі. Це нагорода!\n3. Кожні 10–15 кроків без натягу — ласощі біля вашої ноги.\n4. Несподівано змініть напрямок — хай слідкує за ВАМИ.\n5. Ніяких рулеток! Тільки фіксований повідок 1.5–2м.\n6. Перші тижні тренувальні прогулянки — лише 10–15 хвилин.';
+    if(l.indexOf('кусає')>=0||l.indexOf('кусат')>=0) return '1. Кусає → завмріть як статуя. Не відсмикуйте руку!\n2. Скажіть "Ай" спокійно + відверніться на 3–5 секунд.\n3. Після паузи — запропонуйте іграшку.\n4. Жує іграшку спокійно → клікер + "Молодець!"\n5. Не зупиняється після 3 спроб → вийдіть з кімнати на 30 сек.\n6. Перевірте: чи достатньо спить? Перевтомлене цуценя ЗАВЖДИ кусається!';
+    if(l.indexOf('соціал')>=0) return '1. ОДНЕ нове знайомство на день. Якість > кількість.\n2. Безпечна відстань! Собака бачить, але не в паніці.\n3. Проявляє цікавість (вуха вперед, хвіст нейтрально) → клікер + ласощі.\n4. Проявляє страх (відводить погляд, хвіст униз) → відійдіть далі.\n5. Завершіть ДО того як собака стомиться.\n6. Краще 5 хвилин позитиву ніж 30 хвилин стресу.';
+    if(l.indexOf('підклик')>=0||l.indexOf('до мене')>=0) return '1. Оберіть спеціальне слово "Сюди!" (не ім\'я собаки!).\n2. Вдома в тиші: "Сюди!" → покажіть найсмачніше (сир, м\'ясо).\n3. Підійшла → СВЯТО! Клікер + 5 шматочків + голос + погладити.\n4. 10+ повторів/день вдома. Слово = завжди найкраще в житті.\n5. На вулиці: використовуйте ТІЛЬКИ коли впевнені що підійде.\n6. НІКОЛИ не кличте перед неприємним (купання, обрізка нігтів).';
+    if(l.indexOf('blues')>=0||l.indexOf('не справляюсь')>=0||l.indexOf('жалкую')>=0) return '1. Це НОРМАЛЬНО! 70% нових власників відчувають те саме.\n2. Ви не погана людина і не зробили помилку.\n3. Перші 2 тижні — найгірші. Через місяць буде значно легше.\n4. Попросіть когось допомогти: погуляти, посидіти хоч 1 годину.\n5. Ваш сон — пріоритет! Спіть коли собака спить.\n6. Записуйте 3 позитивні моменти за день. Вони точно є! 💛';
+
+    var prog=getProgramByAge(weeks);
+    return (prog&&prog.tip)||'Задайте конкретне питання — наприклад "Як навчити сидіти?" або "Чому кусається?" 🐾';
+  }
 
   function handleAISubmit(prompt){if(!prompt.trim())return;addChatMessage(prompt,'user');showTyping();var count=parseInt(localStorage.getItem('dc_ai_count')||'0')+1;localStorage.setItem('dc_ai_count',String(count));fetchAIResponse(prompt).then(function(r){removeTyping();addChatMessage(r,'assistant');}).catch(function(){removeTyping();addChatMessage('Помилка 🔄','assistant');});}
 

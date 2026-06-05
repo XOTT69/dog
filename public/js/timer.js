@@ -4,7 +4,6 @@
 
 import { state } from './state.js';
 import { playAlarm } from './audio.js';
-import { $ } from './utils.js';
 
 /** @type {number|null} */
 let intervalId = null;
@@ -54,8 +53,7 @@ export function resetTimer() {
 export function toggleTimer() {
   if (state.timer.running) {
     stopTimer();
-  } else if (state.timer  } else if (state.timer.total > 0) {
-    // Resume
+  } else if (state.timer.total > 0) {
     state.timer.running = true;
     intervalId = setInterval(() => {
       state.timer.seconds--;
@@ -73,7 +71,6 @@ export function toggleTimer() {
 function onTimerComplete() {
   playAlarm();
 
-  // Browser notification
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('⏰ Час горшика!', {
       body: 'Ведіть на пелюшку!',
@@ -101,4 +98,3 @@ export function getTimerProgress() {
   if (state.timer.total <= 0) return 0;
   return state.timer.seconds / state.timer.total;
 }
-

@@ -11,73 +11,38 @@ import { updateStreak, checkAchievements, showConfetti, ACHIEVEMENT_DEFS } from 
 import { startTimer, formatTimer, getTimerProgress } from '../timer.js';
 import { generateDailyPlan } from '../ai.js';
 import { playClicker, playWhistle } from '../audio.js';
-import { toast, isDirty } from '../render.js';
+import { toast } from '../render.js';
 import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
 
 // ===== RENDER =====
 
 export function render() {
-  // Always update streak (lightweight)
   updateStreak();
+  renderStreak();
+  renderDailyTip();
+  renderKpis();
+  renderOneTap();
+  renderTimer();
+  renderDailyPlan();
+  renderHeatmap();
+  renderAchievements();
+  renderAIPlan();
 
-  // Targeted rendering — only dirty sections re-render
-  if (isDirty('hero')) renderHero();
-  if (isDirty('streak')) renderStreak();
-  if (isDirty('tip')) renderDailyTip();
-  if (isDirty('kpi')) renderKpis();
-  if (isDirty('onetap')) renderOneTap();
-  if (isDirty('timer')) renderTimer();
-  if (isDirty('dailyPlan')) renderDailyPlan();
-  if (isDirty('heatmap')) renderHeatmap();
-  if (isDirty('achievements')) renderAchievements();
-
-  // Progressive disclosure cards (lazy, heavy — only if dirty)
-  if (isDirty('breedCard')) renderBreedCard();
-  if (isDirty('problemCards')) renderProblemCards();
-  if (isDirty('recommendedCourses')) renderRecommendedCourses();
-  if (isDirty('weeklyReport')) renderWeeklyReport();
-  if (isDirty('foodGuide')) renderFoodGuide();
-  if (isDirty('ageFocus')) renderAgeFocus();
-  if (isDirty('heatInfo')) renderHeatInfo();
-  if (isDirty('reminders')) renderReminders();
+  // Progressive disclosure cards (lazy)
+  renderBreedCard();
+  renderProblemCards();
+  renderRecommendedCourses();
+  renderWeeklyReport();
+  renderFoodGuide();
+  renderAgeFocus();
+  renderHeatInfo();
+  renderReminders();
 
   // Check achievements after render
   const newAch = checkAchievements();
   if (newAch.length > 0) {
     newAch.forEach(a => toast(`${a.icon} ${a.label}!`, 'success'));
     showConfetti();
-  }
-}
-
-// ===== HERO =====
-
-function renderHero() {
-  const pet = state.pet.data;
-  const nameEl = $('heroName');
-  const metaEl = $('heroMeta');
-  const emojiEl = $('heroEmoji');
-  const streakEl = $('heroStreak');
-  const streakText = $('heroStreakText');
-
-  const petName = pet?.name?.trim() || 'Песик';
-  const weeks = getAgeInWeeks(pet?.birthDate);
-  const ageStr = weekLabel(weeks);
-
-  if (nameEl) nameEl.textContent = petName;
-  if (metaEl) {
-    metaEl.textContent = [pet?.breed || '', ageStr].filter(Boolean).join(' · ') || '—';
-  }
-  if (emojiEl) emojiEl.textContent = pet?.sex === 'дівчинка' ? '🐶' : '🐕';
-
-  // Streak badge in hero
-  const streak = state.gamification.streak;
-  if (streakEl && streakText) {
-    if (streak.count > 0) {
-      streakEl.classList.remove('hidden');
-      streakText.textContent = streak.count;
-    } else {
-      streakEl.classList.add('hidden');
-    }
   }
 }
 
@@ -353,26 +318,17 @@ function renderAchievements() {
   if (!grid) return;
 
   const achievements = state.gamification.achievements;
-  const track = $('achievementsTrack');
-  if (track) {
-    track.innerHTML = ACHIEVEMENT_DEFS.map(a => {
-      const unlocked = !!achievements[a.id];
-      return `<div class="achievement ${unlocked ? 'unlocked' : 'locked'}">
-        <span class="achievement-icon">${a.icon}</span>
-        <span class="achievement-label">${a.label}</span>
-      </div>`;
-    }).join('');
-  }
+  grid.innerHTML = ACHIEVEMENT_DEFS.map(a => {
+    const unlocked = !!achievements[a.id];
+    return `<div class="achievement ${unlocked ? 'unlocked' : 'locked'}">
+      <span class="achievement-icon">${a.icon}</span>
+      <span class="achievement-label">${a.label}</span>
+    </div>`;
+  }).join('');
 }
 
-// ===== AI PLAN (moved to AI tab) =====
+// ===== AI PLAN =====
 
-/** @type {number|null} */
-let aiPlanReqId = null;
-
-/**
- * Debounced wrapper: only fetch if 5s passed since last call
- */
 async function renderAIPlan() {
   const card = $('aiPlanCard');
   const content = $('aiPlanContent');

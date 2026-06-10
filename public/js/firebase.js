@@ -6,19 +6,51 @@
 import { state, batch } from './state.js';
 import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, VAPID_KEY } from './constants.js';
 import { nowTime } from './utils.js';
+import { addToQueue, getQueuedEvents, removeFromQueue, getQueueSize } from './offline-queue.js';
 
 // ===== INIT =====
-const app = firebase.initializeApp(FIREBASE_CONFIG);
-const auth = firebase.auth();
-const db = firebase.firestore();
+let app, auth, db;
+let googleProvider;
 
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
+/** @type {boolean} */
+let firebaseReady = false;
 
-// Enable offline persistence
-db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-  console.warn('[Firestore] Persistence:', err.code);
-});
+try {
+  if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+    throw new Error('Firebase configuration is missing. Please set VITE_FIREBASE_* environment variables.');
+  }
+
+  app = firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth();
+  db = firebase.firestore();
+
+  googleProvider = new firebase.auth.GoogleAuthProvider();
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+  // Enable offline persistence
+  db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+    console.warn('[Firestore] Persistence:', err.code);
+  });
+
+  firebaseReady = true;
+} catch (error) {
+  console.error('[Firebase] Initialization error:', error);
+  // Show error to user
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => showFirebaseError());
+  } else {
+    showFirebaseError();
+  }
+  // Don't throw — app should handle missing Firebase gracefully
+  firebaseReady = false;
+}
+
+function showFirebaseError() {
+  const errorDiv = document.createElement('div');
+  errorDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:1rem;background:#fee;color:#c33;text-align:center;z-index:99999;font-family:sans-serif;';
+  errorDiv.textContent = 'Помилка ініціалізації Firebase. Перевірте налаштування.';
+  document.body.prepend(errorDiv);
+}
 
 // ===== Unsubscribe holders =====
 let unsubPet = null;
@@ -243,8 +275,48 @@ export async function addEvent(payload) {
   };
   if (payload.value != null) data.value = payload.value;
 
-  const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
-  return docRef.id;
+  // Check if offline - queue the event
+  if (!navigator.onLine) {
+    await addToQueue({ ...data, workspaceId: wsId });
+    return 'queued';
+  }
+
+  try {
+    const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
+    return docRef.id;
+  } catch (error) {
+    console.warn('[Firebase] Failed to add event, queuing offline:', error);
+    await addToQueue({ ...data, workspaceId: wsId });
+    return 'queued';
+  }
+}
+
+/**
+ * Sync queued events when connection is restored
+ * @returns {Promise<void>}
+ */
+export async function syncQueuedEvents() {
+  if (!navigator.onLine) return;
+
+  const queued = await getQueuedEvents();
+  if (queued.length === 0) return;
+
+  console.log(`[Firebase] Syncing ${queued.length} queued events`);
+
+  for (const item of queued) {
+    try {
+      const { id, queuedAt, workspaceId, ...eventData } = item;
+      await db.collection('workspaces').doc(workspaceId).collection('events').add(eventData);
+      await removeFromQueue(id);
+    } catch (error) {
+      console.error('[Firebase] Failed to sync queued event:', item.id, error);
+    }
+  }
+
+  const remaining = await getQueueSize();
+  if (remaining > 0) {
+    console.warn(`[Firebase] ${remaining} events still queued`);
+  }
 }
 
 /**

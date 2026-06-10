@@ -3,9 +3,9 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
-import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
-import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile, syncQueuedEvents } from './firebase.js';
+import { setActiveTab, scheduleRender, toast, showLoading, hideLoading, unsubscribeAll as unsubscribeRender } from './render.js';
+import { startTimer, stopTimer, resetTimer, toggleTimer, loadTimerState } from './timer.js';
 import { playClicker, playWhistle, unlock as unlockAudio } from './audio.js';
 import { preloadAll } from './content-loader.js';
 import { haptic } from './utils.js';
@@ -20,9 +20,20 @@ const hide = (el) => el?.classList.add('hidden');
 
 function boot() {
   applyTheme();
+  loadTimerState();
   bindGlobalEvents();
   initAuthFlow();
   updateOnlineStatus();
+  initPTR();
+  hideSplash();
+}
+
+function hideSplash() {
+  const splash = $('splashScreen');
+  if (splash) {
+    splash.classList.add('hide');
+    setTimeout(() => splash.remove(), 500);
+  }
 }
 
 // ===== AUTH FLOW =====
@@ -82,7 +93,7 @@ function waitForData() {
     let resolved = false;
 
     const check = () => {
-      if (!resolved && (!state.pet.loading || !state.events.loading)) {
+      if (!resolved && !state.pet.loading && !state.events.loading) {
         resolved = true;
         resolve();
       }
@@ -220,7 +231,10 @@ function bindGlobalEvents() {
   document.addEventListener('click', unlockHandler, { once: true });
 
   // Online/offline
-  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('online', () => {
+    updateOnlineStatus();
+    syncQueuedEvents();
+  });
   window.addEventListener('offline', updateOnlineStatus);
 
   // Theme toggle
@@ -246,6 +260,7 @@ function bindGlobalEvents() {
     if (confirm('Вийти?')) {
       stopTimer();
       logout();
+      unsubscribeRender();
       hide($('appContent'));
       show($('authScreen'));
     }
@@ -291,6 +306,40 @@ function bindGlobalEvents() {
       startTimer(parseInt(btn.dataset.timerPreset) * 60);
       haptic();
     });
+  });
+
+  // Share invite button
+  $('shareInviteBtn')?.addEventListener('click', async () => {
+    const code = $('inviteCodeView')?.textContent;
+    if (!code || code === '—' || !navigator.share) {
+      if (code && code !== '—') {
+        await navigator.clipboard.writeText(`🐕 Приєднуйтесь до моєї команди в Dog Coach!\n\nКод: ${code}\n\nhttps://dog-coach.vercel.app`);
+        toast('Код скопійовано 📋', 'success');
+      }
+      return;
+    }
+    try {
+      await navigator.share({
+        title: 'Dog Coach AI',
+        text: `🐕 Приєднуйтесь до моєї команди в Dog Coach!\n\nКод: ${code}`,
+        url: 'https://dog-coach.vercel.app',
+      });
+    } catch {}
+  });
+
+  // Share progress button
+  $('shareProgressBtn')?.addEventListener('click', async () => {
+    const petName = state.pet.data?.name || 'Песик';
+    const streak = state.gamification.streak.count;
+    const text = `🐕 ${petName} — ось як ми тренуємося!\n🔥 Streak: ${streak} днів\n📊 Подій: ${state.events.items.length}\n🐾 Dog Coach AI`;
+    if (!navigator.share) {
+      await navigator.clipboard.writeText(text);
+      toast('Скопійовано 📋', 'success');
+      return;
+    }
+    try {
+      await navigator.share({ title: 'Dog Coach AI', text });
+    } catch {}
   });
 
   // Keyboard
@@ -346,6 +395,73 @@ function bindGlobalEvents() {
 
   // Onboarding
   bindOnboarding();
+
+  // Badge API (PWA)
+  updateBadge();
+}
+
+/**
+ * Update PWA badge (unread reminders count)
+ */
+async function updateBadge() {
+  if (!navigator.setAppBadge || !state.pet.data?.reminders) return;
+  const reminders = state.pet.data.reminders || [];
+  const overdue = reminders.filter(r => {
+    if (!r.nextDate) return false;
+    return new Date(r.nextDate) < new Date();
+  });
+  try {
+    if (overdue.length > 0) {
+      await navigator.setAppBadge(overdue.length);
+    } else {
+      await navigator.clearAppBadge();
+    }
+  } catch {}
+}
+
+/**
+ * Pull-to-refresh logic
+ */
+function initPTR() {
+  let startY = 0;
+  let pulling = false;
+  const indicator = $('ptrIndicator');
+  if (!indicator) return;
+
+  document.addEventListener('touchstart', (e) => {
+    if (window.scrollY > 0) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling || window.scrollY > 0) return;
+    const dist = e.touches[0].clientY - startY;
+    if (dist > 0) {
+      indicator.classList.add('visible');
+      if (dist > 120) {
+        indicator.classList.add('ready');
+      } else {
+        indicator.classList.remove('ready');
+      }
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', async () => {
+    if (!pulling) return;
+    pulling = false;
+    if (indicator.classList.contains('ready')) {
+      indicator.classList.remove('ready');
+      indicator.classList.add('refreshing');
+      scheduleRender();
+      syncQueuedEvents();
+      setTimeout(() => {
+        indicator.classList.remove('refreshing', 'visible');
+      }, 800);
+    } else {
+      indicator.classList.remove('visible');
+    }
+  });
 }
 
 // ===== CLICKER =====

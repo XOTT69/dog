@@ -1,11 +1,51 @@
 /**
  * @fileoverview AI interaction — cynologist + veterinary advisor
+ * V2: Streaming responses, chat history, smart fallback preserved
  */
 
 import { state, STORAGE_KEYS } from './state.js';
 import { getIdToken } from './firebase.js';
 import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY } from './constants.js';
 import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate } from './utils.js';
+
+// ===== CHAT HISTORY =====
+const CHAT_HISTORY_KEY = 'dc_chat_history';
+const MAX_CHAT_MESSAGES = 20;
+
+/**
+ * Get chat history from localStorage
+ * @returns {Array<{role: string, content: string}>}
+ */
+export function getChatHistory() {
+  try {
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save a message to chat history
+ * @param {'user'|'assistant'} role
+ * @param {string} content
+ */
+export function saveChatHistory(role, content) {
+  try {
+    const history = getChatHistory();
+    history.push({ role, content, ts: Date.now() });
+    // Keep only last MAX_CHAT_MESSAGES
+    const trimmed = history.slice(-MAX_CHAT_MESSAGES);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Clear chat history
+ */
+export function clearChatHistory() {
+  localStorage.removeItem(CHAT_HISTORY_KEY);
+}
 
 /**
  * Build system prompt with full context
@@ -67,17 +107,22 @@ ${petContext}`;
 }
 
 /**
- * Call AI API
+ * Call AI API with streaming support
  * @param {string} userPrompt
+ * @param {Object} [options]
+ * @param {boolean} [options.stream] - Enable streaming
+ * @param {AbortSignal} [options.signal] - Abort signal
+ * @param {Function} [options.onToken] - Called with each token when streaming
  * @returns {Promise<string>}
  */
-export async function fetchAIResponse(userPrompt) {
+export async function fetchAIResponse(userPrompt, options = {}) {
+  const { stream = false, signal = null, onToken = null } = options;
   const systemPrompt = buildSystemPrompt();
 
   try {
     const token = await getIdToken();
 
-    const response = await fetch('/api/proxy', {
+    const res = await fetch('/api/proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,22 +136,74 @@ export async function fetchAIResponse(userPrompt) {
         ],
         temperature: 0.3,
         max_tokens: MAX_AI_TOKENS,
-        stream: false,
+        stream,
       }),
+      signal,
     });
 
-    if (!response.ok) {
-      console.warn('[AI] API error:', response.status);
-      throw new Error(`HTTP ${response.status}`);
+    if (!res.ok) {
+      console.warn('[AI] API error:', res.status);
+      // Try fallback
+      const fallback = getLocalFallback(userPrompt);
+      if (stream && onToken) {
+        // Simulate streaming for fallback
+        for (let i = 0; i < fallback.length; i += 3) {
+          if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          onToken(fallback.slice(i, i + 3));
+          await new Promise(r => setTimeout(r, 15));
+        }
+        return fallback;
+      }
+      return fallback;
     }
 
-    const data = await response.json();
+    if (stream && res.body) {
+      // Streaming reader
+      let fullText = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (signal?.aborted) {
+          reader.cancel();
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullText += delta;
+              onToken?.(delta);
+            }
+          } catch { /* skip malformed chunks */ }
+        }
+      }
+
+      return fullText || getLocalFallback(userPrompt);
+    }
+
+    // Non-streaming
+    const data = await res.json();
     if (data.choices?.[0]?.message?.content) {
       return data.choices[0].message.content.trim();
     }
     throw new Error('Empty response');
   } catch (e) {
+    if (e.name === 'AbortError') throw e;
     console.warn('[AI] Using local fallback:', e.message);
     return getLocalFallback(userPrompt);
   }
@@ -154,7 +251,7 @@ export function trackAIUsage() {
   localStorage.setItem(STORAGE_KEYS.aiCount, String(count));
 }
 
-// ===== SMART LOCAL FALLBACK =====
+// ===== SMART LOCAL FALLBACK (kept intact) =====
 
 function getLocalFallback(prompt) {
   const l = prompt.toLowerCase();
@@ -472,7 +569,7 @@ function getLocalFallback(prompt) {
 6. Через 3 місяці ви не уявите життя без цього пса. 🐾`;
   }
 
-  // Default — не про туалет!
+  // Default
   return `🐾 Я можу допомогти з:
 
 🎓 Тренування: команди, поведінка, соціалізація

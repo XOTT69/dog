@@ -10,11 +10,41 @@ const $ = (id) => document.getElementById(id);
 // Lazy-loaded render modules
 let homeRenderer = null;
 let diaryRenderer = null;
+let aiTrainerRenderer = null;
 let coursesRenderer = null;
 let profileRenderer = null;
 
 /** @type {boolean} */
 let renderScheduled = false;
+
+/** @type {Set<string>} Dirty sections pending update */
+let dirtySections = new Set();
+
+/**
+ * Mark sections as dirty (targeted rendering)
+ * @param {string|string[]} sections - Section names like 'hero', 'kpi', 'timer', 'dailyPlan', etc.
+ */
+export function markDirty(sections) {
+  const list = Array.isArray(sections) ? sections : [sections];
+  for (const s of list) dirtySections.add(s);
+  scheduleRender();
+}
+
+/**
+ * Check if a section is dirty and consume the flag
+ * @param {string} section
+ * @returns {boolean}
+ */
+export function isDirty(section) {
+  return dirtySections.size === 0 || dirtySections.has(section);
+}
+
+/**
+ * Clear dirty flags (called at end of render cycle)
+ */
+export function clearDirty() {
+  dirtySections.clear();
+}
 
 // ===== TAB MANAGEMENT =====
 
@@ -52,6 +82,7 @@ export function scheduleRender() {
   requestAnimationFrame(() => {
     renderScheduled = false;
     renderActiveTab();
+    clearDirty();
   });
 }
 
@@ -78,6 +109,13 @@ async function renderActiveTab() {
           diaryRenderer = await import('./renders/diary.js');
         }
         diaryRenderer.render();
+        break;
+
+      case 'tabAITrainer':
+        if (!aiTrainerRenderer) {
+          aiTrainerRenderer = await import('./renders/ai-trainer.js');
+        }
+        aiTrainerRenderer.render();
         break;
 
       case 'tabCourses':
@@ -194,17 +232,35 @@ export function hideLoading() {
 
 // ===== SUBSCRIBE TO STATE =====
 
-subscribe(['events', 'pet', 'gamification'], () => {
-  scheduleRender();
-});
+let unsubEventsPetGamification = null;
+let unsubActiveTab = null;
+let unsubTheme = null;
 
-subscribe('ui.activeTab', () => {
-  renderActiveTab();
-});
+function initSubscriptions() {
+  unsubEventsPetGamification = subscribe(['events', 'pet', 'gamification'], () => {
+    scheduleRender();
+  });
 
-subscribe('ui.theme', () => {
-  const theme = state.ui.theme;
-  document.documentElement.setAttribute('data-theme', theme);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
-});
+  unsubActiveTab = subscribe('ui.activeTab', () => {
+    renderActiveTab();
+  });
+
+  unsubTheme = subscribe('ui.theme', () => {
+    const theme = state.ui.theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
+  });
+}
+
+/**
+ * Clean up all render subscriptions — call on logout
+ */
+export function unsubscribeAll() {
+  if (unsubEventsPetGamification) { unsubEventsPetGamification(); unsubEventsPetGamification = null; }
+  if (unsubActiveTab) { unsubActiveTab(); unsubActiveTab = null; }
+  if (unsubTheme) { unsubTheme(); unsubTheme = null; }
+}
+
+// Initialize on module load
+initSubscriptions();

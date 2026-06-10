@@ -43,9 +43,9 @@ export default async function handler(req, res) {
         const daysUntil = Math.floor((nextDate - now) / 86400000);
 
         if (daysUntil === 0) {
-          notifications.push({ token, workspaceId, title: `⏰ ${reminder.label}`, body: `Сьогодні потрібно: ${reminder.label} для ${petName}!` });
+          notifications.push({ token, title: `⏰ ${reminder.label}`, body: `Сьогодні потрібно: ${reminder.label} для ${petName}!` });
         } else if (daysUntil === 1) {
-          notifications.push({ token, workspaceId, title: `📅 Завтра: ${reminder.label}`, body: `Нагадування: завтра ${reminder.label} для ${petName}` });
+          notifications.push({ token, title: `📅 Завтра: ${reminder.label}`, body: `Нагадування: завтра ${reminder.label} для ${petName}` });
         }
       }
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .limit(1).get();
 
       if (eventsSnap.empty && now.getHours() >= 10) {
-        notifications.push({ token, workspaceId, title: `🐾 ${petName} чекає!`, body: 'Сьогодні ще немає записів. Як справи з горшиком?' });
+        notifications.push({ token, title: `🐾 ${petName} чекає!`, body: 'Сьогодні ще немає записів. Як справи з горшиком?' });
       }
 
       // Deworming check
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         const lastDew = new Date(pet.lastDeworming);
         const daysSince = Math.floor((now - lastDew) / 86400000);
         if (daysSince >= 88 && daysSince <= 90) {
-          notifications.push({ token, workspaceId, title: `💊 Час дегельмінтизації!`, body: `${petName}: пройшло ${daysSince} днів з останньої обробки.` });
+          notifications.push({ token, title: `💊 Час дегельмінтизації!`, body: `${petName}: пройшло ${daysSince} днів з останньої обробки.` });
         }
       }
 
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
         const lastVac = new Date(pet.lastVaccine);
         const daysSince = Math.floor((now - lastVac) / 86400000);
         if (daysSince >= 358 && daysSince <= 365) {
-          notifications.push({ token, workspaceId, title: `💉 Вакцинація!`, body: `${petName}: минув майже рік з останньої вакцини.` });
+          notifications.push({ token, title: `💉 Вакцинація!`, body: `${petName}: минув майже рік з останньої вакцини.` });
         }
       }
     }
@@ -97,23 +97,8 @@ export default async function handler(req, res) {
         failed++;
         // Remove invalid tokens
         if (e.code === 'messaging/registration-token-not-registered' || e.code === 'messaging/invalid-registration-token') {
-          // Token expired — remove from Firestore
-          console.log('Invalid token, removing:', notif.token.slice(0, 20));
-          try {
-            const wsId = notif.workspaceId;
-            if (!wsId) continue;
-            await db.collection('workspaces').doc(wsId)
-              .collection('members')
-              .where('pushToken', '==', notif.token)
-              .get()
-              .then((snapshot) => {
-                snapshot.forEach((doc) => {
-                  doc.ref.update({ pushToken: '' });
-                });
-              });
-          } catch (removeError) {
-            console.error('[Push] Failed to remove invalid token:', removeError);
-          }
+          // Token expired — можна видалити з Firestore
+          console.log('Invalid token, should remove:', notif.token.slice(0, 20));
         }
       }
     }

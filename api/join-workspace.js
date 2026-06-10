@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const decoded = await verifyAuthHeader(req);
 
     // Brute-force protection: max 5 attempts per hour per user
-    const { allowed, remaining } = await checkRateLimit(
+    const { allowed, remaining } = checkRateLimit(
       `join:${decoded.uid}`,
       5,
       60 * 60 * 1000 // 1 hour

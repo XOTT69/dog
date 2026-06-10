@@ -1,80 +1,45 @@
 /**
- * @fileoverview Firestore-based rate limiter for Vercel Serverless Functions
- * Uses Firestore for persistent rate limiting across cold starts
+ * @fileoverview In-memory rate limiter for Vercel Serverless Functions
+ * Note: In-memory means it resets on cold start. For production at scale,
+ * use Upstash Redis. For free tier this is sufficient.
  */
 
-import { getAdmin } from './_firebase-admin.js';
+/** @type {Map<string, {count: number, resetAt: number}>} */
+const buckets = new Map();
+
+// Cleanup every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of buckets) {
+    if (bucket.resetAt < now) {
+      buckets.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 /**
- * Check rate limit using Firestore
+ * Check rate limit
  * @param {string} key - Unique identifier (e.g., user ID)
  * @param {number} maxRequests - Max requests per window
  * @param {number} windowMs - Window duration in ms
- * @returns {Promise<{ allowed: boolean, remaining: number, resetAt: number }>}
+ * @returns {{ allowed: boolean, remaining: number, resetAt: number }}
  */
-export async function checkRateLimit(key, maxRequests, windowMs) {
-  const admin = getAdmin();
-  const db = admin.firestore();
+export function checkRateLimit(key, maxRequests, windowMs) {
   const now = Date.now();
-  const windowStart = now - windowMs;
+  let bucket = buckets.get(key);
 
-  try {
-    const docRef = db.collection('rate_limits').doc(key);
-    const doc = await docRef.get();
-
-    if (!doc.exists) {
-      // First request - create document
-      await docRef.set({
-        count: 1,
-        windowStart: now,
-        resetAt: now + windowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return {
-        allowed: true,
-        remaining: maxRequests - 1,
-        resetAt: now + windowMs,
-      };
-    }
-
-    const data = doc.data();
-
-    // Reset if window expired
-    if (data.resetAt < now) {
-      await docRef.update({
-        count: 1,
-        windowStart: now,
-        resetAt: now + windowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return {
-        allowed: true,
-        remaining: maxRequests - 1,
-        resetAt: now + windowMs,
-      };
-    }
-
-    // Increment count
-    const newCount = data.count + 1;
-    await docRef.update({
-      count: newCount,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return {
-      allowed: newCount <= maxRequests,
-      remaining: Math.max(0, maxRequests - newCount),
-      resetAt: data.resetAt,
-    };
-  } catch (error) {
-    console.error('[RateLimit] Firestore error:', error);
-    // Fail open - allow request if rate limit check fails
-    return {
-      allowed: true,
-      remaining: maxRequests,
-      resetAt: now + windowMs,
-    };
+  if (!bucket || bucket.resetAt < now) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    buckets.set(key, bucket);
   }
+
+  bucket.count++;
+
+  return {
+    allowed: bucket.count <= maxRequests,
+    remaining: Math.max(0, maxRequests - bucket.count),
+    resetAt: bucket.resetAt,
+  };
 }
 
 /**
@@ -84,10 +49,10 @@ export async function checkRateLimit(key, maxRequests, windowMs) {
  * @param {string} uid - User ID
  * @param {number} maxRequests
  * @param {number} windowMs
- * @returns {Promise<boolean>} true if rate limited (should return early)
+ * @returns {boolean} true if rate limited (should return early)
  */
-export async function rateLimitResponse(req, res, uid, maxRequests = 10, windowMs = 60000) {
-  const { allowed, remaining, resetAt } = await checkRateLimit(uid, maxRequests, windowMs);
+export function rateLimitResponse(req, res, uid, maxRequests = 10, windowMs = 60000) {
+  const { allowed, remaining, resetAt } = checkRateLimit(uid, maxRequests, windowMs);
 
   res.setHeader('X-RateLimit-Limit', String(maxRequests));
   res.setHeader('X-RateLimit-Remaining', String(remaining));

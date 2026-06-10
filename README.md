@@ -43,3 +43,28 @@ vercel.json
 - `households/{householdId}/routines/{routineId}`
 - `households/{householdId}/reminders/{reminderId}`
 - `households/{householdId}/notes/{noteId}`
+
+function waitForData() {
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const check = () => {
+      // FIX: && замість || — чекаємо поки ОБА завантажаться
+      if (!resolved && !state.pet.loading && !state.events.loading) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    const unsub = subscribe(['pet', 'events'], check);
+
+    // Fallback timeout
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsub();
+        resolve();
+      }
+    }, 3000);
+  });
+}

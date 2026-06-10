@@ -61,20 +61,17 @@ export const SW_CACHE_VERSION = 'dogcoach-v2';
 export const AI_PLAN_CACHE_HOURS = 24;
 
 // ===== FIREBASE CONFIG =====
-// Firebase config should be loaded from environment variables in production
-// For local development, these are placeholder values - replace with your actual config
 export const FIREBASE_CONFIG = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'YOUR_API_KEY',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'your-project.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'your-project-id',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'your-project.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'YOUR_SENDER_ID',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'YOUR_APP_ID',
+  apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
+  authDomain: 'dogs-55f5e.firebaseapp.com',
+  projectId: 'dogs-55f5e',
+  storageBucket: 'dogs-55f5e.firebasestorage.app',
+  messagingSenderId: '1053489833652',
+  appId: '1:1053489833652:web:ddf53d87b0a4af4207d9e1',
 };
 
 // ===== VAPID KEY =====
-// Public key for Web Push — configurable via env, with fallback for development
-export const VAPID_KEY = import.meta.env?.VITE_VAPID_KEY || 'BFvGyG-w5R68xO2RS6gQbYSyAPQaviGnVsHedxjzXajvxg1OUdL1Xe6e4M38j0mewG-Yt3qKgbUnMHmf98PaCiA';
+export const VAPID_KEY = 'BFvGyG-w5R68xO2RS6gQbYSyAPQaviGnVsHedxjzXajvxg1OUdL1Xe6e4M38j0mewG-Yt3qKgbUnMHmf98PaCiA';
 
 // ===== AI MODELS =====
 export const AI_PRIMARY_MODEL = 'groq/llama-3.3-70b-versatile';

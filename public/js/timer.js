@@ -1,12 +1,65 @@
 /**
- * @fileoverview Timer with state integration
+ * @fileoverview Timer with state integration and localStorage persistence
  */
 
 import { state } from './state.js';
 import { playAlarm } from './audio.js';
 
+const TIMER_STORAGE_KEY = 'dc_timer_state';
+
 /** @type {number|null} */
 let intervalId = null;
+
+/**
+ * Load timer state from localStorage
+ */
+export function loadTimerState() {
+  try {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      const now = Date.now();
+      
+      // Only restore if saved within last 24 hours
+      if (now - data.timestamp < 24 * 60 * 60 * 1000) {
+        // Calculate elapsed time
+        const elapsed = Math.floor((now - data.timestamp) / 1000);
+        const remaining = Math.max(0, data.seconds - elapsed);
+        
+        if (remaining > 0 && data.running) {
+          state.timer.total = data.total;
+          state.timer.seconds = remaining;
+          state.timer.running = false; // Start paused
+        } else if (remaining > 0) {
+          state.timer.total = data.total;
+          state.timer.seconds = remaining;
+          state.timer.running = false;
+        }
+      }
+      
+      // Clear old state
+      localStorage.removeItem(TIMER_STORAGE_KEY);
+    }
+  } catch (e) {
+    console.warn('[Timer] Failed to load state:', e);
+  }
+}
+
+/**
+ * Save timer state to localStorage
+ */
+function saveTimerState() {
+  try {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({
+      total: state.timer.total,
+      seconds: state.timer.seconds,
+      running: state.timer.running,
+      timestamp: Date.now(),
+    }));
+  } catch (e) {
+    console.warn('[Timer] Failed to save state:', e);
+  }
+}
 
 /**
  * Start timer with given duration
@@ -17,12 +70,17 @@ export function startTimer(seconds) {
   state.timer.total = seconds;
   state.timer.seconds = seconds;
   state.timer.running = true;
+  saveTimerState();
 
   intervalId = setInterval(() => {
     state.timer.seconds--;
     if (state.timer.seconds <= 0) {
       stopTimer();
       onTimerComplete();
+    }
+    // Save timer state every 10 ticks (10 seconds) to reduce localStorage writes
+    if (state.timer.seconds % 10 === 0) {
+      saveTimerState();
     }
   }, 1000);
 }
@@ -36,6 +94,7 @@ export function stopTimer() {
     intervalId = null;
   }
   state.timer.running = false;
+  saveTimerState();
 }
 
 /**
@@ -45,6 +104,7 @@ export function resetTimer() {
   stopTimer();
   state.timer.seconds = 0;
   state.timer.total = 0;
+  saveTimerState();
 }
 
 /**
@@ -55,11 +115,17 @@ export function toggleTimer() {
     stopTimer();
   } else if (state.timer.total > 0) {
     state.timer.running = true;
+    saveTimerState();
     intervalId = setInterval(() => {
       state.timer.seconds--;
       if (state.timer.seconds <= 0) {
         stopTimer();
         onTimerComplete();
+        return;
+      }
+      // Save timer state every 10 ticks (10 seconds) to reduce localStorage writes
+      if (state.timer.seconds % 10 === 0) {
+        saveTimerState();
       }
     }, 1000);
   }
@@ -70,6 +136,7 @@ export function toggleTimer() {
  */
 function onTimerComplete() {
   playAlarm();
+  localStorage.removeItem(TIMER_STORAGE_KEY);
 
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('⏰ Час горшика!', {

@@ -16,10 +16,7 @@ import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
 
 // ===== RENDER =====
 
-const COLLAPSE_STORAGE_KEY = 'dc_home_collapse';
-
 export function render() {
-  initHomeCollapses();
   updateStreak();
   renderStreak();
   renderDailyTip();
@@ -644,27 +641,6 @@ const AGE_PROGRAMS = [
 function getAgeProgramByWeeks(weeks) {
   if (weeks == null) return AGE_PROGRAMS[1];
   return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
-}
-
-function initHomeCollapses() {
-  const ids = ['collapseTools', 'collapseAchievements', 'collapseHeatmap', 'collapseAgeFocus'];
-  let saved = {};
-  try {
-    saved = JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || '{}');
-  } catch { /* ignore */ }
-
-  ids.forEach((id) => {
-    const el = $(id);
-    if (!el || el.dataset.bound) return;
-    el.dataset.bound = 'true';
-
-    if (id in saved) el.open = saved[id];
-
-    el.addEventListener('toggle', () => {
-      saved[id] = el.open;
-      localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(saved));
-    });
-  });
 }
 
 export { getAgeProgramByWeeks };

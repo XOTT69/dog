@@ -63,12 +63,6 @@ const initialState = {
     items: [],
   },
 
-  // AI chat history (Firestore sync)
-  aiChat: {
-    items: [],
-    loading: true,
-  },
-
   // UI state
   ui: {
     activeTab: 'tabHome',

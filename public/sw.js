@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'dogcoach-v4';
+const CACHE_VERSION = 'dogcoach-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,7 +11,6 @@ const STATIC_ASSETS = [
   '/js/render.js',
   '/js/audio.js',
   '/js/ai.js',
-  '/js/renders/ai-tab.js',
   '/js/timer.js',
   '/js/achievements.js',
   '/js/content-loader.js',

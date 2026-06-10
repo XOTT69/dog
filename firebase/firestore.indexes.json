@@ -24,13 +24,6 @@
       ]
     },
     {
-      "collectionGroup": "aiMessages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "members",
       "queryScope": "COLLECTION",
       "fields": [

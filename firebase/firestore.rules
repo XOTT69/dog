@@ -40,15 +40,6 @@ service cloud.firestore {
              (!('timeLabel' in data) || (data.timeLabel is string && data.timeLabel.size() <= 10));
     }
 
-    // Validate AI chat message
-    function isValidAiMessage() {
-      let data = request.resource.data;
-      return data.role in ['user', 'assistant'] &&
-             isValidString(data.content, 4000) &&
-             data.byUid == request.auth.uid &&
-             isValidString(data.byName, 100);
-    }
-
     // Validate pet data
     function isValidPet() {
       let data = request.resource.data;
@@ -155,15 +146,6 @@ service cloud.firestore {
         allow read: if isMember(workspaceId);
         allow create, update: if isMember(workspaceId);
         allow delete: if isMember(workspaceId);
-      }
-
-      // ===== AI CHAT MESSAGES =====
-      match /aiMessages/{messageId} {
-        allow read: if isMember(workspaceId);
-        allow create: if isMember(workspaceId) && isValidAiMessage();
-        allow update: if false;
-        allow delete: if isMember(workspaceId) &&
-          (resource.data.byUid == request.auth.uid || isOwner(workspaceId));
       }
     }
 

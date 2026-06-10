@@ -4,7 +4,7 @@
  */
 
 import { state, batch } from './state.js';
-import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, MAX_AI_MESSAGES, VAPID_KEY } from './constants.js';
+import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, VAPID_KEY } from './constants.js';
 import { nowTime } from './utils.js';
 
 // ===== INIT =====
@@ -24,7 +24,6 @@ db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
 let unsubPet = null;
 let unsubEvents = null;
 let unsubMembers = null;
-let unsubAiChat = null;
 
 // ===== AUTH =====
 
@@ -81,8 +80,6 @@ export async function logout() {
     state.pet.data = null;
     state.events.items = [];
     state.members.items = [];
-    state.aiChat.items = [];
-    state.aiChat.loading = true;
   });
 }
 
@@ -206,29 +203,10 @@ export function subscribeMembers() {
     }, (err) => console.error('[Firestore] Members error:', err));
 }
 
-export function subscribeAiMessages() {
-  if (unsubAiChat) unsubAiChat();
-  const wsId = state.workspace.id;
-  if (!wsId) return;
-
-  unsubAiChat = db.collection('workspaces').doc(wsId).collection('aiMessages')
-    .orderBy('createdAt', 'asc')
-    .limit(MAX_AI_MESSAGES)
-    .onSnapshot((snap) => {
-      const items = [];
-      snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-      batch(() => {
-        state.aiChat.items = items;
-        state.aiChat.loading = false;
-      });
-    }, (err) => console.error('[Firestore] AI chat error:', err));
-}
-
 function unsubAll() {
   if (unsubPet) { unsubPet(); unsubPet = null; }
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
-  if (unsubAiChat) { unsubAiChat(); unsubAiChat = null; }
 }
 
 // ===== MUTATIONS =====
@@ -300,49 +278,6 @@ export async function restoreEvent(eventData) {
 
   const ref = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return ref.id;
-}
-
-// ===== AI CHAT =====
-
-/**
- * Save AI chat message
- * @param {{ role: 'user'|'assistant', content: string }} payload
- * @returns {Promise<string>}
- */
-export async function saveAiMessage(payload) {
-  const wsId = state.workspace.id;
-  const user = state.auth.user;
-  if (!wsId || !user) throw new Error('No workspace or auth');
-
-  const data = {
-    role: payload.role,
-    content: String(payload.content || '').slice(0, 4000),
-    byUid: user.uid,
-    byName: user.displayName || 'Я',
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-
-  const ref = await db.collection('workspaces').doc(wsId).collection('aiMessages').add(data);
-  return ref.id;
-}
-
-/**
- * Clear all AI chat messages in workspace
- */
-export async function clearAiMessages() {
-  const wsId = state.workspace.id;
-  if (!wsId) return;
-
-  const snap = await db.collection('workspaces').doc(wsId).collection('aiMessages')
-    .orderBy('createdAt', 'desc')
-    .limit(500)
-    .get();
-
-  if (snap.empty) return;
-
-  const writeBatch = db.batch();
-  snap.docs.forEach((doc) => writeBatch.delete(doc.ref));
-  await writeBatch.commit();
 }
 
 // ===== PUSH =====

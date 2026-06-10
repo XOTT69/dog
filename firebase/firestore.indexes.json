@@ -29,6 +29,13 @@
       "fields": [
         { "fieldPath": "pushToken", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "rate_limits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "resetAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

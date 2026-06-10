@@ -5,22 +5,11 @@ export const config = {
 import { json, verifyAuthHeader } from './_firebase-admin.js';
 import { rateLimitResponse } from './_rate-limit.js';
 
-// CORS whitelist - add your production domains here
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://dog-coach.vercel.app',
-  // Add your production domain here
-];
-
 function setCors(req, res) {
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 const PROVIDERS = {

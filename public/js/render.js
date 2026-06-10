@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 let homeRenderer = null;
 let diaryRenderer = null;
 let coursesRenderer = null;
+let aiTabRenderer = null;
 let profileRenderer = null;
 
 /** @type {boolean} */
@@ -34,7 +35,9 @@ export function setActiveTab(tabId) {
   });
 
   const fab = $('fabAddEvent');
-  if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile');
+  if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile' || tabId === 'tabAI');
+
+  document.body.classList.toggle('ai-tab-active', tabId === 'tabAI');
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -85,6 +88,13 @@ async function renderActiveTab() {
           coursesRenderer = await import('./renders/courses.js');
         }
         coursesRenderer.render();
+        break;
+
+      case 'tabAI':
+        if (!aiTabRenderer) {
+          aiTabRenderer = await import('./renders/ai-tab.js');
+        }
+        aiTabRenderer.render();
         break;
 
       case 'tabProfile':

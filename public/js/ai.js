@@ -4,7 +4,7 @@
 
 import { state, STORAGE_KEYS } from './state.js';
 import { getIdToken } from './firebase.js';
-import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY } from './constants.js';
+import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MAX_AI_HISTORY_CONTEXT, MS_PER_DAY } from './constants.js';
 import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate } from './utils.js';
 
 /**
@@ -67,15 +67,78 @@ ${petContext}`;
 }
 
 /**
- * Call AI API
+ * Build messages array with optional chat history
  * @param {string} userPrompt
+ * @param {Array<{role: string, content: string}>} [history]
+ * @returns {Array<{role: string, content: string}>}
+ */
+function buildMessages(userPrompt, history = []) {
+  const systemPrompt = buildSystemPrompt();
+  const contextHistory = history
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .slice(-MAX_AI_HISTORY_CONTEXT)
+    .map(m => ({ role: m.role, content: m.content }));
+
+  return [
+    { role: 'system', content: systemPrompt },
+    ...contextHistory,
+    { role: 'user', content: userPrompt },
+  ];
+}
+
+/**
+ * Parse OpenAI-compatible SSE stream
+ * @param {ReadableStream} body
+ * @param {Function} onChunk - (fullText, delta) => void
  * @returns {Promise<string>}
  */
-export async function fetchAIResponse(userPrompt) {
-  const systemPrompt = buildSystemPrompt();
+async function parseSSEStream(body, onChunk) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let full = '';
 
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta?.content || '';
+        if (delta) {
+          full += delta;
+          onChunk(full, delta);
+        }
+      } catch {
+        // skip malformed chunks
+      }
+    }
+  }
+
+  return full.trim();
+}
+
+/**
+ * Call AI API with streaming
+ * @param {string} userPrompt
+ * @param {Function} onChunk - (fullText, delta) => void
+ * @param {Array<{role: string, content: string}>} [history]
+ * @returns {Promise<string>}
+ */
+export async function fetchAIResponseStream(userPrompt, onChunk, history = []) {
   try {
     const token = await getIdToken();
+    const messages = buildMessages(userPrompt, history);
 
     const response = await fetch('/api/proxy', {
       method: 'POST',
@@ -85,31 +148,51 @@ export async function fetchAIResponse(userPrompt) {
       },
       body: JSON.stringify({
         model: AI_PRIMARY_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
         temperature: 0.3,
         max_tokens: MAX_AI_TOKENS,
-        stream: false,
+        stream: true,
       }),
     });
 
     if (!response.ok) {
-      console.warn('[AI] API error:', response.status);
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type') || '';
 
-    if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content.trim();
+    if (contentType.includes('text/event-stream') && response.body) {
+      const full = await parseSSEStream(response.body, onChunk);
+      if (full) return full;
+      throw new Error('Empty stream');
+    }
+
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content?.trim() || '';
+    if (text) {
+      onChunk(text, text);
+      return text;
     }
     throw new Error('Empty response');
   } catch (e) {
-    console.warn('[AI] Using local fallback:', e.message);
-    return getLocalFallback(userPrompt);
+    console.warn('[AI] Stream failed, using fallback:', e.message);
+    const fallback = getLocalFallback(userPrompt);
+    onChunk(fallback, fallback);
+    return fallback;
   }
+}
+
+/**
+ * Call AI API (non-streaming)
+ * @param {string} userPrompt
+ * @param {Array<{role: string, content: string}>} [history]
+ * @returns {Promise<string>}
+ */
+export async function fetchAIResponse(userPrompt, history = []) {
+  let result = '';
+  return fetchAIResponseStream(userPrompt, (full) => { result = full; }, history)
+    .then(() => result)
+    .catch(() => getLocalFallback(userPrompt));
 }
 
 /**

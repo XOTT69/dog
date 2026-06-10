@@ -16,6 +16,8 @@ export const MAX_FEED_DISPLAY = 60;
 export const MAX_CHART_DAYS = 14;
 export const MAX_HEATMAP_DAYS = 28;
 export const MAX_AI_TOKENS = 600;
+export const MAX_AI_MESSAGES = 100;
+export const MAX_AI_HISTORY_CONTEXT = 10;
 export const AI_TIMEOUT_MS = 25000;
 
 // ===== TIMER PRESETS =====

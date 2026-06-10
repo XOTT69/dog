@@ -3,7 +3,7 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribeAiMessages, subscribePush, savePetProfile } from './firebase.js';
 import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { playClicker, playWhistle, unlock as unlockAudio } from './audio.js';
@@ -45,6 +45,7 @@ function initAuthFlow() {
       subscribePet();
       subscribeMembers();
       subscribeEvents();
+      subscribeAiMessages();
 
       // Wait for first data snapshot
       await waitForData();
@@ -329,6 +330,12 @@ function bindGlobalEvents() {
       scheduleRender();
       haptic();
     });
+  });
+
+  // Open AI tab from home CTA
+  $('openAITabBtn')?.addEventListener('click', () => {
+    setActiveTab('tabAI');
+    haptic();
   });
 
   // Weekly report dismiss

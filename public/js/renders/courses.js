@@ -3,7 +3,7 @@
  */
 
 import { state, STORAGE_KEYS } from '../state.js';
-import { $, $$, escapeHtml, haptic } from '../utils.js';
+import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage } from '../ai.js';
 import { toast } from '../render.js';
@@ -30,6 +30,8 @@ function renderProblemButtons() {
   if (!panel) return;
 
   $$('.problem-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
     btn.addEventListener('click', () => {
       const problemId = btn.dataset.problem;
       const program = getTrainingProgram(problemId);
@@ -150,12 +152,40 @@ function renderAIChat() {
 async function handleAISubmit(prompt) {
   if (!prompt.trim()) return;
 
+  // Auto-personalize prompt with dog data
+  const pet = state.pet.data;
+  const petName = pet?.name?.trim();
+  const breed = pet?.breed?.trim();
+  const age = pet?.birthDate ? getAgeInWeeks(pet.birthDate) : null;
+  const sex = pet?.sex?.trim();
+  const issues = pet?.issues?.trim();
+
+  let personalizedPrompt = prompt;
+  if (petName && !prompt.includes(petName)) {
+    // Replace generic "собака" with dog's name
+    personalizedPrompt = personalizedPrompt.replace(/собака/gi, petName);
+    personalizedPrompt = personalizedPrompt.replace(/Собака/gi, petName);
+  }
+
+  // Prepend context for AI
+  const contextParts = [];
+  if (petName) contextParts.push(`Собака: ${petName}`);
+  if (breed) contextParts.push(`Порода: ${breed}`);
+  if (age) contextParts.push(`Вік: ${age} тижнів`);
+  if (sex) contextParts.push(`Стать: ${sex}`);
+  if (issues) contextParts.push(`Проблеми: ${issues}`);
+
+  let fullPrompt = personalizedPrompt;
+  if (contextParts.length > 0) {
+    fullPrompt = `[${contextParts.join(', ')}] ${personalizedPrompt}`;
+  }
+
   addChatMessage(prompt, 'user');
   showTyping();
   trackAIUsage();
 
   try {
-    const response = await fetchAIResponse(prompt);
+    const response = await fetchAIResponse(fullPrompt);
     removeTyping();
     addChatMessage(response, 'assistant');
   } catch {
@@ -171,8 +201,42 @@ function addChatMessage(text, type) {
   const msg = document.createElement('div');
   msg.className = `ai-msg ${type}`;
   msg.textContent = text;
+
+  // Add share button to AI responses
+  if (type === 'assistant') {
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'msg-share-btn';
+    shareBtn.type = 'button';
+    shareBtn.textContent = '📤 Поділитися';
+    shareBtn.addEventListener('click', () => shareMessage(text));
+    msg.appendChild(shareBtn);
+  }
+
   chat.appendChild(msg);
   chat.scrollTop = chat.scrollHeight;
+}
+
+async function shareMessage(text) {
+  const pet = state.pet.data;
+  const petName = pet?.name || 'Мій песик';
+  const shareText = `🐕 ${petName} — порада від Dog Coach AI:\n\n${text}\n\n— Dog Coach AI`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: shareText, title: 'Dog Coach AI' });
+      haptic();
+    } catch (e) {
+      // User cancelled
+    }
+  } else {
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareText);
+      toast('Скопійовано в буфер обміну 📋', 'success');
+    } catch {
+      toast('Не вдалося скопіювати', 'error');
+    }
+  }
 }
 
 function showTyping() {

@@ -34,7 +34,23 @@ export function setActiveTab(tabId) {
   });
 
   const fab = $('fabAddEvent');
-  if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile');
+  const header = document.querySelector('.header');
+  const nav = document.querySelector('.nav');
+  const main = document.querySelector('.main');
+
+  if (tabId === 'tabChat') {
+    // Full-screen chat mode
+    if (fab) fab.classList.add('hidden');
+    if (header) header.classList.add('hidden');
+    if (nav) nav.classList.add('hidden');
+    if (main) main.style.paddingBottom = '1.25rem';
+  } else {
+    // Normal mode
+    if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile');
+    if (header) header.classList.remove('hidden');
+    if (nav) nav.classList.remove('hidden');
+    if (main) main.style.paddingBottom = '';
+  }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 

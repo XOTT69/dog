@@ -376,7 +376,7 @@ textarea { resize: vertical; min-height: 80px; }
   right: 0;
   z-index: 100;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--surface-glass);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
@@ -1784,6 +1784,121 @@ button:focus:not(:focus-visible) { outline: none; }
   margin-top: 0.5rem;
   font-size: 0.82rem;
   color: var(--text-secondary);
+}
+
+/* ===== PROBLEM GRID (Training) ===== */
+.problem-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+.problem-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 0.6rem;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 150ms var(--ease);
+  box-shadow: var(--shadow-xs);
+}
+.problem-btn:active { transform: scale(0.95); }
+.problem-btn:hover { border-color: var(--accent); background: var(--accent-subtle); }
+.problem-btn.selected { border-color: var(--accent); background: var(--accent-light); box-shadow: 0 0 0 2px var(--accent-light); }
+.problem-icon { font-size: 1.8rem; }
+.problem-label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+
+/* ===== TRAINING PROGRAM ===== */
+.training-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.training-header-icon { font-size: 2rem; }
+.training-header-info h4 { font-size: 1.1rem; font-weight: 800; margin-bottom: 0.2rem; }
+.training-header-info p { font-size: 0.82rem; color: var(--text-secondary); }
+.training-duration {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+  align-self: flex-start;
+}
+.training-steps { margin-bottom: 1rem; }
+.training-step {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.training-step:last-child { border-bottom: none; }
+.training-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.training-step-content { flex: 1; }
+.training-step-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.2rem; }
+.training-step-desc { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; }
+.training-tip {
+  padding: 0.6rem 0.85rem;
+  background: var(--warning-light);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--warning);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+.training-mistake {
+  padding: 0.6rem 0.85rem;
+  background: var(--danger-light);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--danger);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+.training-progress {
+  margin-bottom: 1rem;
+}
+.training-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-sunken);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+.training-progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 4px;
+  transition: width 500ms var(--ease);
+}
+.training-progress-text {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== AI QUICK TAGS ===== */
+.ai-quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
 }
 
 /* ===== FEED LOAD MORE ===== */

@@ -7,6 +7,7 @@ import { $, $$, escapeHtml, haptic } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage } from '../ai.js';
 import { toast } from '../render.js';
+import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -14,11 +15,86 @@ let knowledgeRendered = false;
 let socialRendered = false;
 
 export async function render() {
+  renderProblemButtons();
   renderAIChat();
   await renderCourseGrid();
   await renderKnowledgeGrid();
   await renderSocialGrid();
   renderToiletGuide();
+}
+
+// ===== PROBLEM BUTTONS (Training Programs) =====
+
+function renderProblemButtons() {
+  const panel = $('trainingProgram');
+  if (!panel) return;
+
+  $$('.problem-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const problemId = btn.dataset.problem;
+      const program = getTrainingProgram(problemId);
+      if (!program) return;
+
+      // Toggle selection
+      $$('.problem-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      haptic();
+
+      renderTrainingDetail(program, panel);
+    });
+  });
+}
+
+function renderTrainingDetail(program, panel) {
+  const pet = state.pet.data;
+  const petName = pet?.name || 'ваш песик';
+
+  panel.classList.remove('hidden');
+  panel.innerHTML = `
+    <div class="card" style="border-left: 4px solid var(--accent)">
+      <div class="training-header">
+        <span class="training-header-icon">${program.icon}</span>
+        <div class="training-header-info">
+          <h4>${escapeHtml(program.title)}</h4>
+          <p>${escapeHtml(program.desc)}</p>
+        </div>
+        <span class="training-duration">${escapeHtml(program.duration)}</span>
+      </div>
+
+      <div class="training-steps">
+        ${program.steps.map((step, i) => `
+          <div class="training-step">
+            <div class="training-step-num">${i + 1}</div>
+            <div class="training-step-content">
+              <div class="training-step-title">${escapeHtml(step.title)}</div>
+              <div class="training-step-desc">${escapeHtml(step.desc)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
+      ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
+
+      <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+        🤖 Запитати AI детальніше
+      </button>
+    </div>
+  `;
+
+  // Bind AI button
+  panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
+    const prompt = e.currentTarget.dataset.aiPrompt;
+    if (prompt) {
+      // Switch to chat tab
+      const chatTab = document.querySelector('[data-tab="tabChat"]');
+      if (chatTab) chatTab.click();
+      setTimeout(() => handleAISubmit(prompt), 300);
+    }
+  });
+
+  // Scroll to panel
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ===== AI CHAT =====

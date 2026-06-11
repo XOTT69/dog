@@ -330,32 +330,58 @@
       <!-- ===== COURSES TAB ===== -->
       <section id="tabCourses" class="tab">
         <h3 class="page-title">🎓 Навчання</h3>
-        <div class="card ai-section">
-          <h4 class="card-title">🤖 AI Кінолог</h4>
-          <div class="ai-prompts">
-            <button class="chip" data-ai-prompt="Як навчити Сидіти?" type="button">Сидіти</button>
-            <button class="chip" data-ai-prompt="Що робити якщо гризе?" type="button">Гризіння</button>
-            <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">Гавкіт</button>
-            <button class="chip" data-ai-prompt="Соціалізація цуценя" type="button">Соціалізація</button>
-            <button class="chip" data-ai-prompt="Як на пелюшку?" type="button">Туалет</button>
-            <button class="chip" data-ai-prompt="Не тягнути повідок" type="button">Повідок</button>
-            <button class="chip" data-ai-prompt="Команда До мене" type="button">Підклик</button>
-            <button class="chip" data-ai-prompt="Puppy blues що робити" type="button">Puppy Blues</button>
+
+        <!-- Quick Problem Select -->
+        <div class="card">
+          <h4 class="card-title">🔍 Що вирішуємо?</h4>
+          <div class="problem-grid">
+            <button class="problem-btn" data-problem="bite" type="button">
+              <span class="problem-icon">🦷</span>
+              <span class="problem-label">Кусається</span>
+            </button>
+            <button class="problem-btn" data-problem="pull" type="button">
+              <span class="problem-icon">🦮</span>
+              <span class="problem-label">Тягне повідок</span>
+            </button>
+            <button class="problem-btn" data-problem="bark" type="button">
+              <span class="problem-icon">🗣️</span>
+              <span class="problem-label">Гавкає</span>
+            </button>
+            <button class="problem-btn" data-problem="chew" type="button">
+              <span class="problem-icon">🧸</span>
+              <span class="problem-label">Гризе речі</span>
+            </button>
+            <button class="problem-btn" data-problem="jump" type="button">
+              <span class="problem-icon">🦘</span>
+              <span class="problem-label">Стрибає</span>
+            </button>
+            <button class="problem-btn" data-problem="alone" type="button">
+              <span class="problem-icon">🚪</span>
+              <span class="problem-label">Тривога розлуки</span>
+            </button>
+            <button class="problem-btn" data-problem="toilet" type="button">
+              <span class="problem-icon">🚽</span>
+              <span class="problem-label">Туалет</span>
+            </button>
+            <button class="problem-btn" data-problem="social" type="button">
+              <span class="problem-icon">🌍</span>
+              <span class="problem-label">Соціалізація</span>
+            </button>
+            <button class="problem-btn" data-problem="recall" type="button">
+              <span class="problem-icon">📣</span>
+              <span class="problem-label">Підклик</span>
+            </button>
+            <button class="problem-btn" data-problem="calm" type="button">
+              <span class="problem-icon">🧘</span>
+              <span class="problem-label">Спокій</span>
+            </button>
           </div>
-          <div id="aiChat" class="chat-box"></div>
-          <form id="aiForm" class="chat-form">
-            <div class="chat-input-row">
-              <textarea id="aiInput" placeholder="Запитайте пораду..." rows="1"></textarea>
-              <button class="btn-voice" id="voiceBtn" type="button" aria-label="Голос">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              </button>
-              <button class="btn btn-primary btn-send" type="submit" aria-label="Надіслати">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              </button>
-            </div>
-            <button class="btn btn-ghost btn-sm" id="clearChatBtn" type="button">Очистити чат</button>
-          </form>
         </div>
+
+        <!-- Training Program Detail (hidden by default) -->
+        <div id="trainingProgram" class="hidden"></div>
+
+        <!-- Recommended Courses -->
         <div class="filter-row" id="courseFilters">
           <button class="chip active" data-course-level="all">Всі</button>
           <button class="chip" data-course-level="базовий">🟢 Базовий</button>
@@ -367,6 +393,7 @@
           <div class="skeleton skeleton-card"></div>
         </div>
         <div id="selectedCourse"></div>
+
         <h4 class="section-title mt-lg">📚 База знань</h4>
         <div id="knowledgeGrid" class="knowledge-grid">
           <div class="skeleton skeleton-card"></div>
@@ -377,6 +404,38 @@
         </div>
         <h4 class="section-title mt-lg">🚽 Алгоритм туалету</h4>
         <div id="toiletGuide" class="knowledge-grid"></div>
+      </section>
+
+      <!-- ===== CHAT TAB ===== -->
+      <section id="tabChat" class="tab">
+        <h3 class="page-title">💬 Чат з AI</h3>
+        <div class="card ai-section">
+          <div class="ai-quick-tags">
+            <button class="chip" data-ai-prompt="Як навчити Сидіти?" type="button">🎓 Сидіти</button>
+            <button class="chip" data-ai-prompt="Моя собака гризе руки і на вулиці все тягне в рот" type="button">🦷 Кусає</button>
+            <button class="chip" data-ai-prompt="Як зупинити гавкіт?" type="button">🗣️ Гавкіт</button>
+            <button class="chip" data-ai-prompt="Собака тягне повідок на прогулянці" type="button">🦮 Повідок</button>
+            <button class="chip" data-ai-prompt="Собака блює що робити" type="button">🏥 Блювання</button>
+            <button class="chip" data-ai-prompt="Собака какає мимо пелюшки" type="button">🚽 Туалет</button>
+            <button class="chip" data-ai-prompt="Собака плаче коли залишаюсь одна" type="button">🚪 Розлука</button>
+            <button class="chip" data-ai-prompt="Соціалізація цуценя" type="button">🌍 Соціалізація</button>
+            <button class="chip" data-ai-prompt="Як дати ліки собакі?" type="button">💊 Ліки</button>
+            <button class="chip" data-ai-prompt="Puppy blues що робити" type="button">💛 Puppy Blues</button>
+          </div>
+          <div id="aiChat" class="chat-box"></div>
+          <form id="aiForm" class="chat-form">
+            <div class="chat-input-row">
+              <textarea id="aiInput" placeholder="Опишіть ситуацію — я допоможу як кінолог або ветеринар..." rows="1"></textarea>
+              <button class="btn-voice" id="voiceBtn" type="button" aria-label="Голос">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <button class="btn btn-primary btn-send" type="submit" aria-label="Надіслати">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="clearChatBtn" type="button">Очистити чат</button>
+          </form>
+        </div>
       </section>
 
       <!-- ===== PROFILE TAB ===== -->
@@ -445,6 +504,10 @@
       <button class="nav-item" data-tab="tabCourses" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         <span>Навчання</span>
+      </button>
+      <button class="nav-item" data-tab="tabChat" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Чат</span>
       </button>
       <button class="nav-item" data-tab="tabProfile" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

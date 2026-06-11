@@ -82,7 +82,7 @@ function waitForData() {
     let resolved = false;
 
     const check = () => {
-      if (!resolved && (!state.pet.loading || !state.events.loading)) {
+      if (!resolved && !state.pet.loading && !state.events.loading) {
         resolved = true;
         resolve();
       }

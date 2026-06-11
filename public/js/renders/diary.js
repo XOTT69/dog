@@ -288,8 +288,9 @@ function renderFeed() {
     });
   }
 
-  // Bind delete buttons (event delegation)
-  list.addEventListener('click', handleFeedClick, { once: false });
+  // Bind delete buttons (event delegation) — remove old listener first
+  list.removeEventListener('click', handleFeedClick);
+  list.addEventListener('click', handleFeedClick);
 }
 
 /**

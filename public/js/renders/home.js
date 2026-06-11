@@ -3,7 +3,7 @@
  * Structure: Hero → Quick Actions → Today Stats → Progressive Cards
  */
 
-import { state, STORAGE_KEYS } from '../state.js';
+import { state, STORAGE_KEYS, persistGamification } from '../state.js';
 import { $, $$, escapeHtml, haptic, startOfToday, todayKey, localDateKey, tsToDate, getAgeInWeeks, weekLabel, isToiletSuccess, isToiletMiss, calcToiletStats, daysBetween } from '../utils.js';
 import { MS_PER_DAY, MS_PER_WEEK, TOILET_MODES, STREAK_LEVELS, MAX_HEATMAP_DAYS } from '../constants.js';
 import { addEvent, deleteEvent, restoreEvent } from '../firebase.js';
@@ -278,6 +278,7 @@ function renderDailyPlan() {
       const k = todayKey();
       if (!state.gamification.daily[k]) state.gamification.daily[k] = {};
       state.gamification.daily[k][cb.dataset.daily] = cb.checked;
+      persistGamification();
       haptic();
       renderDailyPlan();
     });

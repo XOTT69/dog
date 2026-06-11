@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0ea5e9">
+  <meta name="theme-color" content="#e07a5f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,16 +14,16 @@
   <link rel="apple-touch-icon" href="/assets/icon-192.png">
 
   <style>
-    body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#f8f9fa;color:#1a1a2e}
+    body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#faf7f5;color:#2d2a26}
     .auth-screen{min-height:100dvh;display:grid;place-items:center;padding:2rem}
-    .auth-card{text-align:center;padding:3rem 2rem;max-width:380px;width:100%;background:rgba(255,255,255,0.72);backdrop-filter:blur(20px);border:1px solid #e9ecef;border-radius:24px}
+    .auth-card{text-align:center;padding:3rem 2rem;max-width:380px;width:100%;background:rgba(255,255,255,0.78);backdrop-filter:blur(20px);border:1px solid #e8e0d8;border-radius:28px}
     .auth-icon{font-size:4rem;margin-bottom:1.25rem}
-    .auth-card h1{font-size:2rem;font-weight:800;background:linear-gradient(135deg,#0ea5e9,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.5rem}
+    .auth-card h1{font-size:2rem;font-weight:800;background:linear-gradient(135deg,#e07a5f,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.5rem}
     .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.3);z-index:9999;backdrop-filter:blur(8px)}
-    .spinner{width:44px;height:44px;border:3px solid #e9ecef;border-top-color:#0ea5e9;border-radius:50%;animation:spin .7s linear infinite}
+    .spinner{width:44px;height:44px;border:3px solid #e8e0d8;border-top-color:#e07a5f;border-radius:50%;animation:spin .7s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
     .hidden{display:none!important}
-    .skeleton{background:linear-gradient(90deg,#f1f3f5 25%,#e9ecef 50%,#f1f3f5 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:10px;height:1rem;margin:0.5rem 0}
+    .skeleton{background:linear-gradient(90deg,#f5f0ec 25%,#e8e0d8 50%,#f5f0ec 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:10px;height:1rem;margin:0.5rem 0}
     .skeleton-card{height:120px;border-radius:16px;margin-bottom:1rem}
     .skeleton-row{height:48px;border-radius:10px;margin-bottom:0.5rem}
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -183,7 +183,7 @@
           <div class="stat-card">
             <div class="stat-ring">
               <svg viewBox="0 0 100 100">
-                <defs><linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs>
+                <defs><linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e07a5f"/><stop offset="100%" stop-color="#c084fc"/></linearGradient></defs>
                 <circle cx="50" cy="50" r="40" class="ring-bg"/>
                 <circle cx="50" cy="50" r="40" class="ring-fill" id="ringFill"/>
               </svg>
@@ -273,10 +273,10 @@
           <div class="heatmap-legend">
             <span>Менше</span>
             <div class="heatmap-legend-cell" style="background:var(--surface-sunken)"></div>
-            <div class="heatmap-legend-cell" style="background:rgba(14,165,233,0.15)"></div>
-            <div class="heatmap-legend-cell" style="background:rgba(14,165,233,0.3)"></div>
-            <div class="heatmap-legend-cell" style="background:rgba(14,165,233,0.5)"></div>
-            <div class="heatmap-legend-cell" style="background:rgba(14,165,233,0.75)"></div>
+            <div class="heatmap-legend-cell" style="background:rgba(224,122,95,0.15)"></div>
+            <div class="heatmap-legend-cell" style="background:rgba(224,122,95,0.3)"></div>
+            <div class="heatmap-legend-cell" style="background:rgba(224,122,95,0.5)"></div>
+            <div class="heatmap-legend-cell" style="background:rgba(224,122,95,0.75)"></div>
             <span>Більше</span>
           </div>
         </div>

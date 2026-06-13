@@ -41,6 +41,16 @@ function fillPetForm() {
   const heatField = $('heatDateField');
   if (heatField) heatField.style.display = pet?.sex === 'дівчинка' ? '' : 'none';
 
+  // Adapt UI for cats
+  const isCat = pet?.petType === 'cat';
+  const toiletField = document.querySelector('[for="petToiletMode"]');
+  const toiletSelect = $('petToiletMode');
+  if (toiletField) toiletField.parentElement.style.display = isCat ? 'none' : '';
+  if (toiletSelect) toiletSelect.disabled = isCat;
+  // Change card title
+  const profileCardTitle = document.querySelector('#tabProfile .card:first-child .card-title');
+  if (profileCardTitle) profileCardTitle.textContent = isCat ? '🐱 Дані кота' : '🐕 Дані собаки';
+
   // Push status
   const ps = $('pushStatus');
   if (ps) {

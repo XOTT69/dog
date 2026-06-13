@@ -1288,17 +1288,26 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .ptr-indicator.ready .ptr-arrow { transform: rotate(180deg); }
 
-/* ===== DOG SWITCHER ===== */
-.dog-switcher {
-  display: flex;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
+/* ===== PET SWITCHER ===== */
+.pet-switcher-bar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 49;
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1.25rem;
   overflow-x: auto;
-  padding: 0.25rem 0;
   scrollbar-width: none;
 }
-.dog-switcher::-webkit-scrollbar { display: none; }
-.dog-chip {
+.pet-switcher-bar::-webkit-scrollbar { display: none; }
+.pet-switcher-scroll {
+  display: flex;
+  gap: 0.4rem;
+  min-width: max-content;
+}
+.pet-chip {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -1311,20 +1320,21 @@ textarea { resize: vertical; min-height: 80px; }
   white-space: nowrap;
   transition: all var(--duration) var(--ease);
   cursor: pointer;
+  flex-shrink: 0;
 }
-.dog-chip:hover { border-color: var(--accent); }
-.dog-chip.active { border-color: var(--accent); background: var(--accent-subtle); color: var(--accent); }
-.dog-chip .dog-chip-photo {
+.pet-chip:hover { border-color: var(--accent); }
+.pet-chip.active { border-color: var(--accent); background: var(--accent-subtle); color: var(--accent); }
+.pet-chip .pet-chip-photo {
   width: 22px;
   height: 22px;
   border-radius: 50%;
   object-fit: cover;
 }
-.dog-chip-add {
+.pet-chip-add {
   border-style: dashed;
   color: var(--text-muted);
 }
-.dog-chip-add:hover { color: var(--accent); border-color: var(--accent); }
+.pet-chip-add:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ===== REMINDERS SETUP ===== */
 .reminder-setup-item {

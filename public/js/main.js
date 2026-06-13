@@ -3,7 +3,7 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
 import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { unlock as unlockAudio } from './audio.js';
@@ -42,7 +42,7 @@ function initAuthFlow() {
 
     try {
       await ensureWorkspace(user);
-      subscribePet();
+      subscribePets();
       subscribeMembers();
       subscribeEvents();
 
@@ -164,16 +164,28 @@ function bindOnboarding() {
 
   $('obBack3')?.addEventListener('click', () => setOnboardingStep(2));
 
+  // Toggle dog/cat fields in onboarding
+  $('obPetType')?.addEventListener('change', () => {
+    const isCat = $('obPetType')?.value === 'cat';
+    const dogFields = $('obDogFields');
+    const catFields = $('obCatFields');
+    if (dogFields) dogFields.classList.toggle('hidden', isCat);
+    if (catFields) catFields.classList.toggle('hidden', !isCat);
+  });
+
   $('obFinish')?.addEventListener('click', async () => {
     showLoading();
     try {
-      await savePetProfile({
+      const isCat = $('obPetType')?.value === 'cat';
+      const payload = {
         name: $('obName')?.value.trim() || '',
         birthDate: $('obBirthDate')?.value || '',
-        sex: $('obSex')?.value || 'хлопчик',
-        breed: $('obBreed')?.value.trim() || '',
-        toiletMode: $('obToiletMode')?.value || 'pad',
-      });
+        sex: isCat ? ($('obCatSex')?.value || 'хлопчик') : ($('obSex')?.value || 'хлопчик'),
+        breed: isCat ? ($('obCatBreed')?.value.trim() || '') : ($('obBreed')?.value.trim() || ''),
+        toiletMode: isCat ? 'pad' : ($('obToiletMode')?.value || 'pad'),
+        petType: isCat ? 'cat' : 'dog',
+      };
+      await savePetProfile(payload);
       localStorage.setItem(STORAGE_KEYS.onboarded, 'true');
       hide($('onboardingScreen'));
       show($('appContent'));
@@ -378,7 +390,7 @@ function applyTheme() {
   const theme = state.ui.theme;
   document.documentElement.setAttribute('data-theme', theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
+  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#e07a5f';
 }
 
 // ===== ONLINE STATUS =====

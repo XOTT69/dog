@@ -15,6 +15,7 @@ import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
 import { getNextHealthEvents, getOverdueHealthEvents } from '../vaccination.js';
 import { renderWeeklyPlan } from '../weekly-plan.js';
 import { renderDailyLesson } from '../daily-lesson.js';
+import { switchPet, addPet } from '../firebase.js';
 
 // ===== RENDER =====
 
@@ -22,6 +23,7 @@ let ptrBound = false;
 
 export function render() {
   if (!ptrBound) initPullToRefresh();
+  renderPetSwitcher();
   updateStreak();
   renderStreak();
   renderDailyTip();
@@ -51,6 +53,57 @@ export function render() {
     newAch.forEach(a => toast(`${a.icon} ${a.label}!`, 'success'));
     showConfetti();
   }
+}
+
+// ===== PET SWITCHER =====
+
+function renderPetSwitcher() {
+  const scroll = $('petSwitcherScroll');
+  if (!scroll) return;
+
+  const pets = state.pets.items;
+  const currentId = state.ui.currentPetId;
+
+  // Show switcher only if more than 1 pet
+  const bar = $('petSwitcherBar');
+  if (bar) {
+    bar.style.display = pets.length <= 1 ? 'none' : '';
+  }
+
+  if (pets.length <= 1) return;
+
+  const petEmoji = (type) => type === 'cat' ? '🐱' : '🐕';
+
+  scroll.innerHTML = pets.map(p => {
+    const isActive = p.id === currentId;
+    const name = p.data?.name || 'Без імені';
+    const emoji = petEmoji(p.data?.petType);
+    return `<button type="button" class="pet-chip ${isActive ? 'active' : ''}" data-pet-id="${p.id}">
+      <span>${emoji}</span>${escapeHtml(name)}
+    </button>`;
+  }).join('') + `<button type="button" class="pet-chip pet-chip-add" data-pet-action="add">＋</button>`;
+
+  // Bind clicks
+  scroll.querySelectorAll('[data-pet-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchPet(btn.dataset.petId);
+      haptic();
+      render();
+    });
+  });
+
+  // Add pet button
+  scroll.querySelector('[data-pet-action="add"]')?.addEventListener('click', async () => {
+    try {
+      const name = prompt('Як звати нову тварину?');
+      if (!name?.trim()) return;
+      await addPet({ name: name.trim(), petType: 'dog' });
+      toast(`${name.trim()} додано! 🎉`, 'success');
+      render();
+    } catch (e) {
+      toast('Помилка: ' + e.message, 'error');
+    }
+  });
 }
 
 // ===== STREAK =====

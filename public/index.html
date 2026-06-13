@@ -89,19 +89,32 @@
         </div>
       </div>
       <div id="onboardingStep3" class="onboarding-step hidden">
-        <div class="onboarding-emoji">🐕</div>
-        <h2>Розкажіть більше</h2>
-        <select id="obSex" class="ob-input">
-          <option value="хлопчик">🐶 Хлопчик</option>
-          <option value="дівчинка">🐶 Дівчинка</option>
+        <div class="onboarding-emoji">🐾</div>
+        <h2>Кого ви додаєте?</h2>
+        <select id="obPetType" class="ob-input">
+          <option value="dog">🐕 Собака</option>
+          <option value="cat">🐱 Кіт</option>
         </select>
-        <input id="obBreed" type="text" placeholder="Порода (необов'язково)" class="ob-input" autocomplete="off">
-        <label class="ob-label" for="obToiletMode">🚽 Як ходить в туалет?</label>
-        <select id="obToiletMode" class="ob-input">
-          <option value="pad">🧻 Пелюшка вдома</option>
-          <option value="outdoor">🌳 На вулиці</option>
-          <option value="transition">🔄 Переходимо на вулицю</option>
-        </select>
+        <div id="obDogFields">
+          <select id="obSex" class="ob-input">
+            <option value="хлопчик">🐶 Хлопчик</option>
+            <option value="дівчинка">🐶 Дівчинка</option>
+          </select>
+          <input id="obBreed" type="text" placeholder="Порода (необов'язково)" class="ob-input" autocomplete="off">
+          <label class="ob-label" for="obToiletMode">🚽 Як ходить в туалет?</label>
+          <select id="obToiletMode" class="ob-input">
+            <option value="pad">🧻 Пелюшка вдома</option>
+            <option value="outdoor">🌳 На вулиці</option>
+            <option value="transition">🔄 Переходимо на вулицю</option>
+          </select>
+        </div>
+        <div id="obCatFields" class="hidden">
+          <select id="obCatSex" class="ob-input">
+            <option value="хлопчик">🐱 Хлопчик</option>
+            <option value="дівчинка">🐱 Дівчинка</option>
+          </select>
+          <input id="obCatBreed" type="text" placeholder="Порода (необов'язково)" class="ob-input" autocomplete="off">
+        </div>
         <div class="ob-row">
           <button class="btn btn-ghost" id="obBack3" type="button">← Назад</button>
           <button class="btn btn-primary" id="obFinish" type="button">Готово! 🎉</button>
@@ -137,6 +150,11 @@
         </button>
       </div>
     </header>
+
+    <!-- PET SWITCHER -->
+    <div class="pet-switcher-bar" id="petSwitcherBar">
+      <div class="pet-switcher-scroll" id="petSwitcherScroll"></div>
+    </div>
 
     <!-- MAIN -->
     <main class="main">
@@ -383,6 +401,26 @@
             <button class="problem-btn" data-problem="calm" type="button">
               <span class="problem-icon">🧘</span>
               <span class="problem-label">Спокій</span>
+            </button>
+            <button class="problem-btn" data-problem="cityAdapt" type="button">
+              <span class="problem-icon">🏙️</span>
+              <span class="problem-label">Місто</span>
+            </button>
+            <button class="problem-btn" data-problem="vetPrep" type="button">
+              <span class="problem-icon">🏥</span>
+              <span class="problem-label">Ветеринар</span>
+            </button>
+            <button class="problem-btn" data-problem="nightMode" type="button">
+              <span class="problem-icon">🌙</span>
+              <span class="problem-label">Нічний режим</span>
+            </button>
+            <button class="problem-btn" data-problem="travel" type="button">
+              <span class="problem-icon">🚗</span>
+              <span class="problem-label">Подорожі</span>
+            </button>
+            <button class="problem-btn" data-problem="motivation" type="button">
+              <span class="problem-icon">🎯</span>
+              <span class="problem-label">Мотивація</span>
             </button>
           </div>
         </div>

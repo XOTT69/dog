@@ -14,13 +14,13 @@ const STORAGE_KEYS = {
   achievements: 'dc_achievements',
   courseProgress: 'dc_course_progress',
   social: 'dc_social',
-  clickerCount: 'dc_clicker_count',
   aiCount: 'dc_ai_count',
   aiPlan: 'dc_aiplan',
   weeklyPlan: 'dc_weekly_plan',
   dailyLesson: 'dc_daily_lesson',
   onboarded: 'dc_onboarded',
   weeklyDismissed: 'dc_weekly_dismissed',
+  currentPetId: 'dc_current_pet_id',
 };
 
 /** @type {Map<string, Set<Function>>} */
@@ -48,7 +48,13 @@ const initialState = {
     data: null,
   },
 
-  // Pet data
+  // Pets (multi-pet support)
+  pets: {
+    items: [],
+    loading: true,
+  },
+
+  // Current pet (derived from pets.items + currentPetId)
   pet: {
     data: null,
     loading: true,

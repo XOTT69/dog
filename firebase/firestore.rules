@@ -47,8 +47,10 @@ service cloud.firestore {
              (!('breed' in data) || isValidString(data.breed, 100)) &&
              (!('sex' in data) || data.sex in ['хлопчик', 'дівчинка']) &&
              (!('toiletMode' in data) || data.toiletMode in ['pad', 'outdoor', 'transition']) &&
+             (!('petType' in data) || data.petType in ['dog', 'cat']) &&
              (!('issues' in data) || isValidString(data.issues, 500)) &&
-             (!('weight' in data) || data.weight is string || data.weight is number);
+             (!('weight' in data) || data.weight is string || data.weight is number) &&
+             (!('photoURL' in data) || isValidString(data.photoURL, 500));
     }
 
     // ===== USER PROFILES =====
@@ -76,9 +78,10 @@ service cloud.firestore {
         request.resource.data.inviteCode.size() >= 4 &&
         request.resource.data.inviteCode.size() <= 12;
 
-      // Only owner can update
+      // Only owner can update (can change currentPetId but not ownerId)
       allow update: if isOwner(workspaceId) &&
-        request.resource.data.ownerId == resource.data.ownerId; // Can't change owner
+        request.resource.data.ownerId == resource.data.ownerId &&
+        (!('currentPetId' in request.resource.data) || isValidString(request.resource.data.currentPetId, 50));
 
       // Only owner can delete
       allow delete: if isOwner(workspaceId);
@@ -104,15 +107,18 @@ service cloud.firestore {
           (memberUid == request.auth.uid || isOwner(workspaceId));
       }
 
-      // ===== DOGS =====
+      // ===== DOGS (multi-pet: dogs/{petId}) =====
       match /dogs/{dogId} {
         allow read: if isMember(workspaceId);
 
-        allow create: if isMember(workspaceId) && isValidPet();
+        // Members can create pets (any UUID, not 'primary')
+        allow create: if isMember(workspaceId) &&
+          dogId != 'primary' &&
+          isValidPet();
 
         allow update: if isMember(workspaceId) && isValidPet();
 
-        // Only owner can delete a dog
+        // Only owner can delete a pet
         allow delete: if isOwner(workspaceId);
       }
 

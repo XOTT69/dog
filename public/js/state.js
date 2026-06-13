@@ -17,6 +17,8 @@ const STORAGE_KEYS = {
   clickerCount: 'dc_clicker_count',
   aiCount: 'dc_ai_count',
   aiPlan: 'dc_aiplan',
+  weeklyPlan: 'dc_weekly_plan',
+  dailyLesson: 'dc_daily_lesson',
   onboarded: 'dc_onboarded',
   weeklyDismissed: 'dc_weekly_dismissed',
 };

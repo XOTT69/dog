@@ -6,7 +6,7 @@ import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js'
 import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
 import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
-import { playClicker, playWhistle, unlock as unlockAudio } from './audio.js';
+import { unlock as unlockAudio } from './audio.js';
 import { preloadAll } from './content-loader.js';
 import { haptic } from './utils.js';
 import { showConfetti } from './achievements.js';
@@ -143,6 +143,21 @@ function bindOnboarding() {
   $('obBack2')?.addEventListener('click', () => setOnboardingStep(1));
 
   $('obNext2')?.addEventListener('click', () => {
+    const birthDate = $('obBirthDate')?.value;
+    if (birthDate) {
+      const date = new Date(birthDate);
+      const now = new Date();
+      if (date > now) {
+        toast("Дата народження не може бути в майбутньому 📅", 'error');
+        return;
+      }
+      const maxAge = new Date();
+      maxAge.setFullYear(maxAge.getFullYear() - 20);
+      if (date < maxAge) {
+        toast("Собака занадто старий? Перевірте дату 🐕", 'error');
+        return;
+      }
+    }
     setOnboardingStep(3);
     haptic();
   });
@@ -284,9 +299,6 @@ function bindGlobalEvents() {
     haptic();
   });
 
-  // Clicker & Whistle
-  bindClickerEvents();
-
   // Timer
   $('timerStartBtn')?.addEventListener('click', () => {
     toggleTimer();
@@ -358,43 +370,6 @@ function bindGlobalEvents() {
 
   // Onboarding
   bindOnboarding();
-}
-
-// ===== CLICKER =====
-
-function bindClickerEvents() {
-  const clickerBtn = $('clickerBtn');
-  const whistleBtn = $('whistleBtn');
-
-  if (clickerBtn) {
-    const handleClicker = (e) => {
-      e.preventDefault();
-      playClicker();
-      const count = parseInt(localStorage.getItem(STORAGE_KEYS.clickerCount) || '0') + 1;
-      localStorage.setItem(STORAGE_KEYS.clickerCount, String(count));
-      clickerBtn.classList.add('clicked');
-      setTimeout(() => clickerBtn.classList.remove('clicked'), 150);
-    };
-
-    clickerBtn.addEventListener('touchend', handleClicker);
-    clickerBtn.addEventListener('click', (e) => {
-      if (!('ontouchend' in window)) handleClicker(e);
-    });
-  }
-
-  if (whistleBtn) {
-    const handleWhistle = (e) => {
-      e.preventDefault();
-      playWhistle();
-      whistleBtn.classList.add('clicked');
-      setTimeout(() => whistleBtn.classList.remove('clicked'), 500);
-    };
-
-    whistleBtn.addEventListener('touchend', handleWhistle);
-    whistleBtn.addEventListener('click', (e) => {
-      if (!('ontouchend' in window)) handleWhistle(e);
-    });
-  }
 }
 
 // ===== THEME =====

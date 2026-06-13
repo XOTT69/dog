@@ -1,11 +1,66 @@
 /**
  * @fileoverview AI interaction — cynologist + veterinary advisor
+ * Now with chat history and better error handling
  */
 
 import { state, STORAGE_KEYS } from './state.js';
 import { getIdToken } from './firebase.js';
-import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY } from './constants.js';
+import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY, MAX_CHAT_HISTORY } from './constants.js';
 import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate } from './utils.js';
+
+// ===== CHAT HISTORY =====
+
+/** @type {Array<{role: string, content: string}>} */
+let chatHistory = [];
+
+/**
+ * Add message to chat history
+ * @param {string} role - 'user' or 'assistant'
+ * @param {string} content
+ */
+export function addChatHistory(role, content) {
+  chatHistory.push({ role, content });
+  // Keep only last N messages
+  if (chatHistory.length > MAX_CHAT_HISTORY) {
+    chatHistory = chatHistory.slice(-MAX_CHAT_HISTORY);
+  }
+}
+
+/**
+ * Get chat history
+ * @returns {Array<{role: string, content: string}>}
+ */
+export function getChatHistory() {
+  return [...chatHistory];
+}
+
+/**
+ * Clear chat history
+ */
+export function clearChatHistory() {
+  chatHistory = [];
+}
+
+/**
+ * Get human-readable error message
+ * @param {number} status
+ * @returns {string}
+ */
+function getErrorMessage(status) {
+  const errors = {
+    400: 'Невірний запит. Спробуйте переформулювати.',
+    401: 'Помилка авторизації. Увійдіть знову.',
+    403: 'Доступ заборонений.',
+    404: 'Сервіс не знайдено.',
+    408: '⏳ Час очікування вичерпаний. Спробуйте ще раз.',
+    429: '🚫 Забагато запитів! Зачекайте хвилину та спробуйте знову.',
+    500: '⚠️ Помилка сервера. Спробуйте пізніше.',
+    502: '⚠️ Сервіс тимчасово недоступний. Спробуйте за хвилину.',
+    503: '⚠️ Сервіс оновлюється. Зачекайте кілька хвилин.',
+    504: '⏳ Сервіс не відповідає. Спробуйте пізніше.',
+  };
+  return errors[status] || `Помилка (${status}). Спробуйте ще раз.`;
+}
 
 /**
  * Build system prompt with full context
@@ -67,7 +122,7 @@ ${petContext}`;
 }
 
 /**
- * Call AI API
+ * Call AI API with chat history
  * @param {string} userPrompt
  * @returns {Promise<string>}
  */
@@ -77,6 +132,18 @@ export async function fetchAIResponse(userPrompt) {
   try {
     const token = await getIdToken();
 
+    // Build messages with history
+    const messages = [{ role: 'system', content: systemPrompt }];
+    
+    // Add chat history (last N messages)
+    const history = getChatHistory();
+    for (const msg of history) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+    
+    // Add current prompt
+    messages.push({ role: 'user', content: userPrompt });
+
     const response = await fetch('/api/proxy', {
       method: 'POST',
       headers: {
@@ -85,10 +152,7 @@ export async function fetchAIResponse(userPrompt) {
       },
       body: JSON.stringify({
         model: AI_PRIMARY_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
         temperature: 0.3,
         max_tokens: MAX_AI_TOKENS,
         stream: false,
@@ -97,17 +161,26 @@ export async function fetchAIResponse(userPrompt) {
 
     if (!response.ok) {
       console.warn('[AI] API error:', response.status);
-      throw new Error(`HTTP ${response.status}`);
+      const errorMsg = getErrorMessage(response.status);
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
 
     if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content.trim();
+      const result = data.choices[0].message.content.trim();
+      // Save to history
+      addChatHistory('user', userPrompt);
+      addChatHistory('assistant', result);
+      return result;
     }
     throw new Error('Empty response');
   } catch (e) {
-    console.warn('[AI] Using local fallback:', e.message);
+    console.warn('[AI] Error:', e.message);
+    // Don't use local fallback for HTTP errors — show the error message
+    if (e.message.startsWith('⚠️') || e.message.startsWith('🚫') || e.message.startsWith('⏳')) {
+      throw e;
+    }
     return getLocalFallback(userPrompt);
   }
 }

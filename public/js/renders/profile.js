@@ -6,6 +6,7 @@ import { state } from '../state.js';
 import { $, escapeHtml, avatarLetter, haptic } from '../utils.js';
 import { savePetProfile, subscribePush, getIdToken } from '../firebase.js';
 import { toast, showLoading, hideLoading } from '../render.js';
+import { renderHealthSchedule, isDewormingDue, isVaccinationDue } from '../vaccination.js';
 
 /** @type {boolean} */
 let bound = false;
@@ -14,6 +15,8 @@ export function render() {
   fillPetForm();
   renderMembers();
   renderWorkspaceMeta();
+  renderHealthAlerts();
+  renderHealthScheduleUI();
   if (!bound) bindProfileEvents();
 }
 
@@ -80,6 +83,33 @@ function renderWorkspaceMeta() {
   if (el) el.textContent = state.workspace.data?.inviteCode || '—';
 }
 
+// ===== HEALTH ALERTS =====
+
+function renderHealthAlerts() {
+  // Show warnings if deworming or vaccination is due
+  const alerts = [];
+  if (isDewormingDue()) {
+    alerts.push('💊 Дегельмінтизація потрібна! Зверніться до ветеринара.');
+  }
+  if (isVaccinationDue()) {
+    alerts.push('💉 Щорічна вакцинація потрібна! Зверніться до ветеринара.');
+  }
+
+  // Update push status with health info
+  const ps = $('pushStatus');
+  if (ps && alerts.length > 0) {
+    ps.innerHTML = alerts.map(a => `<div style="color:var(--warning);margin-top:0.25rem">${a}</div>`).join('');
+  }
+}
+
+// ===== HEALTH SCHEDULE UI =====
+
+function renderHealthScheduleUI() {
+  const container = $('healthScheduleList');
+  if (!container) return;
+  renderHealthSchedule(container);
+}
+
 // ===== BIND EVENTS =====
 
 function bindProfileEvents() {
@@ -88,11 +118,29 @@ function bindProfileEvents() {
   // Pet profile form
   $('petProfileForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    // Validate birth date
+    const birthDate = $('petBirthDate')?.value;
+    if (birthDate) {
+      const date = new Date(birthDate);
+      const now = new Date();
+      if (date > now) {
+        toast("Дата народження не може бути в майбутньому 📅", 'error');
+        return;
+      }
+      const maxAge = new Date();
+      maxAge.setFullYear(maxAge.getFullYear() - 20);
+      if (date < maxAge) {
+        toast("Перевірте дату народження 🐕", 'error');
+        return;
+      }
+    }
+    
     showLoading();
     try {
       await savePetProfile({
         name: $('petName')?.value.trim() || '',
-        birthDate: $('petBirthDate')?.value || '',
+        birthDate: birthDate || '',
         sex: $('petSex')?.value || 'хлопчик',
         breed: $('petBreed')?.value.trim() || '',
         weight: $('petWeight')?.value || '',

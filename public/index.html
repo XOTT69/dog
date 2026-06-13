@@ -44,6 +44,11 @@
   <!-- OFFLINE BAR -->
   <div id="offlineBar" class="offline-bar">📡 Офлайн — дані збережуться при підключенні</div>
 
+  <!-- PULL TO REFRESH -->
+  <div class="ptr-indicator">
+    <svg class="ptr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  </div>
+
   <!-- TOAST -->
   <div id="toastContainer" aria-live="polite"></div>
 
@@ -167,6 +172,13 @@
           <p id="dailyTipText">Завантаження...</p>
         </div>
 
+        <div class="card" id="dailyLessonCard" style="display:none">
+          <div class="card-header">
+            <h4>🎯 Урок дня</h4>
+          </div>
+          <div id="dailyLessonContent"></div>
+        </div>
+
         <div id="aiPlanCard" class="card ai-plan-card hidden">
           <div class="card-header">
             <h4>🧠 Персональний план</h4>
@@ -194,20 +206,6 @@
           <div class="stat-card"><div class="stat-number success" id="kpiSuccess">0</div><span class="stat-label">✅ Вірно</span></div>
           <div class="stat-card"><div class="stat-number danger" id="kpiMiss">0</div><span class="stat-label">❌ Мимо</span></div>
           <div class="stat-card"><div class="stat-number" id="kpiTotal">0</div><span class="stat-label">📊 Всього</span></div>
-        </div>
-
-        <h4 class="section-title">🎯 Інструменти тренера</h4>
-        <div class="clicker-grid">
-          <button type="button" class="clicker-btn clicker-blue" id="clickerBtn">
-            <span class="clicker-icon">🔵</span>
-            <span class="clicker-label">Клікер</span>
-            <span class="clicker-hint">Маркер "Так!"</span>
-          </button>
-          <button type="button" class="clicker-btn clicker-yellow" id="whistleBtn">
-            <span class="clicker-icon">🟡</span>
-            <span class="clicker-label">Свисток</span>
-            <span class="clicker-hint">Підклик / Увага</span>
-          </button>
         </div>
 
         <div class="timer-card" id="timerCard">
@@ -252,6 +250,17 @@
             <div class="skeleton"></div>
             <div class="skeleton" style="width:85%"></div>
             <div class="skeleton" style="width:70%"></div>
+          </div>
+        </div>
+
+        <div class="card" id="weeklyPlanCard">
+          <div class="card-header">
+            <h4>📅 Тижневий план тренувань</h4>
+            <span id="weeklyPlanBadge" class="badge">0/7</span>
+          </div>
+          <div id="weeklyPlanItems">
+            <div class="skeleton"></div>
+            <div class="skeleton" style="width:85%"></div>
           </div>
         </div>
 
@@ -475,6 +484,10 @@
             <div class="field full" id="heatDateField" style="display:none"><label for="petLastHeat">Перша/остання тічка</label><input id="petLastHeat" type="date"></div>
           </div>
           <button class="btn btn-primary full-width" id="saveHealthBtn" type="button">Зберегти здоров'я</button>
+        </div>
+        <div class="card" id="healthScheduleCard">
+          <h4 class="card-title">📅 Графік здоров'я</h4>
+          <div id="healthScheduleList"></div>
         </div>
         <div class="card">
           <h4 class="card-title">📲 Сповіщення</h4>

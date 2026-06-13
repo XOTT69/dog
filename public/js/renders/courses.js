@@ -5,7 +5,7 @@
 import { state, STORAGE_KEYS } from '../state.js';
 import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
-import { fetchAIResponse, trackAIUsage } from '../ai.js';
+import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
 import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
 
@@ -128,6 +128,8 @@ function renderAIChat() {
   $('clearChatBtn')?.addEventListener('click', () => {
     const chat = $('aiChat');
     if (chat) chat.innerHTML = '';
+    clearChatHistory();
+    toast('Чат очищено 🧹', 'success');
   });
 
   // Voice input

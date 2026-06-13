@@ -46,17 +46,17 @@
 }
 
 [data-theme="dark"] {
-  --bg: #1a1714;
-  --surface: #252220;
-  --surface-raised: #2e2a27;
-  --surface-sunken: #1a1714;
-  --surface-glass: rgba(37, 34, 32, 0.85);
-  --border: #3a3530;
-  --border-light: #252220;
-  --text: #f0ebe6;
-  --text-secondary: #b0a89e;
-  --text-muted: #7a7268;
-  --text-inverse: #1a1714;
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface-raised: #22223a;
+  --surface-sunken: #0f0f1a;
+  --surface-glass: rgba(26, 26, 46, 0.9);
+  --border: #2a2a40;
+  --border-light: #1a1a2e;
+  --text: #e8e4f0;
+  --text-secondary: #b0a8c0;
+  --text-muted: #6a6080;
+  --text-inverse: #0f0f1a;
   --accent: #e8956f;
   --accent-hover: #f0a880;
   --accent-light: #3d2a20;
@@ -70,12 +70,12 @@
   --warning-light: #3a2a10;
   --purple: #c084fc;
   --purple-light: #2a1e3a;
-  --shadow-xs: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.4);
-  --shadow-xl: 0 20px 48px rgba(0,0,0,0.5);
-  --shadow-glow: 0 0 20px rgba(232, 149, 111, 0.12);
+  --shadow-xs: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.45);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.5);
+  --shadow-xl: 0 20px 48px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 20px rgba(232, 149, 111, 0.15);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1605,89 +1605,6 @@ details .detail-content {
 }
 button:focus:not(:focus-visible) { outline: none; }
 
-/* ===== CLICKER & WHISTLE ===== */
-.clicker-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-.clicker-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 1.5rem 1rem;
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--border);
-  background: var(--surface);
-  transition: all 100ms var(--ease);
-  box-shadow: var(--shadow-sm);
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-}
-.clicker-btn:active {
-  transform: scale(0.92);
-  box-shadow: var(--shadow-xs);
-}
-.clicker-btn.clicked {
-  transform: scale(0.88);
-}
-.clicker-blue {
-  border-color: #0ea5e9;
-  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
-}
-.clicker-blue:active, .clicker-blue.clicked {
-  background: #bae6fd;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
-}
-.clicker-yellow {
-  border-color: #f59e0b;
-  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
-}
-.clicker-yellow:active, .clicker-yellow.clicked {
-  background: #fde68a;
-  border-color: #d97706;
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
-}
-[data-theme="dark"] .clicker-blue {
-  background: linear-gradient(180deg, #0c2d48 0%, #0c1e30 100%);
-  border-color: #38bdf8;
-}
-[data-theme="dark"] .clicker-blue:active, [data-theme="dark"] .clicker-blue.clicked {
-  background: #0c4a6e;
-}
-[data-theme="dark"] .clicker-yellow {
-  background: linear-gradient(180deg, #422006 0%, #1c1917 100%);
-  border-color: #fbbf24;
-}
-[data-theme="dark"] .clicker-yellow:active, [data-theme="dark"] .clicker-yellow.clicked {
-  background: #78350f;
-}
-.clicker-icon {
-  font-size: 2.5rem;
-  line-height: 1;
-  transition: transform 100ms var(--ease);
-}
-.clicker-btn:active .clicker-icon {
-  transform: scale(0.85);
-}
-.clicker-label {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-.clicker-hint {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-/* Timer ring — duplicate removed, see lines 1150-1184 */
 
 /* ===== WEIGHT DISPLAY ===== */
 .weight-display {
@@ -1737,6 +1654,131 @@ button:focus:not(:focus-visible) { outline: none; }
   font-size: 1.1rem;
   color: var(--accent);
 }
+
+/* ===== DAILY LESSON ===== */
+.daily-lesson {
+  padding: 0;
+}
+.daily-lesson-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.daily-lesson-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.daily-lesson-header strong {
+  font-size: 0.95rem;
+  display: block;
+  margin-bottom: 0.125rem;
+}
+.daily-lesson-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+.daily-lesson-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.daily-lesson-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.daily-lesson-tip {
+  padding: 0.5rem 0.75rem;
+  background: var(--warning-light);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--warning);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ===== WEEKLY PLAN ===== */
+.weekly-day {
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  background: var(--surface-sunken);
+  transition: all var(--duration) var(--ease);
+}
+.weekly-day.today {
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-light);
+}
+.weekly-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.weekly-day-header strong {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.weekly-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.weekly-task {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+.weekly-task span {
+  transition: all var(--duration) var(--ease);
+}
+.weekly-task.done span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.weekly-task input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ===== HEALTH SCHEDULE ===== */
+.health-schedule-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  background: var(--surface-sunken);
+  transition: all var(--duration) var(--ease);
+}
+.health-schedule-item:active { transform: scale(0.98); }
+.health-schedule-icon { font-size: 1.5rem; flex-shrink: 0; }
+.health-schedule-info { flex: 1; min-width: 0; }
+.health-schedule-info strong { display: block; font-size: 0.9rem; margin-bottom: 0.125rem; }
+.health-schedule-info .text-muted { font-size: 0.75rem; }
+.health-schedule-date { text-align: right; flex-shrink: 0; font-size: 0.8rem; }
+.health-schedule-item.danger { border-left: 3px solid var(--danger); background: rgba(239,68,68,0.05); }
+.health-schedule-item.warning { border-left: 3px solid var(--warning); background: rgba(245,158,11,0.05); }
+.health-schedule-item.info { border-left: 3px solid var(--accent); background: rgba(14,165,233,0.05); }
 
 /* ===== BREED META ===== */
 .breed-meta-grid {

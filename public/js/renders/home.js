@@ -10,13 +10,18 @@ import { addEvent, deleteEvent, restoreEvent } from '../firebase.js';
 import { updateStreak, checkAchievements, showConfetti, ACHIEVEMENT_DEFS } from '../achievements.js';
 import { startTimer, formatTimer, getTimerProgress } from '../timer.js';
 import { generateDailyPlan } from '../ai.js';
-import { playClicker, playWhistle } from '../audio.js';
 import { toast } from '../render.js';
 import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
+import { getNextHealthEvents, getOverdueHealthEvents } from '../vaccination.js';
+import { renderWeeklyPlan } from '../weekly-plan.js';
+import { renderDailyLesson } from '../daily-lesson.js';
 
 // ===== RENDER =====
 
+let ptrBound = false;
+
 export function render() {
+  if (!ptrBound) initPullToRefresh();
   updateStreak();
   renderStreak();
   renderDailyTip();
@@ -27,6 +32,8 @@ export function render() {
   renderHeatmap();
   renderAchievements();
   renderAIPlan();
+  renderWeeklyPlanUI();
+  renderDailyLessonUI();
 
   // Progressive disclosure cards (lazy)
   renderBreedCard();
@@ -328,6 +335,40 @@ function renderAchievements() {
   }).join('');
 }
 
+// ===== DAILY LESSON =====
+
+async function renderDailyLessonUI() {
+  const container = $('dailyLessonContent');
+  const card = $('dailyLessonCard');
+  if (!container || !card) return;
+  
+  try {
+    await renderDailyLesson(container);
+  } catch {
+    card.style.display = 'none';
+  }
+}
+
+// ===== WEEKLY PLAN =====
+
+async function renderWeeklyPlanUI() {
+  const container = $('weeklyPlanItems');
+  const badge = $('weeklyPlanBadge');
+  if (!container) return;
+  
+  try {
+    await renderWeeklyPlan(container);
+    // Update badge with completion count
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+    if (badge) {
+      badge.textContent = `${checked.length}/${checkboxes.length}`;
+    }
+  } catch {
+    container.innerHTML = '<p class="text-muted">Завантаження...</p>';
+  }
+}
+
 // ===== AI PLAN =====
 
 async function renderAIPlan() {
@@ -612,20 +653,44 @@ function renderReminders() {
   const list = $('remindersList');
   if (!card || !list) return;
 
-  const reminders = state.pet.data?.reminders || [];
-  if (!reminders.length) { card.style.display = 'none'; return; }
+  // Get health-based reminders
+  const healthEvents = getNextHealthEvents(5);
+  const overdueEvents = getOverdueHealthEvents();
+  
+  // Get custom reminders from pet data
+  const customReminders = state.pet.data?.reminders || [];
+  
+  const allReminders = [...overdueEvents.map(e => ({
+    label: e.name,
+    nextDate: e.date.toISOString().slice(0, 10),
+    type: e.type,
+    overdue: true,
+  })), ...healthEvents.map(e => ({
+    label: e.name,
+    nextDate: e.date.toISOString().slice(0, 10),
+    type: e.type,
+    overdue: false,
+  })), ...customReminders.map(r => ({
+    label: r.label,
+    nextDate: r.nextDate,
+    type: r.type || 'custom',
+    overdue: false,
+  }))];
+
+  if (!allReminders.length) { card.style.display = 'none'; return; }
   card.style.display = '';
 
   const now = new Date();
-  list.innerHTML = reminders.map(r => {
+  list.innerHTML = allReminders.slice(0, 8).map(r => {
     const d = new Date(r.nextDate);
     const days = daysBetween(now, d);
     const cls = days < 0 ? 'danger' : days <= 3 ? 'warning' : '';
+    const typeIcon = { vaccine: '💉', deworming: '💊', vet: '🏥', custom: '🔔' }[r.type] || '🔔';
     const txt = days < 0 ? `⚠️ Прострочено ${Math.abs(days)} дн.`
       : days === 0 ? '⏰ Сьогодні!'
       : days <= 3 ? `⏰ Через ${days} дн.`
       : d.toLocaleDateString('uk');
-    return `<div class="feed-item"><div><strong>${escapeHtml(r.label)}</strong><div class="meta ${cls}">${txt}</div></div></div>`;
+    return `<div class="feed-item"><div><strong>${typeIcon} ${escapeHtml(r.label)}</strong><div class="meta ${cls}">${txt}</div></div></div>`;
   }).join('');
 }
 
@@ -642,6 +707,59 @@ const AGE_PROGRAMS = [
 function getAgeProgramByWeeks(weeks) {
   if (weeks == null) return AGE_PROGRAMS[1];
   return AGE_PROGRAMS.find(p => weeks >= p.minWeeks && weeks < p.maxWeeks) || AGE_PROGRAMS[AGE_PROGRAMS.length - 1];
+}
+
+// ===== PULL TO REFRESH =====
+
+function initPullToRefresh() {
+  ptrBound = true;
+  const indicator = document.querySelector('.ptr-indicator');
+  if (!indicator) return;
+
+  let startY = 0;
+  let pulling = false;
+
+  const mainEl = document.querySelector('.main');
+  if (!mainEl) return;
+
+  mainEl.addEventListener('touchstart', (e) => {
+    if (window.scrollY === 0) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+    }
+  }, { passive: true });
+
+  mainEl.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    const diff = e.touches[0].clientY - startY;
+    if (diff > 0 && diff < 150) {
+      indicator.classList.add('visible');
+      indicator.style.transform = `translateX(-50%) translateY(${Math.min(diff * 0.5, 40)}px)`;
+      if (diff > 80) indicator.classList.add('ready');
+      else indicator.classList.remove('ready');
+    }
+  }, { passive: true });
+
+  mainEl.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (indicator.classList.contains('ready')) {
+      indicator.classList.remove('ready');
+      indicator.classList.add('refreshing');
+      indicator.innerHTML = '<div class="ptr-spinner"></div>';
+      // Refresh data
+      setTimeout(() => {
+        render();
+        indicator.classList.remove('visible', 'refreshing');
+        indicator.innerHTML = '<svg class="ptr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+        indicator.style.transform = '';
+        toast('Оновлено ✓', 'success');
+      }, 800);
+    } else {
+      indicator.classList.remove('visible', 'ready');
+      indicator.style.transform = '';
+    }
+  }, { passive: true });
 }
 
 export { getAgeProgramByWeeks };

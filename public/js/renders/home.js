@@ -121,9 +121,6 @@ export function render() {
   renderHeatInfo();
   renderReminders();
 
-  // Add section separators
-  addSectionSeparators();
-
   // Check achievements after render
   const newAch = checkAchievements();
   if (newAch.length > 0) {
@@ -132,46 +129,6 @@ export function render() {
   }
 }
 
-function addSectionSeparators() {
-  const main = document.querySelector('.main');
-  if (!main) return;
-
-  // Remove existing separators
-  main.querySelectorAll('.section-separator').forEach(el => el.remove());
-
-  // Add separators between major sections
-  const sections = [
-    { after: 'streakCard', label: null },
-    { after: 'weeklyReport', label: null },
-    { after: 'aiPlanCard', label: null },
-    { after: 'stats-grid', label: null },
-    { after: 'timerCard', label: null },
-    { after: 'onetapGrid', label: null },
-    { after: 'dailyItems', label: null },
-    { after: 'weeklyPlanCard', label: null },
-    { after: 'breedCard', label: null },
-    { after: 'problemCards', label: null },
-    { after: 'recommendedCourses', label: null },
-    { after: 'firstDaysCard', label: null },
-    { after: 'puppyBluesCard', label: null },
-    { after: 'foodGuideCard', label: null },
-    { after: 'achievementsGrid', label: null },
-    { after: 'heatmapGrid', label: null },
-    { after: 'remindersCard', label: null },
-    { after: 'heatCard', label: null },
-    { after: 'periodFocus', label: null },
-  ];
-
-  sections.forEach(({ after, label }) => {
-    const el = document.getElementById(after);
-    if (el && el.offsetParent !== null) {
-      const separator = document.createElement('div');
-      separator.className = 'section-separator';
-      separator.style.cssText = 'height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 0.5rem 0; opacity: 0.6;';
-      el.insertAdjacentElement('afterend', separator);
-    }
-  });
-}
 
 // ===== PET SWITCHER =====
 

@@ -142,7 +142,7 @@ function renderHeader() {
 
   if (avatarEl) {
     if (user?.photoURL) {
-      avatarEl.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${avatarLetter(user?.displayName || petName)}'">`;
+      avatarEl.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="" loading="lazy">`;
     } else {
       avatarEl.textContent = avatarLetter(user?.displayName || petName);
     }
@@ -222,5 +222,5 @@ subscribe('ui.theme', () => {
   const theme = state.ui.theme;
   document.documentElement.setAttribute('data-theme', theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#e07a5f';
+  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
 });

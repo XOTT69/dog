@@ -81,8 +81,6 @@ const initialState = {
     selectedEventType: null,
     diaryFilter: 'all',
     courseFilter: 'all',
-    courseFilterFull: false,
-    knowledgeFull: false,
     currentCourseId: 'pee-pad',
     contentLoaded: false,
   },

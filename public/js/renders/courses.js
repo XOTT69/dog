@@ -8,8 +8,6 @@ import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
 import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
-import { getTrainingProgress, saveTrainingProgress, saveCourseProgress as fbSaveCourseProgress } from '../firebase.js';
-import { getCourseProgress as fbGetCourseProgress } from '../firebase.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -49,28 +47,11 @@ function renderProblemButtons() {
   });
 }
 
-async function renderTrainingDetail(program, panel) {
+function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
 
   panel.classList.remove('hidden');
-  
-  // Get saved progress from Firestore (with localStorage fallback)
-  const programId = program.title.toLowerCase().replace(/\s+/g, '_');
-  let savedProgress = await getTrainingProgress(programId);
-  
-  // Fallback to localStorage if Firestore is empty
-  if (Object.keys(savedProgress).length === 0) {
-    const progressKey = `training_${programId}`;
-    savedProgress = JSON.parse(localStorage.getItem(progressKey) || '{}');
-    // Migrate to Firestore if found in localStorage
-    if (Object.keys(savedProgress).length > 0) {
-      await saveTrainingProgress(programId, savedProgress);
-    }
-  }
-  const completedSteps = program.steps.filter((_, i) => savedProgress[i]).length;
-  const progressPercent = Math.round((completedSteps / program.steps.length) * 100);
-
   panel.innerHTML = `
     <div class="card" style="border-left: 4px solid var(--accent)">
       <div class="training-header">
@@ -82,19 +63,10 @@ async function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
-      ${progressPercent > 0 ? `
-        <div class="training-progress">
-          <div class="training-progress-bar">
-            <div class="training-progress-fill" style="width: ${progressPercent}%"></div>
-          </div>
-          <div class="training-progress-text">${completedSteps} з ${program.steps.length} кроків виконано (${progressPercent}%)</div>
-        </div>
-      ` : ''}
-
       <div class="training-steps">
         ${program.steps.map((step, i) => `
-          <div class="training-step ${savedProgress[i] ? 'completed' : ''}" data-step-index="${i}">
-            <div class="training-step-num">${savedProgress[i] ? '✓' : i + 1}</div>
+          <div class="training-step">
+            <div class="training-step-num">${i + 1}</div>
             <div class="training-step-content">
               <div class="training-step-title">${escapeHtml(step.title)}</div>
               <div class="training-step-desc">${escapeHtml(step.desc)}</div>
@@ -106,50 +78,20 @@ async function renderTrainingDetail(program, panel) {
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
-      <button class="btn btn-ghost full-width" id="resetTrainingProgress" type="button">
-        🔄 Скинути прогрес
-      </button>
       <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
         🤖 Запитати AI детальніше
       </button>
     </div>
   `;
 
-  // Bind step clicks to toggle completion
-  const progressKey = `training_${programId}`;
-  panel.querySelectorAll('.training-step').forEach(stepEl => {
-    stepEl.addEventListener('click', async () => {
-      const index = parseInt(stepEl.dataset.stepIndex);
-      savedProgress[index] = !savedProgress[index];
-      
-      // Save to both localStorage and Firestore
-      localStorage.setItem(progressKey, JSON.stringify(savedProgress));
-      await saveTrainingProgress(programId, savedProgress);
-      
-      // Re-render to update UI
-      renderTrainingDetail(program, panel);
-      
-      // Haptic feedback
-      if (navigator.vibrate) navigator.vibrate(10);
-    });
-  });
-
   // Bind AI button
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
+      // Switch to chat tab
       const chatTab = document.querySelector('[data-tab="tabChat"]');
       if (chatTab) chatTab.click();
       setTimeout(() => handleAISubmit(prompt), 300);
-    }
-  });
-
-  // Bind reset button
-  panel.querySelector('#resetTrainingProgress')?.addEventListener('click', () => {
-    if (confirm('Скинути прогрес для цієї програми?')) {
-      localStorage.removeItem(progressKey);
-      renderTrainingDetail(program, panel);
-      toast('Прогрес скинуто', 'success');
     }
   });
 
@@ -376,34 +318,14 @@ async function renderCourseGrid() {
       ? courses
       : courses.filter(c => c.level === filter);
 
-    // ⚡ Pre-calculate all progress values with Promise.all to avoid [object Promise]
-    const progressValues = await Promise.all(filtered.map(async c => {
-      const totalChecks = c.checklist?.length || 0;
-      const pct = totalChecks > 0 ? await calcCourseProgressPct(c.id, totalChecks) : 0;
-      return { id: c.id, pct };
-    }));
-    const progressMap = Object.fromEntries(progressValues.map(p => [p.id, p.pct]));
-
-    // Limit display to first 8, unless "show all" was requested
-    const DISPLAY_LIMIT = 8;
-    const showAll = state.ui.courseFilterFull;
-    const displayCourses = showAll ? filtered : filtered.slice(0, DISPLAY_LIMIT);
-    const hasMore = filtered.length > DISPLAY_LIMIT && !showAll;
-
-    grid.innerHTML = displayCourses.map(c => {
-      const progress = progressMap[c.id] || 0;
-      const progressColor = progress >= 70 ? 'var(--success)' : progress >= 30 ? 'var(--warning)' : progress > 0 ? 'var(--accent)' : 'var(--border)';
+    grid.innerHTML = filtered.map(c => {
+      const progress = getCourseProgress(c.id, c.checklist?.length || 0);
       return `
         <button type="button" class="course-btn ${c.id === currentId ? 'selected' : ''}" data-course-id="${c.id}">
           <span class="c-badge">${c.badge}</span>
           <strong>${c.title}</strong>
           <div class="c-meta">${c.description}</div>
-          ${progress > 0 ? `
-            <div class="progress-bar" style="margin-top:0.6rem">
-              <div class="progress-bar-fill" style="width:${progress}%;background:${progressColor}"></div>
-            </div>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;text-align:right">${progress}%</div>
-          ` : '<div style="height:6px"></div>'}
+          ${progress > 0 ? `<div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>` : ''}
         </button>`;
     }).join('');
 
@@ -416,22 +338,6 @@ async function renderCourseGrid() {
       });
     });
 
-    if (hasMore) {
-      grid.insertAdjacentHTML('afterend', `
-        <button class="btn btn-ghost full-width" id="showMoreCoursesBtn" type="button">
-          Показати ще (${filtered.length - DISPLAY_LIMIT})
-        </button>
-      `);
-      const moreBtn = document.getElementById('showMoreCoursesBtn');
-      if (moreBtn) {
-        moreBtn.addEventListener('click', () => {
-          moreBtn.remove();
-          state.ui.courseFilterFull = true;
-          renderCourseGrid();
-        });
-      }
-    }
-
     // Render selected course detail
     const course = courses.find(c => c.id === currentId) || filtered[0] || courses[0];
     if (course) {
@@ -442,19 +348,9 @@ async function renderCourseGrid() {
   }
 }
 
-async function renderCourseDetail(course, container) {
-  // Get progress from Firestore with localStorage fallback
-  let progress = await fbGetCourseProgress(course.id);
-  
-  // Fallback to localStorage if Firestore is empty
-  if (typeof progress !== 'object' || Object.keys(progress).length === 0) {
-    const localProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-    progress = localProgress[course.id] || {};
-    // Migrate to Firestore if found in localStorage
-    if (Object.keys(progress).length > 0) {
-      await fbSaveCourseProgress(course.id, progress);
-    }
-  }
+function renderCourseDetail(course, container) {
+  const progress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+  const done = progress[course.id] || {};
 
   container.innerHTML = `
     <div class="course-detail">
@@ -467,35 +363,28 @@ async function renderCourseDetail(course, container) {
       <h4>Чекліст</h4>
       <ul class="checks">${course.checklist.map((s, i) =>
         `<li><label class="daily-item">
-          <input type="checkbox" data-course-check="${course.id}:${i}" ${progress[i] ? 'checked' : ''}>
+          <input type="checkbox" data-course-check="${course.id}:${i}" ${done[i] ? 'checked' : ''}>
           <span>${s}</span>
         </label></li>`
       ).join('')}</ul>
     </div>`;
 
   container.querySelectorAll('[data-course-check]').forEach(cb => {
-    cb.addEventListener('change', async () => {
+    cb.addEventListener('change', () => {
       const [courseId, idx] = cb.dataset.courseCheck.split(':');
-      progress[idx] = cb.checked;
-      
-      // Save to both localStorage and Firestore
-      const localProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-      if (!localProgress[courseId]) localProgress[courseId] = {};
-      localProgress[courseId][idx] = cb.checked;
-      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(localProgress));
-      await fbSaveCourseProgress(courseId, progress);
+      const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+      if (!p[courseId]) p[courseId] = {};
+      p[courseId][idx] = cb.checked;
+      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(p));
       haptic();
     });
   });
 }
 
-/**
- * Calculate course progress percentage from Firestore progress object
- */
-async function calcCourseProgressPct(courseId, totalChecks) {
+function getCourseProgress(courseId, totalChecks) {
   if (totalChecks === 0) return 0;
-  const progress = await fbGetCourseProgress(courseId);
-  const done = progress || {};
+  const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+  const done = p[courseId] || {};
   return Math.round(Object.values(done).filter(Boolean).length / totalChecks * 100);
 }
 
@@ -507,34 +396,13 @@ async function renderKnowledgeGrid() {
 
   try {
     const knowledge = await getKnowledge();
-    const KNOWLEDGE_LIMIT = 4;
-    const showAll = state.ui.knowledgeFull || false;
-    const display = showAll ? knowledge : knowledge.slice(0, KNOWLEDGE_LIMIT);
-    const hasMore = knowledge.length > KNOWLEDGE_LIMIT && !showAll;
-
-    grid.innerHTML = display.map(k => `
+    grid.innerHTML = knowledge.map(k => `
       <div class="k-card">
         <strong>${k.title}</strong>
         <p>${k.text}</p>
         <span class="k-tag">${k.tag}</span>
       </div>
     `).join('');
-
-    if (hasMore) {
-      grid.insertAdjacentHTML('afterend', `
-        <button class="btn btn-ghost full-width" id="showMoreKnowledgeBtn" type="button">
-          Показати ще (${knowledge.length - KNOWLEDGE_LIMIT})
-        </button>
-      `);
-      const moreBtn = document.getElementById('showMoreKnowledgeBtn');
-      if (moreBtn) {
-        moreBtn.addEventListener('click', () => {
-          moreBtn.remove();
-          state.ui.knowledgeFull = true;
-          renderKnowledgeGrid();
-        });
-      }
-    }
     knowledgeRendered = true;
   } catch {
     grid.innerHTML = '<p class="text-muted">Завантаження...</p>';

@@ -11,7 +11,6 @@ import { toast } from '../render.js';
 /** @type {IntersectionObserver|null} */
 let chartObserver = null;
 let chartRendered = false;
-let feedListBound = false;
 
 export function render() {
   renderFeed();
@@ -60,11 +59,9 @@ function renderChart(canvas) {
   ctx.clearRect(0, 0, w, h);
 
   const isDark = state.ui.theme === 'dark';
-  const accent = '#e07a5f';
-  const accentDark = '#e8956f';
-  const accentColor = isDark ? accentDark : accent;
-  const danger = isDark ? '#f87171' : '#d94f4f';
-  const warning = isDark ? '#fbbf24' : '#d4943a';
+  const accent = isDark ? '#38bdf8' : '#0ea5e9';
+  const danger = isDark ? '#f87171' : '#ef4444';
+  const warning = isDark ? '#fbbf24' : '#f59e0b';
   const muted = isDark ? '#6c757d' : '#adb5bd';
   const border = isDark ? '#2a2a4a' : '#e9ecef';
   const textC = isDark ? '#adb5bd' : '#495057';
@@ -130,7 +127,7 @@ function renderChart(canvas) {
     } else {
       const barH = Math.max(8, (day.pct / 100) * ch);
       const y = pad.top + ch - barH;
-      const barColor = day.pct >= 70 ? accentColor : day.pct >= 40 ? warning : danger;
+      const barColor = day.pct >= 70 ? accent : day.pct >= 40 ? warning : danger;
 
       ctx.fillStyle = barColor;
       const r = Math.min(4, barW / 2);
@@ -166,7 +163,7 @@ function renderChart(canvas) {
   ctx.font = '10px -apple-system, system-ui, sans-serif';
   ctx.textAlign = 'left';
 
-  ctx.fillStyle = accentColor;
+  ctx.fillStyle = accent;
   ctx.fillRect(lx, ly, 10, 10);
   ctx.fillStyle = textC;
   ctx.fillText('≥70%', lx + 14, ly + 9);
@@ -237,15 +234,9 @@ function renderFeed() {
 
   const filter = state.ui.diaryFilter;
   const typeConfig = getTypeConfig();
-  const currentPetId = state.ui.currentPetId;
   let events = state.events.items;
 
-  // Filter by current pet
-  if (currentPetId) {
-    events = events.filter(e => !e.petId || e.petId === currentPetId);
-  }
-
-  // Apply type filter
+  // Apply filter
   const allowedTypes = FILTER_TYPES[filter];
   if (allowedTypes) {
     events = events.filter(e => allowedTypes.includes(e.eventType));
@@ -297,11 +288,9 @@ function renderFeed() {
     });
   }
 
-  // Bind delete buttons (event delegation) — bind only once
-  if (!feedListBound) {
-    feedListBound = true;
-    list.addEventListener('click', handleFeedClick);
-  }
+  // Bind delete buttons (event delegation) — remove old listener first
+  list.removeEventListener('click', handleFeedClick);
+  list.addEventListener('click', handleFeedClick);
 }
 
 /**

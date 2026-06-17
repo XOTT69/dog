@@ -82,62 +82,6 @@ export function generateHealthSchedule() {
 }
 
 /**
- * Get vaccine history from pet data
- * @returns {Array<{date: string, type: string, name: string}>}
- */
-export function getVaccineHistory() {
-  const pet = state.pet.data;
-  if (!pet?.vaccineHistory) return [];
-  return pet.vaccineHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-}
-
-/**
- * Add vaccine to history
- * @param {Object} entry - {date: string, type: string, name: string}
- */
-export async function addVaccineEntry(entry) {
-  const pet = state.pet.data;
-  if (!pet) return;
-
-  const history = pet.vaccineHistory || [];
-  history.push({
-    date: entry.date,
-    type: entry.type || 'vaccine',
-    name: entry.name,
-  });
-
-  await savePetProfile({ vaccineHistory: history });
-}
-
-/**
- * Calculate next vaccine date based on history
- * @param {string} type - 'vaccine' | 'deworming' | 'vet'
- * @returns {Date|null}
- */
-export function getNextScheduledDate(type) {
-  const pet = state.pet.data;
-  if (!pet?.birthDate) return null;
-
-  const birthDate = new Date(pet.birthDate);
-  const schedules = {
-    vaccine: VACCINE_SCHEDULE,
-    deworming: DEWORMING_SCHEDULE,
-    vet: HEALTH_CHECKS,
-  };
-
-  const items = schedules[type] || [];
-  const now = new Date();
-
-  // Find next upcoming item
-  for (const item of items) {
-    const date = new Date(birthDate.getTime() + item.weekOffset * 7 * MS_PER_DAY);
-    if (date >= now) return date;
-  }
-
-  return null;
-}
-
-/**
  * Get next upcoming health events
  * @param {number} limit
  * @returns {Array}

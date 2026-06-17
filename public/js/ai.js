@@ -266,7 +266,7 @@ function getLocalFallback(prompt) {
 • Блювання + пронос одночасно`;
   }
 
-  if (l.includes('не їсть') || l.includes('відмовля') && l.includes('їж') || l.includes('не хоче їсти')) {
+  if (l.includes('не їсть') || (l.includes('відмовля') && l.includes('їж')) || l.includes('не хоче їсти')) {
     return `🏥 Відмова від їжі:
 
 1. Пропуск 1 прийому — часто норма (спека, стрес, перевтома).

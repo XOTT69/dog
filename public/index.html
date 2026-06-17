@@ -528,6 +528,31 @@
           <div id="healthScheduleList"></div>
         </div>
         <div class="card">
+          <h4 class="card-title">💉 Історія вакцинацій</h4>
+          <div id="vaccineHistoryList"></div>
+          <div class="form-grid" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+            <div class="field">
+              <label for="newVaccineDate">Дата</label>
+              <input id="newVaccineDate" type="date">
+            </div>
+            <div class="field">
+              <label for="newVaccineType">Тип</label>
+              <select id="newVaccineType">
+                <option value="vaccine">💉 Вакцина</option>
+                <option value="deworming">💊 Дегельмінтизація</option>
+                <option value="vet">🏥 Огляд</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label for="newVaccineName">Назва</label>
+              <input id="newVaccineName" type="text" placeholder="Наприклад: DHPP ревакцинація">
+            </div>
+            <div class="field full">
+              <button class="btn btn-primary full-width" id="addVaccineBtn" type="button">➕ Додати запис</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
           <h4 class="card-title">📲 Сповіщення</h4>
           <p class="text-muted" style="margin-bottom:0.75rem">Нагадування навіть коли застосунок закритий.</p>
           <button class="btn btn-primary full-width" id="enablePushBtn" type="button">🔔 Увімкнути сповіщення</button>
@@ -545,6 +570,32 @@
             <button class="btn btn-primary btn-sm" type="submit">Приєднатися</button>
           </form>
           <div id="membersList" class="members-list"></div>
+        </div>
+        <div class="card">
+          <h4 class="card-title">🔔 Кастомні нагадування</h4>
+          <div id="customRemindersList"></div>
+          <div class="form-grid" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+            <div class="field">
+              <label for="reminderLabel">Назва</label>
+              <input id="reminderLabel" type="text" placeholder="Наприклад: Вакцинація">
+            </div>
+            <div class="field">
+              <label for="reminderDate">Дата</label>
+              <input id="reminderDate" type="date">
+            </div>
+            <div class="field">
+              <label for="reminderType">Тип</label>
+              <select id="reminderType">
+                <option value="custom">🔔 Загальне</option>
+                <option value="vaccine">💉 Вакцина</option>
+                <option value="deworming">💊 Дегельмінтизація</option>
+                <option value="vet">🏥 Ветеринар</option>
+              </select>
+            </div>
+            <div class="field">
+              <button class="btn btn-primary full-width" id="addReminderBtn" type="button">➕ Додати нагадування</button>
+            </div>
+          </div>
         </div>
         <div class="card">
           <h4 class="card-title">📦 Дані</h4>

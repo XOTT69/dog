@@ -234,9 +234,15 @@ function renderFeed() {
 
   const filter = state.ui.diaryFilter;
   const typeConfig = getTypeConfig();
+  const currentPetId = state.ui.currentPetId;
   let events = state.events.items;
 
-  // Apply filter
+  // Filter by current pet
+  if (currentPetId) {
+    events = events.filter(e => !e.petId || e.petId === currentPetId);
+  }
+
+  // Apply type filter
   const allowedTypes = FILTER_TYPES[filter];
   if (allowedTypes) {
     events = events.filter(e => allowedTypes.includes(e.eventType));

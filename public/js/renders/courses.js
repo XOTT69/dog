@@ -8,6 +8,7 @@ import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
 import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
+import { getTrainingProgress, saveTrainingProgress } from '../firebase.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -47,11 +48,28 @@ function renderProblemButtons() {
   });
 }
 
-function renderTrainingDetail(program, panel) {
+async function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
 
   panel.classList.remove('hidden');
+  
+  // Get saved progress from Firestore (with localStorage fallback)
+  const programId = program.title.toLowerCase().replace(/\s+/g, '_');
+  let savedProgress = await getTrainingProgress(programId);
+  
+  // Fallback to localStorage if Firestore is empty
+  if (Object.keys(savedProgress).length === 0) {
+    const progressKey = `training_${programId}`;
+    savedProgress = JSON.parse(localStorage.getItem(progressKey) || '{}');
+    // Migrate to Firestore if found in localStorage
+    if (Object.keys(savedProgress).length > 0) {
+      await saveTrainingProgress(programId, savedProgress);
+    }
+  }
+  const completedSteps = program.steps.filter((_, i) => savedProgress[i]).length;
+  const progressPercent = Math.round((completedSteps / program.steps.length) * 100);
+
   panel.innerHTML = `
     <div class="card" style="border-left: 4px solid var(--accent)">
       <div class="training-header">
@@ -63,10 +81,19 @@ function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
+      ${progressPercent > 0 ? `
+        <div class="training-progress">
+          <div class="training-progress-bar">
+            <div class="training-progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+          <div class="training-progress-text">${completedSteps} з ${program.steps.length} кроків виконано (${progressPercent}%)</div>
+        </div>
+      ` : ''}
+
       <div class="training-steps">
         ${program.steps.map((step, i) => `
-          <div class="training-step">
-            <div class="training-step-num">${i + 1}</div>
+          <div class="training-step ${savedProgress[i] ? 'completed' : ''}" data-step-index="${i}">
+            <div class="training-step-num">${savedProgress[i] ? '✓' : i + 1}</div>
             <div class="training-step-content">
               <div class="training-step-title">${escapeHtml(step.title)}</div>
               <div class="training-step-desc">${escapeHtml(step.desc)}</div>
@@ -78,20 +105,50 @@ function renderTrainingDetail(program, panel) {
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
+      <button class="btn btn-ghost full-width" id="resetTrainingProgress" type="button">
+        🔄 Скинути прогрес
+      </button>
       <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
         🤖 Запитати AI детальніше
       </button>
     </div>
   `;
 
+  // Bind step clicks to toggle completion
+  const progressKey = `training_${programId}`;
+  panel.querySelectorAll('.training-step').forEach(stepEl => {
+    stepEl.addEventListener('click', async () => {
+      const index = parseInt(stepEl.dataset.stepIndex);
+      savedProgress[index] = !savedProgress[index];
+      
+      // Save to both localStorage and Firestore
+      localStorage.setItem(progressKey, JSON.stringify(savedProgress));
+      await saveTrainingProgress(programId, savedProgress);
+      
+      // Re-render to update UI
+      renderTrainingDetail(program, panel);
+      
+      // Haptic feedback
+      if (navigator.vibrate) navigator.vibrate(10);
+    });
+  });
+
   // Bind AI button
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
-      // Switch to chat tab
       const chatTab = document.querySelector('[data-tab="tabChat"]');
       if (chatTab) chatTab.click();
       setTimeout(() => handleAISubmit(prompt), 300);
+    }
+  });
+
+  // Bind reset button
+  panel.querySelector('#resetTrainingProgress')?.addEventListener('click', () => {
+    if (confirm('Скинути прогрес для цієї програми?')) {
+      localStorage.removeItem(progressKey);
+      renderTrainingDetail(program, panel);
+      toast('Прогрес скинуто', 'success');
     }
   });
 

@@ -17,6 +17,26 @@ import { renderWeeklyPlan } from '../weekly-plan.js';
 import { renderDailyLesson } from '../daily-lesson.js';
 import { switchPet, addPet } from '../firebase.js';
 
+// ===== NAVIGATION BADGES =====
+
+function updateNavBadges() {
+  const overdueEvents = getOverdueHealthEvents();
+  const hasOverdue = overdueEvents.length > 0;
+  
+  // Update profile nav item with badge
+  const profileNav = document.querySelector('[data-tab="tabProfile"]');
+  if (profileNav) {
+    const existingBadge = profileNav.querySelector('.nav-badge');
+    if (hasOverdue && !existingBadge) {
+      const badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      profileNav.appendChild(badge);
+    } else if (!hasOverdue && existingBadge) {
+      existingBadge.remove();
+    }
+  }
+}
+
 // ===== RENDER =====
 
 let ptrBound = false;
@@ -24,6 +44,7 @@ let ptrBound = false;
 export function render() {
   if (!ptrBound) initPullToRefresh();
   renderPetSwitcher();
+  updateNavBadges();
   updateStreak();
   renderStreak();
   renderDailyTip();
@@ -92,12 +113,15 @@ function renderPetSwitcher() {
     });
   });
 
-  // Add pet button
+  // Add pet button with improved UX
   scroll.querySelector('[data-pet-action="add"]')?.addEventListener('click', async () => {
+    const name = prompt('Як звати нову тварину?');
+    if (!name?.trim()) return;
+    
+    const petType = confirm('Це собака?\n\nOK = Собака 🐕\nСкасувати = Кіт 🐱') ? 'dog' : 'cat';
+    
     try {
-      const name = prompt('Як звати нову тварину?');
-      if (!name?.trim()) return;
-      await addPet({ name: name.trim(), petType: 'dog' });
+      await addPet({ name: name.trim(), petType });
       toast(`${name.trim()} додано! 🎉`, 'success');
       render();
     } catch (e) {

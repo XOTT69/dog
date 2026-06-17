@@ -4,9 +4,9 @@
 
 import { state } from '../state.js';
 import { $, escapeHtml, avatarLetter, haptic } from '../utils.js';
-import { savePetProfile, subscribePush, getIdToken } from '../firebase.js';
+import { savePetProfile, subscribePush, getIdToken, addReminder, deleteReminder } from '../firebase.js';
 import { toast, showLoading, hideLoading } from '../render.js';
-import { renderHealthSchedule, isDewormingDue, isVaccinationDue } from '../vaccination.js';
+import { renderHealthSchedule, isDewormingDue, isVaccinationDue, getVaccineHistory, addVaccineEntry } from '../vaccination.js';
 
 /** @type {boolean} */
 let bound = false;
@@ -17,6 +17,8 @@ export function render() {
   renderWorkspaceMeta();
   renderHealthAlerts();
   renderHealthScheduleUI();
+  renderVaccineHistory();
+  renderCustomReminders();
   if (!bound) bindProfileEvents();
 }
 
@@ -120,6 +122,78 @@ function renderHealthScheduleUI() {
   renderHealthSchedule(container);
 }
 
+// ===== CUSTOM REMINDERS =====
+
+function renderCustomReminders() {
+  const container = $('customRemindersList');
+  if (!container) return;
+
+  const reminders = state.pet.data?.reminders || [];
+  
+  if (!reminders.length) {
+    container.innerHTML = '<p class="text-muted">Поки немає кастомних нагадувань.</p>';
+    return;
+  }
+
+  container.innerHTML = reminders.map(r => {
+    const dateStr = new Date(r.nextDate).toLocaleDateString('uk', { day: 'numeric', month: 'short' });
+    const typeIcon = { vaccine: '💉', deworming: '💊', vet: '🏥', custom: '🔔' }[r.type] || '🔔';
+    return `
+      <div class="feed-item">
+        <div>
+          <strong>${typeIcon} ${escapeHtml(r.label)}</strong>
+          <div class="meta">${dateStr}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-delete-reminder="${r.id}" aria-label="Видалити">✕</button>
+      </div>
+    `;
+  }).join('');
+
+  // Bind delete buttons
+  container.querySelectorAll('[data-delete-reminder]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const reminderId = btn.dataset.deleteReminder;
+      showLoading();
+      try {
+        await deleteReminder(reminderId);
+        toast('Видалено', 'success');
+        renderCustomReminders();
+      } catch {
+        toast('Помилка', 'error');
+      } finally {
+        hideLoading();
+      }
+    });
+  });
+}
+
+// ===== VACCINE HISTORY =====
+
+function renderVaccineHistory() {
+  const container = $('vaccineHistoryList');
+  if (!container) return;
+
+  const history = getVaccineHistory();
+  
+  if (!history.length) {
+    container.innerHTML = '<p class="text-muted">Поки немає записів. Додайте першу вакцинацію нижче.</p>';
+    return;
+  }
+
+  container.innerHTML = history.map(entry => {
+    const dateStr = new Date(entry.date).toLocaleDateString('uk', { day: 'numeric', month: 'short', year: 'numeric' });
+    const typeIcon = { vaccine: '💉', deworming: '💊', vet: '🏥' }[entry.type] || '📋';
+    return `
+      <div class="feed-item">
+        <div>
+          <strong>${typeIcon} ${escapeHtml(entry.name)}</strong>
+          <div class="meta">${dateStr}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 // ===== BIND EVENTS =====
 
 function bindProfileEvents() {
@@ -175,6 +249,64 @@ function bindProfileEvents() {
         lastHeat: $('petLastHeat')?.value || '',
       });
       toast('Збережено ✓', 'success');
+    } catch {
+      toast('Помилка', 'error');
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // Add custom reminder
+  $('addReminderBtn')?.addEventListener('click', async () => {
+    const labelInput = $('reminderLabel');
+    const dateInput = $('reminderDate');
+    const typeSelect = $('reminderType');
+    
+    if (!labelInput?.value.trim() || !dateInput?.value) {
+      toast('Заповніть назву та дату', 'error');
+      return;
+    }
+
+    showLoading();
+    try {
+      await addReminder({
+        label: labelInput.value.trim(),
+        nextDate: dateInput.value,
+        type: typeSelect?.value || 'custom',
+      });
+      toast('Нагадування додано ✓', 'success');
+      labelInput.value = '';
+      dateInput.value = '';
+      renderCustomReminders();
+    } catch {
+      toast('Помилка', 'error');
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // Add vaccine entry
+  $('addVaccineBtn')?.addEventListener('click', async () => {
+    const dateInput = $('newVaccineDate');
+    const nameInput = $('newVaccineName');
+    const typeSelect = $('newVaccineType');
+    
+    if (!dateInput?.value || !nameInput?.value.trim()) {
+      toast('Заповніть дату та назву', 'error');
+      return;
+    }
+
+    showLoading();
+    try {
+      await addVaccineEntry({
+        date: dateInput.value,
+        name: nameInput.value.trim(),
+        type: typeSelect?.value || 'vaccine',
+      });
+      toast('Додано ✓', 'success');
+      dateInput.value = '';
+      nameInput.value = '';
+      renderVaccineHistory();
     } catch {
       toast('Помилка', 'error');
     } finally {

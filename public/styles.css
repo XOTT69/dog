@@ -920,6 +920,140 @@ textarea { resize: vertical; min-height: 80px; }
 .field label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
 .field.full { grid-column: 1 / -1; }
 
+/* ===== VACCINE HISTORY ===== */
+.vaccine-history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  transition: all var(--duration) var(--ease);
+  box-shadow: var(--shadow-xs);
+}
+
+.vaccine-history-item:hover {
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+.vaccine-history-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.vaccine-history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vaccine-history-info strong {
+  font-size: 0.85rem;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.vaccine-history-info .meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ===== TRAINING PROGRESS ===== */
+.training-progress-bar {
+  height: 6px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.training-progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: var(--radius-full);
+  transition: width 300ms var(--ease);
+}
+
+.training-step {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.6rem;
+  transition: all var(--duration) var(--ease);
+  box-shadow: var(--shadow-xs);
+}
+
+.training-step:hover {
+  border-color: var(--accent);
+  transform: translateX(2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.training-step.completed {
+  border-color: var(--success);
+  background: var(--success-light);
+}
+
+.training-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.training-step.completed .training-step-num {
+  background: var(--success);
+}
+
+.training-step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.training-step-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--text);
+}
+
+.training-step-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.training-tip {
+  padding: 0.85rem 1rem;
+  background: var(--accent-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.training-mistake {
+  padding: 0.85rem 1rem;
+  background: var(--danger-light);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-sm);
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
 /* ===== PROFILE ===== */
 .invite-row {
   display: flex;

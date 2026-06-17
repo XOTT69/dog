@@ -315,6 +315,13 @@ export async function addPet(payload) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 
+  // If adding a cat, update toiletMode to 'pad' since cats don't use outdoor toilet
+  if (payload.petType === 'cat') {
+    await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId).update({
+      toiletMode: 'pad'
+    });
+  }
+
   // Switch to new pet
   switchPet(petId);
   return petId;
@@ -395,6 +402,72 @@ export async function savePetProfile(payload, petId) {
 
   await db.collection('workspaces').doc(wsId).collection('dogs').doc(targetId)
     .set({ ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/**
+ * Save training progress to Firestore
+ * @param {string} programId
+ * @param {Object} progress - {stepIndex: boolean}
+ */
+export async function saveTrainingProgress(programId, progress) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return;
+
+  await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
+    .collection('trainingProgress').doc(programId)
+    .set({ progress, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/**
+ * Get training progress from Firestore
+ * @param {string} programId
+ * @returns {Promise<Object>}
+ */
+export async function getTrainingProgress(programId) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return {};
+
+  try {
+    const doc = await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
+      .collection('trainingProgress').doc(programId).get();
+    return doc.exists ? doc.data().progress || {} : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Add custom reminder
+ * @param {Object} reminder - {label, nextDate, type}
+ */
+export async function addReminder(reminder) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return;
+
+  const reminders = state.pet.data?.reminders || [];
+  reminders.push({
+    ...reminder,
+    id: Date.now().toString(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await savePetProfile({ reminders });
+}
+
+/**
+ * Delete custom reminder
+ * @param {string} reminderId
+ */
+export async function deleteReminder(reminderId) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return;
+
+  const reminders = (state.pet.data?.reminders || []).filter(r => r.id !== reminderId);
+  await savePetProfile({ reminders });
 }
 
 /**

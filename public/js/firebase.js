@@ -439,6 +439,40 @@ export async function getTrainingProgress(programId) {
 }
 
 /**
+ * Save course progress to Firestore
+ * @param {string} courseId
+ * @param {Object} progress - {checkIndex: boolean}
+ */
+export async function saveCourseProgress(courseId, progress) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return;
+
+  await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
+    .collection('courseProgress').doc(courseId)
+    .set({ progress, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/**
+ * Get course progress from Firestore
+ * @param {string} courseId
+ * @returns {Promise<Object>}
+ */
+export async function getCourseProgress(courseId) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return {};
+
+  try {
+    const doc = await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
+      .collection('courseProgress').doc(courseId).get();
+    return doc.exists ? doc.data().progress || {} : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Add custom reminder
  * @param {Object} reminder - {label, nextDate, type}
  */

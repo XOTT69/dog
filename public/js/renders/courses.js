@@ -8,7 +8,7 @@ import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
 import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
-import { getTrainingProgress, saveTrainingProgress } from '../firebase.js';
+import { getTrainingProgress, saveTrainingProgress, getCourseProgress, saveCourseProgress } from '../firebase.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -377,12 +377,18 @@ async function renderCourseGrid() {
 
     grid.innerHTML = filtered.map(c => {
       const progress = getCourseProgress(c.id, c.checklist?.length || 0);
+      const progressColor = progress >= 70 ? 'var(--success)' : progress >= 30 ? 'var(--warning)' : progress > 0 ? 'var(--accent)' : 'var(--border)';
       return `
         <button type="button" class="course-btn ${c.id === currentId ? 'selected' : ''}" data-course-id="${c.id}">
           <span class="c-badge">${c.badge}</span>
           <strong>${c.title}</strong>
           <div class="c-meta">${c.description}</div>
-          ${progress > 0 ? `<div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>` : ''}
+          ${progress > 0 ? `
+            <div class="progress-bar" style="margin-top:0.6rem">
+              <div class="progress-bar-fill" style="width:${progress}%;background:${progressColor}"></div>
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;text-align:right">${progress}%</div>
+          ` : '<div style="height:6px"></div>'}
         </button>`;
     }).join('');
 
@@ -405,9 +411,19 @@ async function renderCourseGrid() {
   }
 }
 
-function renderCourseDetail(course, container) {
-  const progress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-  const done = progress[course.id] || {};
+async function renderCourseDetail(course, container) {
+  // Get progress from Firestore with localStorage fallback
+  let progress = await getCourseProgress(course.id);
+  
+  // Fallback to localStorage if Firestore is empty
+  if (Object.keys(progress).length === 0) {
+    const localProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+    progress = localProgress[course.id] || {};
+    // Migrate to Firestore if found in localStorage
+    if (Object.keys(progress).length > 0) {
+      await saveCourseProgress(course.id, progress);
+    }
+  }
 
   container.innerHTML = `
     <div class="course-detail">
@@ -420,29 +436,47 @@ function renderCourseDetail(course, container) {
       <h4>Чекліст</h4>
       <ul class="checks">${course.checklist.map((s, i) =>
         `<li><label class="daily-item">
-          <input type="checkbox" data-course-check="${course.id}:${i}" ${done[i] ? 'checked' : ''}>
+          <input type="checkbox" data-course-check="${course.id}:${i}" ${progress[i] ? 'checked' : ''}>
           <span>${s}</span>
         </label></li>`
       ).join('')}</ul>
     </div>`;
 
   container.querySelectorAll('[data-course-check]').forEach(cb => {
-    cb.addEventListener('change', () => {
+    cb.addEventListener('change', async () => {
       const [courseId, idx] = cb.dataset.courseCheck.split(':');
-      const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-      if (!p[courseId]) p[courseId] = {};
-      p[courseId][idx] = cb.checked;
-      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(p));
+      progress[idx] = cb.checked;
+      
+      // Save to both localStorage and Firestore
+      const localProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+      if (!localProgress[courseId]) localProgress[courseId] = {};
+      localProgress[courseId][idx] = cb.checked;
+      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(localProgress));
+      await saveCourseProgress(courseId, progress);
       haptic();
     });
   });
 }
 
-function getCourseProgress(courseId, totalChecks) {
+async function getCourseProgress(courseId, totalChecks) {
   if (totalChecks === 0) return 0;
-  const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-  const done = p[courseId] || {};
+  const progress = await getCourseProgressFromFirestore(courseId);
+  const done = progress || {};
   return Math.round(Object.values(done).filter(Boolean).length / totalChecks * 100);
+}
+
+async function getCourseProgressFromFirestore(courseId) {
+  const wsId = state.workspace.id;
+  const petId = state.ui.currentPetId;
+  if (!wsId || !petId) return {};
+
+  try {
+    const doc = await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
+      .collection('courseProgress').doc(courseId).get();
+    return doc.exists ? doc.data().progress || {} : {};
+  } catch {
+    return {};
+  }
 }
 
 // ===== KNOWLEDGE =====

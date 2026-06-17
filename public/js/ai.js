@@ -155,7 +155,7 @@ export async function fetchAIResponse(userPrompt) {
         messages,
         temperature: 0.3,
         max_tokens: MAX_AI_TOKENS,
-        stream: false,
+        stream: true, // Enable streaming
       }),
     });
 
@@ -165,11 +165,41 @@ export async function fetchAIResponse(userPrompt) {
       throw new Error(errorMsg);
     }
 
-    const data = await response.json();
+    // Handle streaming response
+    if (response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      // Create message element for streaming
+      const chat = document.getElementById('aiChat');
+      const msgEl = document.createElement('div');
+      msgEl.className = 'ai-msg assistant';
+      chat.appendChild(msgEl);
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+        msgEl.textContent = fullText;
+        
+        // Scroll to bottom
+        chat.scrollTop = chat.scrollHeight;
+      }
+      
+      // Save to history
+      addChatHistory('user', userPrompt);
+      addChatHistory('assistant', fullText.trim());
+      
+      return fullText.trim();
+    }
 
+    // Fallback to non-streaming if body not available
+    const data = await response.json();
     if (data.choices?.[0]?.message?.content) {
       const result = data.choices[0].message.content.trim();
-      // Save to history
       addChatHistory('user', userPrompt);
       addChatHistory('assistant', result);
       return result;
@@ -177,7 +207,6 @@ export async function fetchAIResponse(userPrompt) {
     throw new Error('Empty response');
   } catch (e) {
     console.warn('[AI] Error:', e.message);
-    // Don't use local fallback for HTTP errors — show the error message
     if (e.message.startsWith('⚠️') || e.message.startsWith('🚫') || e.message.startsWith('⏳')) {
       throw e;
     }

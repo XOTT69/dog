@@ -23,7 +23,7 @@ function updateNavBadges() {
   const overdueEvents = getOverdueHealthEvents();
   const hasOverdue = overdueEvents.length > 0;
   
-  // Update profile nav item with badge
+  // Profile badge - overdue health events
   const profileNav = document.querySelector('[data-tab="tabProfile"]');
   if (profileNav) {
     const existingBadge = profileNav.querySelector('.nav-badge');
@@ -32,6 +32,59 @@ function updateNavBadges() {
       badge.className = 'nav-badge';
       profileNav.appendChild(badge);
     } else if (!hasOverdue && existingBadge) {
+      existingBadge.remove();
+    }
+  }
+
+  // Courses badge - active training programs
+  const coursesNav = document.querySelector('[data-tab="tabCourses"]');
+  if (coursesNav) {
+    const hasActiveTraining = state.pet.data?.issues?.trim().length > 0;
+    const existingBadge = coursesNav.querySelector('.nav-badge');
+    if (hasActiveTraining && !existingBadge) {
+      const badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      coursesNav.appendChild(badge);
+    } else if (!hasActiveTraining && existingBadge) {
+      existingBadge.remove();
+    }
+  }
+
+  // Diary badge - not filled for 2+ days
+  const diaryNav = document.querySelector('[data-tab="tabDiary"]');
+  if (diaryNav) {
+    const today = startOfToday();
+    const twoDaysAgo = new Date(today);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    
+    const recentEvents = state.events.items.filter(e => {
+      const ts = tsToDate(e.createdAt);
+      return ts && ts >= twoDaysAgo;
+    });
+    
+    const needsDiaryBadge = recentEvents.length === 0 && state.events.items.length > 0;
+    const existingBadge = diaryNav.querySelector('.nav-badge');
+    
+    if (needsDiaryBadge && !existingBadge) {
+      const badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      diaryNav.appendChild(badge);
+    } else if ((!needsDiaryBadge || state.events.items.length === 0) && existingBadge) {
+      existingBadge.remove();
+    }
+  }
+
+  // Chat badge - always show for new users (encourages engagement)
+  const chatNav = document.querySelector('[data-tab="tabChat"]');
+  if (chatNav) {
+    const hasChatHistory = localStorage.getItem(STORAGE_KEYS.aiHistory)?.length > 0;
+    const existingBadge = chatNav.querySelector('.nav-badge');
+    if (!hasChatHistory && !existingBadge) {
+      const badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      badge.style.background = 'var(--accent)';
+      chatNav.appendChild(badge);
+    } else if (hasChatHistory && existingBadge) {
       existingBadge.remove();
     }
   }
@@ -68,12 +121,56 @@ export function render() {
   renderHeatInfo();
   renderReminders();
 
+  // Add section separators
+  addSectionSeparators();
+
   // Check achievements after render
   const newAch = checkAchievements();
   if (newAch.length > 0) {
     newAch.forEach(a => toast(`${a.icon} ${a.label}!`, 'success'));
     showConfetti();
   }
+}
+
+function addSectionSeparators() {
+  const main = document.querySelector('.main');
+  if (!main) return;
+
+  // Remove existing separators
+  main.querySelectorAll('.section-separator').forEach(el => el.remove());
+
+  // Add separators between major sections
+  const sections = [
+    { after: 'streakCard', label: null },
+    { after: 'weeklyReport', label: null },
+    { after: 'aiPlanCard', label: null },
+    { after: 'stats-grid', label: null },
+    { after: 'timerCard', label: null },
+    { after: 'onetapGrid', label: null },
+    { after: 'dailyItems', label: null },
+    { after: 'weeklyPlanCard', label: null },
+    { after: 'breedCard', label: null },
+    { after: 'problemCards', label: null },
+    { after: 'recommendedCourses', label: null },
+    { after: 'firstDaysCard', label: null },
+    { after: 'puppyBluesCard', label: null },
+    { after: 'foodGuideCard', label: null },
+    { after: 'achievementsGrid', label: null },
+    { after: 'heatmapGrid', label: null },
+    { after: 'remindersCard', label: null },
+    { after: 'heatCard', label: null },
+    { after: 'periodFocus', label: null },
+  ];
+
+  sections.forEach(({ after, label }) => {
+    const el = document.getElementById(after);
+    if (el && el.offsetParent !== null) {
+      const separator = document.createElement('div');
+      separator.className = 'section-separator';
+      separator.style.cssText = 'height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 0.5rem 0; opacity: 0.6;';
+      el.insertAdjacentElement('afterend', separator);
+    }
+  });
 }
 
 // ===== PET SWITCHER =====
@@ -519,20 +616,20 @@ function renderWeeklyReport() {
 // ===== BREED CARD =====
 
 async function renderBreedCard() {
-  const container = $('breedCard');
-  if (!container) return;
+  const container = $('breedContent');
+  const card = $('breedCard');
+  if (!container || !card) return;
 
   const pet = state.pet.data;
   const profile = getBreedProfile(pet?.breed);
 
-  if (!profile) { container.style.display = 'none'; return; }
-  container.style.display = '';
+  if (!profile) { card.style.display = 'none'; return; }
+  card.style.display = '';
 
   const energyLabel = { low: '🟢 Низька', mid: '🟡 Середня', high: '🟠 Висока', very_high: '🔴 Дуже висока' };
   const trainLabel = { low: '🟠 Складна', mid: '🟡 Середня', high: '🟢 Легка', very_high: '🟢 Дуже легка' };
 
   container.innerHTML = `
-    <h4 class="card-title">🐕 ${profile.name}</h4>
     <div class="breed-meta-grid">
       <div>⚡ ${energyLabel[profile.energy] || '?'}</div>
       <div>🎓 ${trainLabel[profile.trainability] || '?'}</div>
@@ -548,11 +645,12 @@ async function renderBreedCard() {
 // ===== PROBLEM PROTOCOLS =====
 
 async function renderProblemCards() {
-  const container = $('problemCards');
-  if (!container) return;
+  const container = $('problemContent');
+  const card = $('problemCards');
+  if (!container || !card) return;
 
   const issues = (state.pet.data?.issues || '').toLowerCase();
-  if (!issues.trim()) { container.style.display = 'none'; return; }
+  if (!issues.trim()) { card.style.display = 'none'; return; }
 
   try {
     const protocols = await getProtocols();
@@ -561,32 +659,32 @@ async function renderProblemCards() {
       return keywords.some(kw => issues.includes(kw));
     });
 
-    if (!active.length) { container.style.display = 'none'; return; }
-    container.style.display = '';
+    if (!active.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
 
-    container.innerHTML = `<h4 class="card-title">🆘 Ваші проблеми → План</h4>` +
-      active.map(p => `
-        <details>
-          <summary>${p.icon} ${p.name} <span class="text-muted">(${p.duration})</span></summary>
-          <div class="detail-content">
-            <ol class="protocol-steps">${p.steps.map(s => `<li>${s}</li>`).join('')}</ol>
-            ${p.dailyTasks ? `<div class="protocol-daily"><strong>Щоденно:</strong>${p.dailyTasks.map(t => `<div>• ${t}</div>`).join('')}</div>` : ''}
-          </div>
-        </details>
-      `).join('');
+    container.innerHTML = active.map(p => `
+      <details>
+        <summary>${p.icon} ${p.name} <span class="text-muted">(${p.duration})</span></summary>
+        <div class="detail-content">
+          <ol class="protocol-steps">${p.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+          ${p.dailyTasks ? `<div class="protocol-daily"><strong>Щоденно:</strong>${p.dailyTasks.map(t => `<div>• ${t}</div>`).join('')}</div>` : ''}
+        </div>
+      </details>
+    `).join('');
   } catch {
-    container.style.display = 'none';
+    card.style.display = 'none';
   }
 }
 
 // ===== RECOMMENDED COURSES =====
 
 async function renderRecommendedCourses() {
-  const container = $('recommendedCourses');
-  if (!container) return;
+  const container = $('recommendedContent');
+  const card = $('recommendedCourses');
+  if (!container || !card) return;
 
   const pet = state.pet.data;
-  if (!pet) { container.style.display = 'none'; return; }
+  if (!pet) { card.style.display = 'none'; return; }
 
   const weeks = getAgeInWeeks(pet.birthDate);
   const issues = (pet.issues || '').toLowerCase();
@@ -610,35 +708,35 @@ async function renderRecommendedCourses() {
   if (issues.includes('гавкає')) rec.add('settle-down');
 
   const unique = [...rec].slice(0, 6);
-  if (!unique.length) { container.style.display = 'none'; return; }
+  if (!unique.length) { card.style.display = 'none'; return; }
 
   try {
     const { getCourses } = await import('../content-loader.js');
     const courses = await getCourses();
-    container.style.display = '';
-    container.innerHTML = `<h4 class="card-title">🎯 Рекомендовані для вас</h4>
-      <div class="course-grid">${unique.map(id => {
-        const c = courses.find(x => x.id === id);
-        if (!c) return '';
-        return `<button type="button" class="course-btn" data-rec-course="${c.id}">
-          <span class="c-badge">${c.badge}</span><strong>${c.title}</strong>
-          <div class="c-meta">${c.description}</div>
-        </button>`;
-      }).join('')}</div>`;
+    card.style.display = '';
+    container.innerHTML = `<div class="course-grid">${unique.map(id => {
+      const c = courses.find(x => x.id === id);
+      if (!c) return '';
+      return `<button type="button" class="course-btn" data-rec-course="${c.id}">
+        <span class="c-badge">${c.badge}</span><strong>${c.title}</strong>
+        <div class="c-meta">${c.description}</div>
+      </button>`;
+    }).join('')}</div>`;
   } catch {
-    container.style.display = 'none';
+    card.style.display = 'none';
   }
 }
 
 // ===== FOOD GUIDE =====
 
 function renderFoodGuide() {
-  const container = $('foodGuideCard');
-  if (!container) return;
+  const container = $('foodGuideContent');
+  const card = $('foodGuideCard');
+  if (!container || !card) return;
 
   const pet = state.pet.data;
   const weight = parseFloat(pet?.weight) || 0;
-  if (!weight) { container.style.display = 'none'; return; }
+  if (!weight) { card.style.display = 'none'; return; }
 
   const weeks = getAgeInWeeks(pet?.birthDate);
   const isPuppy = weeks != null && weeks < 52;
@@ -664,8 +762,8 @@ function renderFoodGuide() {
   const table = isPuppy ? tables.puppy : tables.adult;
   const match = table.find(r => weight >= r.min && weight < r.max) || table[table.length - 1];
 
-  container.style.display = '';
-  container.innerHTML = `<h4 class="card-title">🍖 Рекомендації по їжі</h4>
+  card.style.display = '';
+  container.innerHTML = `
     <div class="food-guide-grid">
       <div class="food-stat"><div class="food-stat-label">Норма/день</div><strong>${match.daily}</strong></div>
       <div class="food-stat"><div class="food-stat-label">Прийомів</div><strong>${match.meals} рази</strong></div>

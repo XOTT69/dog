@@ -19,6 +19,7 @@ export function render() {
   renderHealthScheduleUI();
   renderVaccineHistory();
   renderCustomReminders();
+  checkAndSendNotifications();
   if (!bound) bindProfileEvents();
 }
 
@@ -167,6 +168,33 @@ function renderCustomReminders() {
   });
 }
 
+// ===== NOTIFICATIONS =====
+
+function checkAndSendNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  
+  const reminders = state.pet.data?.reminders || [];
+  const now = new Date();
+  
+  reminders.forEach(r => {
+    const reminderDate = new Date(r.nextDate);
+    const daysUntil = daysBetween(now, reminderDate);
+    
+    // Send notification if due today or overdue
+    if (daysUntil <= 0) {
+      const notificationKey = `notified_${r.id}_${r.nextDate}`;
+      if (!localStorage.getItem(notificationKey)) {
+        const typeIcon = { vaccine: '💉', deworming: '💊', vet: '🏥', custom: '🔔' }[r.type] || '🔔';
+        const title = `${typeIcon} Нагадування: ${r.label}`;
+        const body = daysUntil < 0 ? `Прострочено на ${Math.abs(daysUntil)} днів!` : 'Сьогодні!';
+        
+        new Notification(title, { body, icon: '/assets/icon-192.png', tag: r.id });
+        localStorage.setItem(notificationKey, 'true');
+      }
+    }
+  });
+}
+
 // ===== VACCINE HISTORY =====
 
 function renderVaccineHistory() {
@@ -278,6 +306,11 @@ function bindProfileEvents() {
       labelInput.value = '';
       dateInput.value = '';
       renderCustomReminders();
+      
+      // Request notification permission if not granted
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
     } catch {
       toast('Помилка', 'error');
     } finally {

@@ -142,7 +142,7 @@ function renderHeader() {
 
   if (avatarEl) {
     if (user?.photoURL) {
-      avatarEl.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="" loading="lazy">`;
+      avatarEl.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${avatarLetter(user?.displayName || petName)}'">`;
     } else {
       avatarEl.textContent = avatarLetter(user?.displayName || petName);
     }

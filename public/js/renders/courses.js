@@ -8,7 +8,8 @@ import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
 import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
-import { getTrainingProgress, saveTrainingProgress, getCourseProgress, saveCourseProgress } from '../firebase.js';
+import { getTrainingProgress, saveTrainingProgress, saveCourseProgress as fbSaveCourseProgress } from '../firebase.js';
+import { getCourseProgress as fbGetCourseProgress } from '../firebase.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -376,7 +377,8 @@ async function renderCourseGrid() {
       : courses.filter(c => c.level === filter);
 
     grid.innerHTML = filtered.map(c => {
-      const progress = getCourseProgress(c.id, c.checklist?.length || 0);
+      const totalChecks = c.checklist?.length || 0;
+      const progress = totalChecks > 0 ? calcCourseProgressPct(c.id, totalChecks) : 0;
       const progressColor = progress >= 70 ? 'var(--success)' : progress >= 30 ? 'var(--warning)' : progress > 0 ? 'var(--accent)' : 'var(--border)';
       return `
         <button type="button" class="course-btn ${c.id === currentId ? 'selected' : ''}" data-course-id="${c.id}">
@@ -394,8 +396,11 @@ async function renderCourseGrid() {
 
     // Bind course selection
     grid.querySelectorAll('[data-course-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.ui.currentCourseId = btn.dataset.courseId;
+      // Remove old listener and add new one to avoid duplicates
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      newBtn.addEventListener('click', () => {
+        state.ui.currentCourseId = newBtn.dataset.courseId;
         haptic();
         renderCourseGrid(); // Re-render with new selection
       });
@@ -413,15 +418,15 @@ async function renderCourseGrid() {
 
 async function renderCourseDetail(course, container) {
   // Get progress from Firestore with localStorage fallback
-  let progress = await getCourseProgress(course.id);
+  let progress = await fbGetCourseProgress(course.id);
   
   // Fallback to localStorage if Firestore is empty
-  if (Object.keys(progress).length === 0) {
+  if (typeof progress !== 'object' || Object.keys(progress).length === 0) {
     const localProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
     progress = localProgress[course.id] || {};
     // Migrate to Firestore if found in localStorage
     if (Object.keys(progress).length > 0) {
-      await saveCourseProgress(course.id, progress);
+      await fbSaveCourseProgress(course.id, progress);
     }
   }
 
@@ -452,31 +457,20 @@ async function renderCourseDetail(course, container) {
       if (!localProgress[courseId]) localProgress[courseId] = {};
       localProgress[courseId][idx] = cb.checked;
       localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(localProgress));
-      await saveCourseProgress(courseId, progress);
+      await fbSaveCourseProgress(courseId, progress);
       haptic();
     });
   });
 }
 
-async function getCourseProgress(courseId, totalChecks) {
+/**
+ * Calculate course progress percentage from Firestore progress object
+ */
+async function calcCourseProgressPct(courseId, totalChecks) {
   if (totalChecks === 0) return 0;
-  const progress = await getCourseProgressFromFirestore(courseId);
+  const progress = await fbGetCourseProgress(courseId);
   const done = progress || {};
   return Math.round(Object.values(done).filter(Boolean).length / totalChecks * 100);
-}
-
-async function getCourseProgressFromFirestore(courseId) {
-  const wsId = state.workspace.id;
-  const petId = state.ui.currentPetId;
-  if (!wsId || !petId) return {};
-
-  try {
-    const doc = await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId)
-      .collection('courseProgress').doc(courseId).get();
-    return doc.exists ? doc.data().progress || {} : {};
-  } catch {
-    return {};
-  }
 }
 
 // ===== KNOWLEDGE =====

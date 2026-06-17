@@ -121,12 +121,33 @@ export function render() {
   renderHeatInfo();
   renderReminders();
 
+  // Hide empty sections dynamically
+  hideEmptySections();
+
   // Check achievements after render
   const newAch = checkAchievements();
   if (newAch.length > 0) {
     newAch.forEach(a => toast(`${a.icon} ${a.label}!`, 'success'));
     showConfetti();
   }
+}
+
+/**
+ * Hide .home-section containers that have no visible children
+ */
+function hideEmptySections() {
+  document.querySelectorAll('.home-section').forEach(section => {
+    let hasVisible = false;
+    section.childNodes.forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const style = window.getComputedStyle(child);
+        if (style.display !== 'none' && child.offsetParent !== null) {
+          hasVisible = true;
+        }
+      }
+    });
+    section.style.display = hasVisible ? '' : 'none';
+  });
 }
 
 

@@ -376,9 +376,22 @@ async function renderCourseGrid() {
       ? courses
       : courses.filter(c => c.level === filter);
 
-    grid.innerHTML = filtered.map(c => {
+    // ⚡ Pre-calculate all progress values with Promise.all to avoid [object Promise]
+    const progressValues = await Promise.all(filtered.map(async c => {
       const totalChecks = c.checklist?.length || 0;
-      const progress = totalChecks > 0 ? calcCourseProgressPct(c.id, totalChecks) : 0;
+      const pct = totalChecks > 0 ? await calcCourseProgressPct(c.id, totalChecks) : 0;
+      return { id: c.id, pct };
+    }));
+    const progressMap = Object.fromEntries(progressValues.map(p => [p.id, p.pct]));
+
+    // Limit display to first 8, unless "show all" was requested
+    const DISPLAY_LIMIT = 8;
+    const showAll = state.ui.courseFilterFull;
+    const displayCourses = showAll ? filtered : filtered.slice(0, DISPLAY_LIMIT);
+    const hasMore = filtered.length > DISPLAY_LIMIT && !showAll;
+
+    grid.innerHTML = displayCourses.map(c => {
+      const progress = progressMap[c.id] || 0;
       const progressColor = progress >= 70 ? 'var(--success)' : progress >= 30 ? 'var(--warning)' : progress > 0 ? 'var(--accent)' : 'var(--border)';
       return `
         <button type="button" class="course-btn ${c.id === currentId ? 'selected' : ''}" data-course-id="${c.id}">
@@ -396,15 +409,28 @@ async function renderCourseGrid() {
 
     // Bind course selection
     grid.querySelectorAll('[data-course-id]').forEach(btn => {
-      // Remove old listener and add new one to avoid duplicates
-      const newBtn = btn.cloneNode(true);
-      btn.parentNode.replaceChild(newBtn, btn);
-      newBtn.addEventListener('click', () => {
-        state.ui.currentCourseId = newBtn.dataset.courseId;
+      btn.addEventListener('click', () => {
+        state.ui.currentCourseId = btn.dataset.courseId;
         haptic();
         renderCourseGrid(); // Re-render with new selection
       });
     });
+
+    if (hasMore) {
+      grid.insertAdjacentHTML('afterend', `
+        <button class="btn btn-ghost full-width" id="showMoreCoursesBtn" type="button">
+          Показати ще (${filtered.length - DISPLAY_LIMIT})
+        </button>
+      `);
+      const moreBtn = document.getElementById('showMoreCoursesBtn');
+      if (moreBtn) {
+        moreBtn.addEventListener('click', () => {
+          moreBtn.remove();
+          state.ui.courseFilterFull = true;
+          renderCourseGrid();
+        });
+      }
+    }
 
     // Render selected course detail
     const course = courses.find(c => c.id === currentId) || filtered[0] || courses[0];
@@ -481,13 +507,34 @@ async function renderKnowledgeGrid() {
 
   try {
     const knowledge = await getKnowledge();
-    grid.innerHTML = knowledge.map(k => `
+    const KNOWLEDGE_LIMIT = 4;
+    const showAll = state.ui.knowledgeFull || false;
+    const display = showAll ? knowledge : knowledge.slice(0, KNOWLEDGE_LIMIT);
+    const hasMore = knowledge.length > KNOWLEDGE_LIMIT && !showAll;
+
+    grid.innerHTML = display.map(k => `
       <div class="k-card">
         <strong>${k.title}</strong>
         <p>${k.text}</p>
         <span class="k-tag">${k.tag}</span>
       </div>
     `).join('');
+
+    if (hasMore) {
+      grid.insertAdjacentHTML('afterend', `
+        <button class="btn btn-ghost full-width" id="showMoreKnowledgeBtn" type="button">
+          Показати ще (${knowledge.length - KNOWLEDGE_LIMIT})
+        </button>
+      `);
+      const moreBtn = document.getElementById('showMoreKnowledgeBtn');
+      if (moreBtn) {
+        moreBtn.addEventListener('click', () => {
+          moreBtn.remove();
+          state.ui.knowledgeFull = true;
+          renderKnowledgeGrid();
+        });
+      }
+    }
     knowledgeRendered = true;
   } catch {
     grid.innerHTML = '<p class="text-muted">Завантаження...</p>';

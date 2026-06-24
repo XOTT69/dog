@@ -159,3 +159,19 @@ export function throttle(fn, ms) {
     }
   };
 }
+
+/**
+ * Safely parse JSON with fallback
+ * @param {string} str - JSON string to parse
+ * @param {*} fallback - Default value if parsing fails
+ * @returns {*}
+ */
+export function safeJsonParse(str, fallback = null) {
+  if (str == null) return fallback;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed != null ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}

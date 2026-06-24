@@ -1,5 +1,6 @@
 /**
  * @fileoverview Training programs — real step-by-step guides for common dog problems
+ * With emergency protocols section
  */
 
 export const TRAINING_PROGRAMS = {
@@ -503,6 +504,129 @@ export const TRAINING_PROGRAMS = {
 };
 
 /**
+ * Emergency protocols — quick reference for urgent situations
+ */
+export const EMERGENCY_PROTOCOLS = [
+  {
+    icon: '🚨',
+    title: 'Отруєння / токсини',
+    severity: 'CRITICAL',
+    steps: [
+      'Зателефонуйте ветеринару НЕГАЙНО!',
+      'Запам\'ятайте: ЩО з\'їла, СКІЛЬКИ, КОЛИ',
+      'НЕ викликайте блювання самі (кислоти/луги обпікають двічі)',
+      'Їдьте до клініки ЗАРАЗ. Перші 1–2 години критичні!',
+      'Візьміть зразок того що з\'їла (упаковку, залишки)',
+    ],
+    dangerSigns: 'Судоми, втрата свідомості, блювання, слинотеча, млявість',
+    toxicItems: ['Шоколад (темний)', 'Ксиліт (жуйки, цукерки)', 'Цибуля, часник', 'Виноград, родзинки', 'Парацетамол, ібупрофен', 'Антифриз', 'Щурячий яд'],
+  },
+  {
+    icon: '🌡️',
+    title: 'Тепловий удар',
+    severity: 'CRITICAL',
+    steps: [
+      'Негайно в тінь / прохолодне місце',
+      'Мокрі рушники на живіт, лапи, голову (холодною водою)',
+      'Давайте пити маленькими порціями',
+      'НЕ накривайте мокрим рушником повністю (перегрів)',
+      'Виміряйте температуру: >40°C — терміново до ветеринара!',
+      'Транспортуйте з кондиціонером або відкритими вікнами',
+    ],
+    dangerSigns: 'Задишка, язик/ясна яскраво-червоні, слина густа, дезорієнтація, колапс',
+    breedsAtRisk: ['Мопси', 'Бульдоги', 'Пекінеси', 'Ши-тцу', 'Боксери — всі брахіцефали'],
+  },
+  {
+    icon: '🩸',
+    title: 'Кровотеча',
+    severity: 'CRITICAL',
+    steps: [
+      'Надіньте рукавички (якщо є)',
+      'Притисніть чисту тканину до рани з тиском',
+      'Тримайте 5–10 хвилин без відпускання',
+      'Підніміть травмовану кінцівку вище серця',
+      'Якщо кров просочується — НЕ знімайте, кладіть зверху ще шар',
+      'Терміново до ветеринара!',
+    ],
+    dangerSigns: 'Кров фонтаном, не зупиняється 10+ хв, велика глибока рана',
+    note: 'НЕ використовуйте джгут без знання як правильно!',
+  },
+  {
+    icon: '🤕',
+    title: 'Травма / ДТП',
+    severity: 'URGENT',
+    steps: [
+      'Намордник! Біль = може вкусити навіть добродушна собака',
+      'Обережно покладіть на тверду поверхню (дошка, ковдра)',
+      'Фіксуйте шию і хребет (не крутіть головою!)',
+      'НЕ давайте їсти/пити (може знадобитись наркоз)',
+      'Накрийте ковдрою (шок = зниження температури)',
+      'Транспортуйте максимально обережно, бажано вдвох',
+    ],
+    dangerSigns: 'Не рухається, скиглить, кров з носа/рота, нерівне дихання',
+    note: 'Після ДТП навіть якщо виглядає нормально — покажіть ветеринару!',
+  },
+  {
+    icon: '🦴',
+    title: 'Перелом / вивих',
+    severity: 'URGENT',
+    steps: [
+      'Намордник!',
+      'НЕ намагайтесь вправити!',
+      'Зафіксуйте кінцівку в тому положенні в якому вона є',
+      'Шина: журнал, палка, картон + бинт/тканина',
+      'Шинувати вище і нижче місця перелому',
+      'Терміново до ветеринара (рентген)',
+    ],
+    dangerSigns: 'Кінцівка вивернута, не наступає, сильний біль, кістка видно',
+    note: 'Відкритий перелом → накрити стерильною пов\'язкою',
+  },
+  {
+    icon: '⚡',
+    title: 'Удар струмом',
+    severity: 'CRITICAL',
+    steps: [
+      'ВИМКНІТЬ електрику! НЕ торкайтесь собаки поки струм увімкнено!',
+      'Якщо не можете вимкнути — дерев\'яною палкою відсуньте',
+      'Перевірте дихання і серцебиття',
+      'Не дихає → штучне дихання (рот до носа, 1 вдих кожні 5 сек)',
+      'Немає серця → непрямий масаж серця (100-120 натискань/хв)',
+      'Терміново до ветеринара! Опіки рота можуть бути всередині',
+    ],
+    dangerSigns: 'Непритомність, зупинка дихання, опіки рота/язика',
+  },
+  {
+    icon: '💊',
+    title: 'Алергічна реакція',
+    severity: 'URGENT',
+    steps: [
+      'Визначте причину (укус комахи, їжа, ліки, вакцина)',
+      'Холодний компрес на місце набряку',
+      'Дайте антигістамінне (ТІЛЬКИ ветеринарне!)',
+      'Спостерігайте 30 хвилин',
+      'Якщо набряк поширюється — терміново до ветеринара!',
+    ],
+    dangerSigns: 'Набряк морди/горла, утруднене дихання, синюшні ясна, колапс — ТЕРМІНОВО ін\'єкцію!',
+    note: 'Якщо є схильність до алергії — тримайте антигістамін при собі!',
+  },
+  {
+    icon: '🏊',
+    title: 'Втоплення / вода в легенях',
+    severity: 'CRITICAL',
+    steps: [
+      'Дістаньте з води, тримайте голову вниз (сток позиція) 10–15 сек',
+      'Очистіть рот від води/слизу пальцем',
+      'Покладіть на бік — вода витече',
+      'Не дихає → штучне дихання',
+      'Немає серця → непрямий масаж',
+      'Навіть якщо прийшла до тями — ТЕРМІНОВО до ветеринара!',
+    ],
+    dangerSigns: 'Непритомність, синюшність, вода з носа/рота, кашель з піною',
+    note: '"Сухе втоплення" — симптоми можуть з\'явитись через 24 години!',
+  },
+];
+
+/**
  * Get training program by problem id
  * @param {string} problemId
  * @returns {object|null}
@@ -517,4 +641,87 @@ export function getTrainingProgram(problemId) {
  */
 export function getAllProblemIds() {
   return Object.keys(TRAINING_PROGRAMS);
+}
+
+/**
+ * Get emergency protocols
+ * @returns {Array}
+ */
+export function getEmergencyProtocols() {
+  return EMERGENCY_PROTOCOLS;
+}
+
+// ===== TRAINING PROGRESS =====
+
+const TRAINING_PROGRESS_KEY = 'dc_training_progress';
+
+/**
+ * Get saved progress for a training program
+ * @param {string} problemId
+ * @returns {object} { completedSteps: Set<number>, startedAt: string, completedAt: string|null }
+ */
+export function getTrainingProgress(problemId) {
+  try {
+    const data = JSON.parse(localStorage.getItem(TRAINING_PROGRESS_KEY) || '{}');
+    return data[problemId] || { completedSteps: [], startedAt: null, completedAt: null };
+  } catch {
+    return { completedSteps: [], startedAt: null, completedAt: null };
+  }
+}
+
+/**
+ * Toggle a step as completed/uncompleted
+ * @param {string} problemId
+ * @param {number} stepIndex
+ */
+export function toggleTrainingStep(problemId, stepIndex) {
+  try {
+    const data = JSON.parse(localStorage.getItem(TRAINING_PROGRESS_KEY) || '{}');
+    if (!data[problemId]) {
+      data[problemId] = { completedSteps: [], startedAt: new Date().toISOString(), completedAt: null };
+    }
+    const progress = data[problemId];
+    const idx = progress.completedSteps.indexOf(stepIndex);
+    if (idx === -1) {
+      progress.completedSteps.push(stepIndex);
+    } else {
+      progress.completedSteps.splice(idx, 1);
+    }
+    // Check if all steps completed
+    const program = TRAINING_PROGRAMS[problemId];
+    if (program && progress.completedSteps.length >= program.steps.length) {
+      progress.completedAt = progress.completedAt || new Date().toISOString();
+    } else {
+      progress.completedAt = null;
+    }
+    data[problemId] = progress;
+    localStorage.setItem(TRAINING_PROGRESS_KEY, JSON.stringify(data));
+    return progress;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get completion percentage for a training program
+ * @param {string} problemId
+ * @returns {number} 0-100
+ */
+export function getTrainingCompletionPercent(problemId) {
+  const program = TRAINING_PROGRAMS[problemId];
+  if (!program || !program.steps.length) return 0;
+  const progress = getTrainingProgress(problemId);
+  return Math.round((progress.completedSteps.length / program.steps.length) * 100);
+}
+
+/**
+ * Reset progress for a training program
+ * @param {string} problemId
+ */
+export function resetTrainingProgress(problemId) {
+  try {
+    const data = JSON.parse(localStorage.getItem(TRAINING_PROGRESS_KEY) || '{}');
+    delete data[problemId];
+    localStorage.setItem(TRAINING_PROGRESS_KEY, JSON.stringify(data));
+  } catch { /* ignore */ }
 }

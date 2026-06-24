@@ -3,7 +3,7 @@
  */
 
 import { state, STORAGE_KEYS } from './state.js';
-import { getAgeInWeeks, weekLabel, todayKey } from './utils.js';
+import { getAgeInWeeks, weekLabel, todayKey, safeJsonParse } from './utils.js';
 import { fetchAIResponse } from './ai.js';
 
 /**
@@ -14,12 +14,10 @@ export async function getDailyLesson() {
   // Check cache
   const cached = localStorage.getItem(STORAGE_KEYS.dailyLesson);
   if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (parsed.date === todayKey() && parsed.lesson) {
-        return parsed.lesson;
-      }
-    } catch { /* ignore */ }
+    const parsed = safeJsonParse(cached);
+    if (parsed && parsed.date === todayKey() && parsed.lesson) {
+      return parsed.lesson;
+    }
   }
 
   // Generate new lesson
@@ -46,8 +44,8 @@ export async function getDailyLesson() {
     const response = await fetchAIResponse(prompt);
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const lesson = JSON.parse(jsonMatch[0]);
-      if (lesson.title && lesson.steps) {
+      const lesson = safeJsonParse(jsonMatch[0]);
+      if (lesson && lesson.title && lesson.steps) {
         localStorage.setItem(STORAGE_KEYS.dailyLesson, JSON.stringify({ 
           date: todayKey(), 
           lesson 

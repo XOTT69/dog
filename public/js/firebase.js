@@ -8,7 +8,6 @@ import { state, batch, STORAGE_KEYS } from './state.js';
 import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, VAPID_KEY } from './constants.js';
 import { nowTime } from './utils.js';
 
-// ===== INIT =====
 const app = firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -16,35 +15,27 @@ const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Enable offline persistence
 db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
   console.warn('[Firestore] Persistence:', err.code);
 });
 
-// ===== Unsubscribe holders =====
 let unsubPets = null;
 let unsubEvents = null;
 let unsubMembers = null;
 let unsubCalendar = null;
 let subscribedEventsPetId = undefined;
 
-// ===== HELPERS =====
-
 function generateId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
-  for (let i = 0; i < 20; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < 20; i++) id += chars[Math.floor(Math.random() * chars.length)];
   return id;
 }
 
 function generateInviteCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
@@ -52,9 +43,7 @@ function loadOfflineEvents() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.offlineEvents) || '[]');
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function saveOfflineEvents(items) {
@@ -96,22 +85,33 @@ function queueEvent(data) {
   return item.localId;
 }
 
-/**
- * Get current active pet ID
- */
-export function getCurrentPetId() {
-  return state.ui.currentPetId || null;
+function petPayload(payload = {}) {
+  return {
+    name: payload.name || '',
+    birthDate: payload.birthDate || '',
+    sex: payload.sex || 'хлопчик',
+    breed: payload.breed || '',
+    toiletMode: payload.toiletMode || 'pad',
+    weight: payload.weight || '',
+    issues: payload.issues || '',
+    petType: payload.petType || 'dog',
+  };
 }
 
-/**
- * Update current pet and derive state.pet.data
- */
+function syncCurrentPetLocal(petId, data) {
+  state.ui.currentPetId = petId;
+  localStorage.setItem(STORAGE_KEYS.currentPetId, petId);
+  state.pet.data = { ...data, id: petId, petType: data.petType || 'dog' };
+  state.pet.loading = false;
+}
+
 function _syncCurrentPet() {
   const pets = state.pets.items;
   const currentId = state.ui.currentPetId;
 
   if (!pets.length) {
     state.pet.data = null;
+    state.pet.loading = false;
     state.ui.currentPetId = null;
     localStorage.removeItem(STORAGE_KEYS.currentPetId);
     if (unsubEvents) { unsubEvents(); unsubEvents = null; }
@@ -127,16 +127,13 @@ function _syncCurrentPet() {
     state.ui.currentPetId = current.id;
     localStorage.setItem(STORAGE_KEYS.currentPetId, current.id);
     state.pet.data = { ...current.data, id: current.id, petType: current.data.petType || 'dog' };
+    state.pet.loading = false;
     if (subscribedEventsPetId !== current.id) subscribeEvents();
   }
 }
 
-// ===== AUTH =====
+export function getCurrentPetId() { return state.ui.currentPetId || null; }
 
-/**
- * Start auth state listener
- * @param {Function} onReady - Called once user state is determined
- */
 export function initAuth(onReady) {
   auth.onAuthStateChanged((user) => {
     batch(() => {
@@ -152,22 +149,12 @@ export function initAuth(onReady) {
   });
 
   auth.getRedirectResult().catch((e) => {
-    if (e.code && e.code !== 'auth/no-auth-event') {
-      console.error('[Auth] Redirect error:', e);
-    }
+    if (e.code && e.code !== 'auth/no-auth-event') console.error('[Auth] Redirect error:', e);
   });
 }
 
-/**
- * Sign in with Google
- */
-export async function loginGoogle() {
-  await auth.signInWithRedirect(googleProvider);
-}
+export async function loginGoogle() { await auth.signInWithRedirect(googleProvider); }
 
-/**
- * Sign out
- */
 export async function logout() {
   unsubAll();
   await auth.signOut();
@@ -186,48 +173,53 @@ export async function logout() {
   });
 }
 
-/**
- * Get current user's ID token
- * @returns {Promise<string>}
- */
 export async function getIdToken() {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
   return user.getIdToken();
 }
 
-// ===== WORKSPACE =====
-
-/**
- * Ensure user has a workspace
- * @param {Object} user - Firebase auth user
- */
 export async function ensureWorkspace(user) {
-  const userDoc = await db.collection('users').doc(user.uid).get();
+  const userRef = db.collection('users').doc(user.uid);
+  const userDoc = await userRef.get();
 
   if (userDoc.exists && userDoc.data().workspaceId) {
     const wsId = userDoc.data().workspaceId;
     state.workspace.id = wsId;
+
+    try {
+      await db.collection('workspaces').doc(wsId).collection('members').doc(user.uid).set({
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+      }, { merge: true });
+    } catch (e) {
+      console.warn('[Workspace] Member repair skipped:', e);
+    }
+
     const wsDoc = await db.collection('workspaces').doc(wsId).get();
     state.workspace.data = wsDoc.exists ? wsDoc.data() : null;
-
-    // Migrate: if old primary doc exists, migrate to new format
+    if (state.workspace.data?.currentPetId) {
+      state.ui.currentPetId = state.workspace.data.currentPetId;
+      localStorage.setItem(STORAGE_KEYS.currentPetId, state.workspace.data.currentPetId);
+    }
     await _migrateOldPrimary(wsId);
     return;
   }
 
-  // Create new workspace
   const wsRef = db.collection('workspaces').doc();
+  const firstPetId = generateId();
   const inviteCode = generateInviteCode();
   const wsData = {
     name: (user.displayName || 'Мій').split(' ')[0],
     ownerId: user.uid,
     inviteCode,
+    currentPetId: firstPetId,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   await wsRef.set(wsData);
-
   await db.collection('users').doc(user.uid).set({
     uid: user.uid,
     email: user.email || '',
@@ -236,7 +228,6 @@ export async function ensureWorkspace(user) {
     role: 'owner',
     workspaceId: wsRef.id,
   }, { merge: true });
-
   await wsRef.collection('members').doc(user.uid).set({
     uid: user.uid,
     email: user.email || '',
@@ -246,41 +237,28 @@ export async function ensureWorkspace(user) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Create first pet with UUID
-  const firstPetId = generateId();
+  const firstPet = petPayload();
   await wsRef.collection('dogs').doc(firstPetId).set({
-    name: '',
-    birthDate: '',
-    sex: 'хлопчик',
-    breed: '',
-    toiletMode: 'pad',
-    weight: '',
-    issues: '',
-    petType: 'dog',
+    ...firstPet,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Save currentPetId to workspace
-  await wsRef.update({ currentPetId: firstPetId });
-
   state.workspace.id = wsRef.id;
   state.workspace.data = wsData;
+  state.pets.items = [{ id: firstPetId, data: firstPet }];
+  state.pets.loading = false;
+  syncCurrentPetLocal(firstPetId, firstPet);
 }
 
-/**
- * Migrate old 'primary' document to new UUID format
- */
 async function _migrateOldPrimary(wsId) {
   try {
     const primaryDoc = await db.collection('workspaces').doc(wsId).collection('dogs').doc('primary').get();
     if (primaryDoc.exists) {
       const data = primaryDoc.data();
-      // Check if a UUID pet already exists
       const petsSnap = await db.collection('workspaces').doc(wsId).collection('dogs').get();
       const uuidPets = petsSnap.docs.filter(d => d.id !== 'primary');
       if (uuidPets.length === 0) {
-        // Migrate primary to UUID
         const newId = generateId();
         await db.collection('workspaces').doc(wsId).collection('dogs').doc(newId).set({
           ...data,
@@ -290,55 +268,46 @@ async function _migrateOldPrimary(wsId) {
         await db.collection('workspaces').doc(wsId).collection('dogs').doc('primary').delete();
         await db.collection('workspaces').doc(wsId).update({ currentPetId: newId });
       } else {
-        // Delete orphan primary
         await db.collection('workspaces').doc(wsId).collection('dogs').doc('primary').delete();
       }
     }
-  } catch (e) {
-    console.warn('[Migration] Error:', e);
-  }
+  } catch (e) { console.warn('[Migration] Error:', e); }
 }
 
-// ===== SUBSCRIPTIONS =====
-
-/**
- * Subscribe to all pets in workspace
- */
 export function subscribePets() {
   if (unsubPets) unsubPets();
   const wsId = state.workspace.id;
-  if (!wsId) return;
+  if (!wsId) {
+    state.pets.loading = false;
+    state.pet.loading = false;
+    return;
+  }
+
+  state.pets.loading = true;
+  state.pet.loading = true;
 
   unsubPets = db.collection('workspaces').doc(wsId).collection('dogs')
     .orderBy('createdAt', 'asc')
     .onSnapshot((snap) => {
       const items = [];
-      snap.forEach((d) => {
-        if (d.id !== 'primary') { // Skip old primary docs
-          items.push({ id: d.id, data: d.data() });
-        }
-      });
-
+      snap.forEach((d) => { if (d.id !== 'primary') items.push({ id: d.id, data: d.data() }); });
       batch(() => {
         state.pets.items = items;
         state.pets.loading = false;
-
-        // Sync currentPetId
         const savedId = localStorage.getItem(STORAGE_KEYS.currentPetId);
-        if (savedId && items.find(p => p.id === savedId)) {
-          state.ui.currentPetId = savedId;
-        } else if (items.length > 0) {
-          state.ui.currentPetId = items[0].id;
-        }
-
+        if (savedId && items.find(p => p.id === savedId)) state.ui.currentPetId = savedId;
+        else if (items.length > 0) state.ui.currentPetId = items[0].id;
         _syncCurrentPet();
       });
-    }, (err) => console.error('[Firestore] Pets error:', err));
+    }, (err) => {
+      console.error('[Firestore] Pets error:', err);
+      batch(() => {
+        state.pets.loading = false;
+        state.pet.loading = false;
+      });
+    });
 }
 
-/**
- * Switch active pet
- */
 export function switchPet(petId) {
   if (!petId || petId === state.ui.currentPetId) return;
   state.ui.currentPetId = petId;
@@ -346,77 +315,39 @@ export function switchPet(petId) {
   _syncCurrentPet();
 }
 
-/**
- * Add a new pet
- * @param {Object} payload - Pet data
- * @returns {Promise<string>} pet id
- */
 export async function addPet(payload) {
   const wsId = state.workspace.id;
   if (!wsId) throw new Error('No workspace');
-
   const petId = generateId();
+  const data = petPayload(payload);
   await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId).set({
-    name: payload.name || '',
-    birthDate: payload.birthDate || '',
-    sex: payload.sex || 'хлопчик',
-    breed: payload.breed || '',
-    toiletMode: payload.toiletMode || 'pad',
-    weight: payload.weight || '',
-    issues: payload.issues || '',
-    petType: payload.petType || 'dog',
+    ...data,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
-
-  // Switch to new pet
-  switchPet(petId);
+  state.pets.items = [...state.pets.items, { id: petId, data }];
+  syncCurrentPetLocal(petId, data);
   return petId;
 }
 
-/**
- * Remove a pet
- * @param {string} petId
- */
 export async function removePet(petId) {
   const wsId = state.workspace.id;
   if (!wsId || !petId) return;
-
-  // Don't remove last pet
-  if (state.pets.items.length <= 1) {
-    throw new Error('Неможливо видалити останню тварину');
-  }
-
+  if (state.pets.items.length <= 1) throw new Error('Неможливо видалити останню тварину');
   await db.collection('workspaces').doc(wsId).collection('dogs').doc(petId).delete();
-
-  // Switch to first remaining pet
   const remaining = state.pets.items.filter(p => p.id !== petId);
-  if (remaining.length > 0) {
-    switchPet(remaining[0].id);
-  }
+  if (remaining.length > 0) switchPet(remaining[0].id);
 }
 
 export function subscribeEvents() {
   if (unsubEvents) unsubEvents();
   const wsId = state.workspace.id;
   if (!wsId) return;
-
   const petId = state.ui.currentPetId;
   subscribedEventsPetId = petId || null;
-  batch(() => {
-    state.events.items = [];
-    state.events.loading = true;
-  });
-
-  // Build query: filter by petId if available
-  let query = db.collection('workspaces').doc(wsId).collection('events')
-    .orderBy('createdAt', 'desc')
-    .limit(MAX_EVENTS_QUERY);
-
-  if (petId) {
-    query = query.where('petId', '==', petId);
-  }
-
+  batch(() => { state.events.items = []; state.events.loading = true; });
+  let query = db.collection('workspaces').doc(wsId).collection('events').orderBy('createdAt', 'desc').limit(MAX_EVENTS_QUERY);
+  if (petId) query = query.where('petId', '==', petId);
   unsubEvents = query.onSnapshot((snap) => {
     const items = [];
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -425,20 +356,18 @@ export function subscribeEvents() {
       state.events.items = mergeQueuedEvents(items);
       state.events.loading = false;
     });
-  }, (err) => console.error('[Firestore] Events error:', err));
+  }, (err) => { console.error('[Firestore] Events error:', err); state.events.loading = false; });
 }
 
 export function subscribeMembers() {
   if (unsubMembers) unsubMembers();
   const wsId = state.workspace.id;
   if (!wsId) return;
-
-  unsubMembers = db.collection('workspaces').doc(wsId).collection('members')
-    .onSnapshot((snap) => {
-      const items = [];
-      snap.forEach((d) => items.push(d.data()));
-      state.members.items = items;
-    }, (err) => console.error('[Firestore] Members error:', err));
+  unsubMembers = db.collection('workspaces').doc(wsId).collection('members').onSnapshot((snap) => {
+    const items = [];
+    snap.forEach((d) => items.push(d.data()));
+    state.members.items = items;
+  }, (err) => console.error('[Firestore] Members error:', err));
 }
 
 function normalizeCalendarItem(doc) {
@@ -464,22 +393,12 @@ export function subscribeCalendarItems() {
   if (unsubCalendar) unsubCalendar();
   const wsId = state.workspace.id;
   if (!wsId) return;
-
   state.calendar.loading = true;
-  unsubCalendar = db.collection('workspaces').doc(wsId).collection('reminders')
-    .orderBy('date', 'asc')
-    .limit(300)
-    .onSnapshot((snap) => {
-      const items = [];
-      snap.forEach((doc) => items.push(normalizeCalendarItem(doc)));
-      batch(() => {
-        state.calendar.items = items;
-        state.calendar.loading = false;
-      });
-    }, (err) => {
-      console.error('[Firestore] Calendar error:', err);
-      state.calendar.loading = false;
-    });
+  unsubCalendar = db.collection('workspaces').doc(wsId).collection('reminders').orderBy('date', 'asc').limit(300).onSnapshot((snap) => {
+    const items = [];
+    snap.forEach((doc) => items.push(normalizeCalendarItem(doc)));
+    batch(() => { state.calendar.items = items; state.calendar.loading = false; });
+  }, (err) => { console.error('[Firestore] Calendar error:', err); state.calendar.loading = false; });
 }
 
 function unsubAll() {
@@ -489,47 +408,33 @@ function unsubAll() {
   if (unsubCalendar) { unsubCalendar(); unsubCalendar = null; }
 }
 
-/**
- * Re-subscribe events when current pet changes
- * Exported to be called from switchPet / pet switcher
- */
-export function resubscribeEvents() {
-  subscribeEvents();
-}
+export function resubscribeEvents() { subscribeEvents(); }
 
-// ===== MUTATIONS =====
-
-/**
- * Save pet profile (for current or specified pet)
- * @param {Object} payload
- * @param {string} [petId] - defaults to current pet
- */
 export async function savePetProfile(payload, petId) {
   const wsId = state.workspace.id;
-  if (!wsId) throw new Error('No workspace');
-
-  const targetId = petId || state.ui.currentPetId;
-  if (!targetId) throw new Error('No pet selected');
-
-  await db.collection('workspaces').doc(wsId).collection('dogs').doc(targetId)
-    .set({ ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  if (!wsId) throw new Error('Профіль ще готується. Спробуйте ще раз через кілька секунд.');
+  let targetId = petId || state.ui.currentPetId;
+  if (!targetId) return addPet(payload);
+  const patch = petPayload({ ...state.pet.data, ...payload });
+  await db.collection('workspaces').doc(wsId).collection('dogs').doc(targetId).set({
+    ...patch,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  state.pets.items = state.pets.items.map(p => p.id === targetId ? { id: p.id, data: { ...p.data, ...patch } } : p);
+  if (!state.pets.items.find(p => p.id === targetId)) state.pets.items = [...state.pets.items, { id: targetId, data: patch }];
+  syncCurrentPetLocal(targetId, { ...state.pet.data, ...patch });
+  return targetId;
 }
 
-/**
- * Add event (linked to current pet)
- * @param {Object} payload
- * @returns {Promise<string>} doc id
- */
 export async function addEvent(payload) {
   const wsId = state.workspace.id;
   const user = state.auth.user;
   const petId = state.ui.currentPetId;
   if (!wsId || !user) throw new Error('No workspace or auth');
   if (!petId) throw new Error('No pet selected');
-
   const data = {
     eventType: payload.eventType,
-    petId: petId || null,
+    petId,
     byUid: user.uid,
     byName: user.displayName || 'Я',
     note: payload.note || '',
@@ -537,27 +442,17 @@ export async function addEvent(payload) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   if (payload.value != null) data.value = payload.value;
-
-  if (!navigator.onLine) {
-    return queueEvent(data);
-  }
-
+  if (!navigator.onLine) return queueEvent(data);
   try {
     const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
     return docRef.id;
   } catch (e) {
     const msg = e.message?.toLowerCase() || '';
-    if (e.code === 'unavailable' || msg.includes('offline') || msg.includes('network')) {
-      return queueEvent(data);
-    }
+    if (e.code === 'unavailable' || msg.includes('offline') || msg.includes('network')) return queueEvent(data);
     throw e;
   }
 }
 
-/**
- * Delete event
- * @param {string} eventId
- */
 export async function deleteEvent(eventId) {
   const wsId = state.workspace.id;
   if (!wsId || !eventId) return;
@@ -569,15 +464,9 @@ export async function deleteEvent(eventId) {
   await db.collection('workspaces').doc(wsId).collection('events').doc(eventId).delete();
 }
 
-/**
- * Restore deleted event
- * @param {Object} eventData
- * @returns {Promise<string>}
- */
 export async function restoreEvent(eventData) {
   const wsId = state.workspace.id;
   if (!wsId) throw new Error('No workspace');
-
   const data = {
     eventType: eventData.eventType,
     petId: eventData.petId || state.ui.currentPetId || null,
@@ -588,7 +477,6 @@ export async function restoreEvent(eventData) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   if (eventData.value != null) data.value = eventData.value;
-
   const ref = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return ref.id;
 }
@@ -597,7 +485,6 @@ export async function addCalendarItem(payload) {
   const wsId = state.workspace.id;
   const user = state.auth.user;
   if (!wsId || !user) throw new Error('No workspace or auth');
-
   const data = {
     title: payload.title || 'Задача',
     type: payload.type || 'note',
@@ -611,7 +498,6 @@ export async function addCalendarItem(payload) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
-
   const ref = await db.collection('workspaces').doc(wsId).collection('reminders').add(data);
   return ref.id;
 }
@@ -619,7 +505,6 @@ export async function addCalendarItem(payload) {
 export async function updateCalendarItem(itemId, patch) {
   const wsId = state.workspace.id;
   if (!wsId || !itemId) return;
-
   await db.collection('workspaces').doc(wsId).collection('reminders').doc(itemId).set({
     ...patch,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -636,13 +521,10 @@ export async function flushOfflineEvents() {
   const wsId = state.workspace.id;
   const user = state.auth.user;
   if (!wsId || !user || !navigator.onLine) return 0;
-
   const queued = loadOfflineEvents();
   if (!queued.length) return 0;
-
   const remaining = [];
   let flushed = 0;
-
   for (const item of queued) {
     try {
       await db.collection('workspaces').doc(wsId).collection('events').add({
@@ -656,21 +538,14 @@ export async function flushOfflineEvents() {
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       flushed++;
-    } catch {
-      remaining.push(item);
-    }
+    } catch { remaining.push(item); }
   }
-
   saveOfflineEvents(remaining);
   state.events.items = mergeQueuedEvents(state.events.items.filter(e => !e.pending));
   return flushed;
 }
 
-export function getOfflineEventCount() {
-  return loadOfflineEvents().length;
-}
-
-// ===== PUSH =====
+export function getOfflineEventCount() { return loadOfflineEvents().length; }
 
 export async function subscribePush() {
   try {
@@ -682,92 +557,49 @@ export async function subscribePush() {
     const messaging = firebase.messaging();
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return;
-
-    const token = await messaging.getToken({
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: reg,
-    });
-
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if (token && state.workspace.id && state.auth.user) {
-      await db.collection('workspaces').doc(state.workspace.id)
-        .collection('members').doc(state.auth.user.uid)
-        .update({ pushToken: token });
+      await db.collection('workspaces').doc(state.workspace.id).collection('members').doc(state.auth.user.uid).update({ pushToken: token });
     }
-  } catch (e) {
-    console.warn('[Push] Failed:', e);
-  }
+  } catch (e) { console.warn('[Push] Failed:', e); }
 }
-
-// ===== MEDICATION SYNC (Firestore + localStorage) =====
 
 const MED_COLLECTION = 'medications';
 
-/**
- * Sync medications from localStorage to Firestore
- * @returns {Promise<void>}
- */
 export async function syncMedicationsToFirestore() {
   const wsId = state.workspace.id;
   if (!wsId || !state.auth.user) return;
-
   try {
     const localData = localStorage.getItem('dc_medications');
     const logData = localStorage.getItem('dc_medication_log');
     if (!localData && !logData) return;
-
-    const batch = db.batch();
+    const writeBatch = db.batch();
     const ref = db.collection('workspaces').doc(wsId).collection(MED_COLLECTION).doc(state.auth.user.uid);
-
-    // Merge medications and log into one document
     const data = {};
     if (localData) data.medications = JSON.parse(localData);
     if (logData) data.medicationLog = JSON.parse(logData);
     data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-
-    batch.set(ref, data, { merge: true });
-    await batch.commit();
-  } catch (e) {
-    console.warn('[MedSync] Save error:', e);
-  }
+    writeBatch.set(ref, data, { merge: true });
+    await writeBatch.commit();
+  } catch (e) { console.warn('[MedSync] Save error:', e); }
 }
 
-/**
- * Load medications from Firestore into localStorage
- * @returns {Promise<boolean>} true if data was loaded
- */
 export async function loadMedicationsFromFirestore() {
   const wsId = state.workspace.id;
   if (!wsId || !state.auth.user) return false;
-
   try {
-    const doc = await db.collection('workspaces').doc(wsId)
-      .collection(MED_COLLECTION).doc(state.auth.user.uid).get();
-
+    const doc = await db.collection('workspaces').doc(wsId).collection(MED_COLLECTION).doc(state.auth.user.uid).get();
     if (!doc.exists) return false;
-
     const data = doc.data();
     let loaded = false;
-
     if (data.medications && Array.isArray(data.medications)) {
-      // Only load if localStorage is empty or Firestore is newer
       const local = localStorage.getItem('dc_medications');
-      if (!local || local === '[]') {
-        localStorage.setItem('dc_medications', JSON.stringify(data.medications));
-        loaded = true;
-      }
+      if (!local || local === '[]') { localStorage.setItem('dc_medications', JSON.stringify(data.medications)); loaded = true; }
     }
-
     if (data.medicationLog && Array.isArray(data.medicationLog)) {
       const local = localStorage.getItem('dc_medication_log');
-      if (!local || local === '[]') {
-        localStorage.setItem('dc_medication_log', JSON.stringify(data.medicationLog));
-        loaded = true;
-      }
+      if (!local || local === '[]') { localStorage.setItem('dc_medication_log', JSON.stringify(data.medicationLog)); loaded = true; }
     }
-
     return loaded;
-  } catch (e) {
-    console.warn('[MedSync] Load error:', e);
-    return false;
-  }
+  } catch (e) { console.warn('[MedSync] Load error:', e); return false; }
 }

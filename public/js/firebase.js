@@ -162,25 +162,7 @@ export function initAuth(onReady) {
  * Sign in with Google
  */
 export async function loginGoogle() {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
-
-  if (isIOS || isStandalone) {
-    await auth.signInWithRedirect(googleProvider);
-    return;
-  }
-
-  try {
-    await auth.signInWithPopup(googleProvider);
-  } catch (e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
-      await auth.signInWithRedirect(googleProvider);
-    } else {
-      throw e;
-    }
-  }
+  await auth.signInWithRedirect(googleProvider);
 }
 
 /**

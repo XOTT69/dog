@@ -19,7 +19,7 @@ export function startTimer(seconds) {
   state.timer.running = true;
 
   intervalId = setInterval(() => {
-    state.timer.seconds--;
+    state.timer.seconds = Math.max(0, state.timer.seconds - 1); // Prevent negative
     if (state.timer.seconds <= 0) {
       stopTimer();
       onTimerComplete();

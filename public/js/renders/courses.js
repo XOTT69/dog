@@ -7,7 +7,7 @@ import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
-import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
+import { getTrainingProgram, TRAINING_PROGRAMS, getTrainingProgress, toggleTrainingStep, getTrainingCompletionPercent, resetTrainingProgress } from '../training-programs.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -23,17 +23,54 @@ export async function render() {
   renderToiletGuide();
 }
 
+// ===== HIDDEN PROBLEMS (can hide irrelevant buttons) =====
+const HIDDEN_PROBLEMS_KEY = 'dc_hidden_problems';
+
+function getHiddenProblems() {
+  try {
+    return JSON.parse(localStorage.getItem(HIDDEN_PROBLEMS_KEY) || '[]');
+  } catch { return []; }
+}
+
+function toggleHiddenProblem(problemId) {
+  const hidden = getHiddenProblems();
+  const idx = hidden.indexOf(problemId);
+  if (idx === -1) {
+    hidden.push(problemId);
+  } else {
+    hidden.splice(idx, 1);
+  }
+  localStorage.setItem(HIDDEN_PROBLEMS_KEY, JSON.stringify(hidden));
+  renderProblemButtons(); // Re-render
+}
+
 // ===== PROBLEM BUTTONS (Training Programs) =====
 
 function renderProblemButtons() {
   const panel = $('trainingProgram');
   if (!panel) return;
+  const hiddenProblems = getHiddenProblems();
+  let manageMode = panel.dataset.manageMode === 'true';
 
   $$('.problem-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = 'true';
+    if (btn.dataset.boundAI) return;
+    btn.dataset.boundAI = 'true';
+    
+    const problemId = btn.dataset.problem;
+    
+    // Apply hidden class
+    if (hiddenProblems.includes(problemId) && !manageMode) {
+      btn.classList.add('hidden-problem');
+    } else {
+      btn.classList.remove('hidden-problem');
+    }
+    
     btn.addEventListener('click', () => {
-      const problemId = btn.dataset.problem;
+      if (manageMode) {
+        // In manage mode — toggle hidden
+        toggleHiddenProblem(problemId);
+        return;
+      }
       const program = getTrainingProgram(problemId);
       if (!program) return;
 
@@ -45,11 +82,46 @@ function renderProblemButtons() {
       renderTrainingDetail(program, panel);
     });
   });
+
+  // Add manage button if not exists
+  let manageBtn = $('manageProblemsBtn');
+  const problemCard = document.querySelector('.problem-grid')?.parentElement;
+  
+  if (problemCard && !manageBtn) {
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem';
+    footer.innerHTML = `
+      <button class="btn btn-ghost btn-sm full-width" id="manageProblemsBtn" type="button">
+        ⚙️ Керувати списком
+      </button>
+    `;
+    problemCard.appendChild(footer);
+    footer.querySelector('#manageProblemsBtn').addEventListener('click', () => {
+      panel.dataset.manageMode = panel.dataset.manageMode !== 'true' ? 'true' : '';
+      const btn = footer.querySelector('#manageProblemsBtn');
+      if (panel.dataset.manageMode === 'true') {
+        btn.textContent = '✅ Готово';
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-ghost');
+      } else {
+        btn.textContent = '⚙️ Керувати списком';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-ghost');
+      }
+      renderProblemButtons();
+    });
+  }
 }
 
 function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
+
+  // Get problemId from TRAINING_PROGRAMS
+  const problemId = Object.keys(TRAINING_PROGRAMS).find(k => TRAINING_PROGRAMS[k] === program) || '';
+  const progress = problemId ? getTrainingProgress(problemId) : { completedSteps: [] };
+  const completedSet = new Set(progress.completedSteps);
+  const pct = problemId ? getTrainingCompletionPercent(problemId) : 0;
 
   panel.classList.remove('hidden');
   panel.innerHTML = `
@@ -63,32 +135,67 @@ function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
-      <div class="training-steps">
-        ${program.steps.map((step, i) => `
-          <div class="training-step">
-            <div class="training-step-num">${i + 1}</div>
+      ${pct > 0 ? `
+        <div class="training-progress">
+          <div class="training-progress-bar">
+            <div class="training-progress-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="training-progress-text">${pct}% виконано ${progress.completedAt ? '🎉' : ''}</div>
+        </div>
+      ` : ''}
+
+      <div class="training-steps" data-problem-id="${escapeHtml(problemId)}">
+        ${program.steps.map((step, i) => {
+          const done = completedSet.has(i);
+          return `
+          <div class="training-step ${done ? 'done' : ''}" data-step-index="${i}">
+            <div class="training-step-num" style="background:${done ? 'var(--success)' : 'var(--accent-gradient)'}">${done ? '✓' : (i + 1)}</div>
             <div class="training-step-content">
-              <div class="training-step-title">${escapeHtml(step.title)}</div>
+              <div class="training-step-title" style="${done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(step.title)}</div>
               <div class="training-step-desc">${escapeHtml(step.desc)}</div>
             </div>
+            <div style="flex-shrink:0;padding-left:0.5rem">
+              <input type="checkbox" ${done ? 'checked' : ''} data-training-step="${problemId}:${i}" style="width:18px;height:18px;accent-color:var(--success)">
+            </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
 
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
-      <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
-        🤖 Запитати AI детальніше
-      </button>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-primary full-width" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+          🤖 Запитати AI
+        </button>
+        ${pct > 0 ? `<button class="btn btn-ghost" id="resetTrainingProgressBtn" type="button" style="flex-shrink:0">↺</button>` : ''}
+      </div>
     </div>
   `;
+
+  // Bind training step checkboxes
+  panel.querySelectorAll('[data-training-step]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const [pid, idxStr] = cb.dataset.trainingStep.split(':');
+      const idx = parseInt(idxStr);
+      toggleTrainingStep(pid, idx);
+      // Re-render the detail with updated progress
+      renderTrainingDetail(program, panel);
+    });
+  });
+
+  // Reset progress
+  panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', () => {
+    if (confirm('Скинути прогрес тренування?')) {
+      resetTrainingProgress(problemId);
+      renderTrainingDetail(program, panel);
+    }
+  });
 
   // Bind AI button
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
-      // Switch to chat tab
       const chatTab = document.querySelector('[data-tab="tabChat"]');
       if (chatTab) chatTab.click();
       setTimeout(() => handleAISubmit(prompt), 300);
@@ -183,16 +290,35 @@ async function handleAISubmit(prompt) {
   }
 
   addChatMessage(prompt, 'user');
-  showTyping();
   trackAIUsage();
 
+  // Show a streaming message element that we'll update in real-time
+  const chat = $('aiChat');
+  if (!chat) return;
+
+  const msgEl = document.createElement('div');
+  msgEl.className = 'ai-msg assistant streaming';
+  msgEl.textContent = '';
+  chat.appendChild(msgEl);
+  chat.scrollTop = chat.scrollHeight;
+
   try {
-    const response = await fetchAIResponse(fullPrompt);
-    removeTyping();
-    addChatMessage(response, 'assistant');
+    await fetchAIResponse(fullPrompt, (chunk) => {
+      msgEl.textContent += chunk;
+      chat.scrollTop = chat.scrollHeight;
+    });
+    msgEl.classList.remove('streaming');
+
+    // Add share button to the response
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'msg-share-btn';
+    shareBtn.type = 'button';
+    shareBtn.textContent = '📤 Поділитися';
+    shareBtn.addEventListener('click', () => shareMessage(msgEl.textContent));
+    msgEl.appendChild(shareBtn);
   } catch {
-    removeTyping();
-    addChatMessage('Помилка. Спробуйте ще раз 🔄', 'assistant');
+    msgEl.textContent = 'Помилка. Спробуйте ще раз 🔄';
+    msgEl.classList.remove('streaming');
   }
 }
 

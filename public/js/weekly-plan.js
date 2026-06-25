@@ -41,8 +41,10 @@ export async function getWeeklyPlan() {
 
   try {
     const response = await fetchAIResponse(prompt);
+    // Clean response: remove ```json, ``` markers, and any text before/after JSON
+    const cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     // Try to parse JSON from response
-    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const days = JSON.parse(jsonMatch[0]);
       const weekStart = getWeekStart(new Date());

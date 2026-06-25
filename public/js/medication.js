@@ -6,7 +6,21 @@
 import { state } from './state.js';
 import { todayKey, tsToDate, haptic, safeJsonParse } from './utils.js';
 import { MS_PER_DAY } from './constants.js';
-import { syncMedicationsToFirestore, loadMedicationsFromFirestore } from './firebase.js';
+
+// Lazy import for Firestore sync to avoid circular dependency
+let _syncToFirestore = null;
+let _loadFromFirestore = null;
+async function getSync() {
+  if (!_syncToFirestore) {
+    const m = await import('./firebase.js');
+    _syncToFirestore = m.syncMedicationsToFirestore;
+    _loadFromFirestore = m.loadMedicationsFromFirestore;
+  }
+  return { sync: _syncToFirestore, load: _loadFromFirestore };
+}
+
+// Auto-load from Firestore on init
+getSync().then(({ load }) => load()).catch(() => {});
 
 // ===== STORAGE =====
 const STORAGE_KEY = 'dc_medications';
@@ -90,6 +104,8 @@ export function addMedication(data) {
   meds.push(med);
   saveMedications(meds);
   haptic();
+  // Sync to Firestore in background
+  getSync().then(({ sync }) => sync()).catch(() => {});
   return med;
 }
 
@@ -105,6 +121,7 @@ export function updateMedication(id, data) {
   meds[idx] = { ...meds[idx], ...data };
   saveMedications(meds);
   haptic();
+  getSync().then(({ sync }) => sync()).catch(() => {});
 }
 
 /**
@@ -116,6 +133,7 @@ export function deleteMedication(id) {
   meds = meds.filter(m => m.id !== id);
   saveMedications(meds);
   haptic();
+  getSync().then(({ sync }) => sync()).catch(() => {});
 }
 
 /**

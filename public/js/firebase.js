@@ -347,17 +347,25 @@ export function subscribeEvents() {
   const wsId = state.workspace.id;
   if (!wsId) return;
 
-  unsubEvents = db.collection('workspaces').doc(wsId).collection('events')
+  const petId = state.ui.currentPetId;
+
+  // Build query: filter by petId if available
+  let query = db.collection('workspaces').doc(wsId).collection('events')
     .orderBy('createdAt', 'desc')
-    .limit(MAX_EVENTS_QUERY)
-    .onSnapshot((snap) => {
-      const items = [];
-      snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-      batch(() => {
-        state.events.items = items;
-        state.events.loading = false;
-      });
-    }, (err) => console.error('[Firestore] Events error:', err));
+    .limit(MAX_EVENTS_QUERY);
+
+  if (petId) {
+    query = query.where('petId', '==', petId);
+  }
+
+  unsubEvents = query.onSnapshot((snap) => {
+    const items = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    batch(() => {
+      state.events.items = items;
+      state.events.loading = false;
+    });
+  }, (err) => console.error('[Firestore] Events error:', err));
 }
 
 export function subscribeMembers() {
@@ -377,6 +385,14 @@ function unsubAll() {
   if (unsubPets) { unsubPets(); unsubPets = null; }
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
+}
+
+/**
+ * Re-subscribe events when current pet changes
+ * Exported to be called from switchPet / pet switcher
+ */
+export function resubscribeEvents() {
+  subscribeEvents();
 }
 
 // ===== MUTATIONS =====
@@ -478,5 +494,79 @@ export async function subscribePush() {
     }
   } catch (e) {
     console.warn('[Push] Failed:', e);
+  }
+}
+
+// ===== MEDICATION SYNC (Firestore + localStorage) =====
+
+const MED_COLLECTION = 'medications';
+
+/**
+ * Sync medications from localStorage to Firestore
+ * @returns {Promise<void>}
+ */
+export async function syncMedicationsToFirestore() {
+  const wsId = state.workspace.id;
+  if (!wsId || !state.auth.user) return;
+
+  try {
+    const localData = localStorage.getItem('dc_medications');
+    const logData = localStorage.getItem('dc_medication_log');
+    if (!localData && !logData) return;
+
+    const batch = db.batch();
+    const ref = db.collection('workspaces').doc(wsId).collection(MED_COLLECTION).doc(state.auth.user.uid);
+
+    // Merge medications and log into one document
+    const data = {};
+    if (localData) data.medications = JSON.parse(localData);
+    if (logData) data.medicationLog = JSON.parse(logData);
+    data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+
+    batch.set(ref, data, { merge: true });
+    await batch.commit();
+  } catch (e) {
+    console.warn('[MedSync] Save error:', e);
+  }
+}
+
+/**
+ * Load medications from Firestore into localStorage
+ * @returns {Promise<boolean>} true if data was loaded
+ */
+export async function loadMedicationsFromFirestore() {
+  const wsId = state.workspace.id;
+  if (!wsId || !state.auth.user) return false;
+
+  try {
+    const doc = await db.collection('workspaces').doc(wsId)
+      .collection(MED_COLLECTION).doc(state.auth.user.uid).get();
+
+    if (!doc.exists) return false;
+
+    const data = doc.data();
+    let loaded = false;
+
+    if (data.medications && Array.isArray(data.medications)) {
+      // Only load if localStorage is empty or Firestore is newer
+      const local = localStorage.getItem('dc_medications');
+      if (!local || local === '[]') {
+        localStorage.setItem('dc_medications', JSON.stringify(data.medications));
+        loaded = true;
+      }
+    }
+
+    if (data.medicationLog && Array.isArray(data.medicationLog)) {
+      const local = localStorage.getItem('dc_medication_log');
+      if (!local || local === '[]') {
+        localStorage.setItem('dc_medication_log', JSON.stringify(data.medicationLog));
+        loaded = true;
+      }
+    }
+
+    return loaded;
+  } catch (e) {
+    console.warn('[MedSync] Load error:', e);
+    return false;
   }
 }

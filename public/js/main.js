@@ -299,12 +299,6 @@ function bindGlobalEvents() {
     haptic();
   });
 
-  // Chat back button → go to home
-  $('chatBackBtn')?.addEventListener('click', () => {
-    setActiveTab('tabHome');
-    haptic();
-  });
-
   // Chat settings → go to profile
   $('chatSettingsBtn')?.addEventListener('click', () => {
     setActiveTab('tabProfile');

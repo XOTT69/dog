@@ -63,6 +63,33 @@ function getProviderConfig(model) {
 }
 
 /**
+ * Handle streaming response from provider
+ */
+async function handleStreamResponse(upstream, res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+  });
+
+  try {
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      res.write(chunk);
+    }
+    res.end();
+  } catch (e) {
+    // If streaming fails mid-way, try to end gracefully
+    try { res.end(); } catch {}
+  }
+}
+
+/**
  * Sanitize messages to prevent injection
  */
 function sanitizeMessages(messages) {

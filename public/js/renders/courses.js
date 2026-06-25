@@ -7,7 +7,7 @@ import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
 import { toast } from '../render.js';
-import { getTrainingProgram, TRAINING_PROGRAMS, getTrainingProgress, toggleTrainingStep, getTrainingCompletionPercent, resetTrainingProgress } from '../training-programs.js';
+import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -51,12 +51,6 @@ function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
 
-  // Get problemId from TRAINING_PROGRAMS
-  const problemId = Object.keys(TRAINING_PROGRAMS).find(k => TRAINING_PROGRAMS[k] === program) || '';
-  const progress = problemId ? getTrainingProgress(problemId) : { completedSteps: [] };
-  const completedSet = new Set(progress.completedSteps);
-  const pct = problemId ? getTrainingCompletionPercent(problemId) : 0;
-
   panel.classList.remove('hidden');
   panel.innerHTML = `
     <div class="card" style="border-left: 4px solid var(--accent)">
@@ -69,67 +63,32 @@ function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
-      ${pct > 0 ? `
-        <div class="training-progress">
-          <div class="training-progress-bar">
-            <div class="training-progress-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="training-progress-text">${pct}% виконано ${progress.completedAt ? '🎉' : ''}</div>
-        </div>
-      ` : ''}
-
-      <div class="training-steps" data-problem-id="${escapeHtml(problemId)}">
-        ${program.steps.map((step, i) => {
-          const done = completedSet.has(i);
-          return `
-          <div class="training-step ${done ? 'done' : ''}" data-step-index="${i}">
-            <div class="training-step-num" style="background:${done ? 'var(--success)' : 'var(--accent-gradient)'}">${done ? '✓' : (i + 1)}</div>
+      <div class="training-steps">
+        ${program.steps.map((step, i) => `
+          <div class="training-step">
+            <div class="training-step-num">${i + 1}</div>
             <div class="training-step-content">
-              <div class="training-step-title" style="${done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(step.title)}</div>
+              <div class="training-step-title">${escapeHtml(step.title)}</div>
               <div class="training-step-desc">${escapeHtml(step.desc)}</div>
             </div>
-            <div style="flex-shrink:0;padding-left:0.5rem">
-              <input type="checkbox" ${done ? 'checked' : ''} data-training-step="${problemId}:${i}" style="width:18px;height:18px;accent-color:var(--success)">
-            </div>
           </div>
-        `}).join('')}
+        `).join('')}
       </div>
 
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
-      <div style="display:flex;gap:0.5rem;margin-top:1rem">
-        <button class="btn btn-primary full-width" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
-          🤖 Запитати AI
-        </button>
-        ${pct > 0 ? `<button class="btn btn-ghost" id="resetTrainingProgressBtn" type="button" style="flex-shrink:0">↺</button>` : ''}
-      </div>
+      <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+        🤖 Запитати AI детальніше
+      </button>
     </div>
   `;
-
-  // Bind training step checkboxes
-  panel.querySelectorAll('[data-training-step]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const [pid, idxStr] = cb.dataset.trainingStep.split(':');
-      const idx = parseInt(idxStr);
-      toggleTrainingStep(pid, idx);
-      // Re-render the detail with updated progress
-      renderTrainingDetail(program, panel);
-    });
-  });
-
-  // Reset progress
-  panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', () => {
-    if (confirm('Скинути прогрес тренування?')) {
-      resetTrainingProgress(problemId);
-      renderTrainingDetail(program, panel);
-    }
-  });
 
   // Bind AI button
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
+      // Switch to chat tab
       const chatTab = document.querySelector('[data-tab="tabChat"]');
       if (chatTab) chatTab.click();
       setTimeout(() => handleAISubmit(prompt), 300);
@@ -224,35 +183,16 @@ async function handleAISubmit(prompt) {
   }
 
   addChatMessage(prompt, 'user');
+  showTyping();
   trackAIUsage();
 
-  // Show a streaming message element that we'll update in real-time
-  const chat = $('aiChat');
-  if (!chat) return;
-
-  const msgEl = document.createElement('div');
-  msgEl.className = 'ai-msg assistant streaming';
-  msgEl.textContent = '';
-  chat.appendChild(msgEl);
-  chat.scrollTop = chat.scrollHeight;
-
   try {
-    await fetchAIResponse(fullPrompt, (chunk) => {
-      msgEl.textContent += chunk;
-      chat.scrollTop = chat.scrollHeight;
-    });
-    msgEl.classList.remove('streaming');
-
-    // Add share button to the response
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'msg-share-btn';
-    shareBtn.type = 'button';
-    shareBtn.textContent = '📤 Поділитися';
-    shareBtn.addEventListener('click', () => shareMessage(msgEl.textContent));
-    msgEl.appendChild(shareBtn);
+    const response = await fetchAIResponse(fullPrompt);
+    removeTyping();
+    addChatMessage(response, 'assistant');
   } catch {
-    msgEl.textContent = 'Помилка. Спробуйте ще раз 🔄';
-    msgEl.classList.remove('streaming');
+    removeTyping();
+    addChatMessage('Помилка. Спробуйте ще раз 🔄', 'assistant');
   }
 }
 

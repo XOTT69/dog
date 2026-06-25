@@ -15,7 +15,7 @@ import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
 import { getNextHealthEvents, getOverdueHealthEvents } from '../vaccination.js';
 import { renderWeeklyPlan } from '../weekly-plan.js';
 import { renderDailyLesson } from '../daily-lesson.js';
-import { switchPet, addPet, resubscribeEvents } from '../firebase.js';
+import { switchPet, addPet } from '../firebase.js';
 
 // ===== RENDER =====
 
@@ -46,8 +46,6 @@ export function render() {
   renderAgeFocus();
   renderHeatInfo();
   renderReminders();
-  renderVaccinationCard();
-  renderEmergencyCard();
 
   // Check achievements after render
   const newAch = checkAchievements();
@@ -66,6 +64,7 @@ function renderPetSwitcher() {
   const pets = state.pets.items;
   const currentId = state.ui.currentPetId;
 
+  // Show switcher only if more than 1 pet
   const bar = $('petSwitcherBar');
   if (bar) {
     bar.style.display = pets.length <= 1 ? 'none' : '';
@@ -84,15 +83,16 @@ function renderPetSwitcher() {
     </button>`;
   }).join('') + `<button type="button" class="pet-chip pet-chip-add" data-pet-action="add">＋</button>`;
 
+  // Bind clicks
   scroll.querySelectorAll('[data-pet-id]').forEach(btn => {
     btn.addEventListener('click', () => {
       switchPet(btn.dataset.petId);
-      resubscribeEvents();
       haptic();
       render();
     });
   });
 
+  // Add pet button
   scroll.querySelector('[data-pet-action="add"]')?.addEventListener('click', async () => {
     try {
       const name = prompt('Як звати нову тварину?');
@@ -143,6 +143,7 @@ async function renderDailyTip() {
   const toiletMode = pet?.toiletMode || 'pad';
   const events = state.events.items;
 
+  // Calculate recent stats
   const weekAgo = Date.now() - 7 * MS_PER_DAY;
   const last7 = events.filter(e => {
     const ts = tsToDate(e.createdAt);
@@ -153,6 +154,7 @@ async function renderDailyTip() {
 
   const tips = [];
 
+  // Contextual tips by toilet mode
   if (toiletMode === TOILET_MODES.TRANSITION) {
     tips.push(stats.rate !== null && stats.rate < 70
       ? '🌳 Перехід на вулицю: виходьте в "правильні" моменти — після сну і їжі!'
@@ -168,6 +170,7 @@ async function renderDailyTip() {
   if (trainings7 === 0) tips.push('🎓 0 тренувань цього тижня. 2 хв + клікер = результат!');
   if (stats.total === 0 && events.length < 5) tips.push('📝 Записуйте туалет — побачите патерн за 3 дні!');
 
+  // Fallback to tips pool
   if (tips.length > 0) {
     el.textContent = tips[Math.floor(Date.now() / 3600000) % tips.length];
   } else {
@@ -250,6 +253,7 @@ function renderOneTap() {
     </button>`
   ).join('');
 
+  // Bind clicks (event delegation would be better, but keeping simple)
   grid.querySelectorAll('[data-onetap]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (btn.classList.contains('logged')) return;
@@ -293,6 +297,7 @@ function renderTimer() {
   if (card) card.classList.toggle('active', state.timer.running);
   if (startBtn) startBtn.textContent = state.timer.running ? '⏸ Пауза' : '▶ Старт';
 
+  // Timer label based on toilet mode
   const timerLabel = card?.querySelector('.timer-label');
   if (timerLabel) {
     const toiletMode = state.pet.data?.toiletMode || 'pad';
@@ -305,7 +310,7 @@ function renderTimer() {
   }
 }
 
-// ===== DAILY PLAN =====
+// ===== DAILY PLAN (checklist by age) =====
 
 function renderDailyPlan() {
   const list = $('dailyItems');
@@ -406,6 +411,7 @@ async function renderWeeklyPlanUI() {
   
   try {
     await renderWeeklyPlan(container);
+    // Update badge with completion count
     const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     const checked = container.querySelectorAll('input[type="checkbox"]:checked');
     if (badge) {
@@ -563,14 +569,17 @@ async function renderRecommendedCourses() {
   const toiletMode = pet.toiletMode || 'pad';
   const rec = new Set();
 
+  // By toilet mode
   if (toiletMode === 'pad') rec.add('pee-pad');
   else if (toiletMode === 'transition') rec.add('outdoor-switch');
 
+  // By age
   if (weeks != null && weeks < 12) { rec.add('first-days'); rec.add('name-focus'); rec.add('hand-feeding'); }
   else if (weeks != null && weeks < 24) { rec.add('sit-command'); rec.add('leash-walking'); rec.add('recall'); }
   else if (weeks != null && weeks < 72) { rec.add('recall'); rec.add('alone-training'); rec.add('nose-games'); }
   else { rec.add('nose-games'); rec.add('settle-down'); }
 
+  // By issues
   if (issues.includes('кусає')) rec.add('bite-control');
   if (issues.includes('тягне') || issues.includes('повідок')) rec.add('leash-walking');
   if (issues.includes('один') || issues.includes('розлук')) rec.add('alone-training');
@@ -610,6 +619,7 @@ function renderFoodGuide() {
   const weeks = getAgeInWeeks(pet?.birthDate);
   const isPuppy = weeks != null && weeks < 52;
 
+  // Simplified food guide inline (no need for separate JSON)
   const tables = {
     puppy: [
       { min: 0, max: 3, daily: '50–90 г', meals: 4, note: 'Мініатюрні: слідкуйте за гіпоглікемією!' },
@@ -696,8 +706,11 @@ function renderReminders() {
   const list = $('remindersList');
   if (!card || !list) return;
 
+  // Get health-based reminders
   const healthEvents = getNextHealthEvents(5);
   const overdueEvents = getOverdueHealthEvents();
+  
+  // Get custom reminders from pet data
   const customReminders = state.pet.data?.reminders || [];
   
   const allReminders = [...overdueEvents.map(e => ({
@@ -732,38 +745,6 @@ function renderReminders() {
       : d.toLocaleDateString('uk');
     return `<div class="feed-item"><div><strong>${typeIcon} ${escapeHtml(r.label)}</strong><div class="meta ${cls}">${txt}</div></div></div>`;
   }).join('');
-}
-
-// ===== VACCINATION CARD =====
-
-function renderVaccinationCard() {
-  const container = $('remindersCard');
-  if (!container) return;
-  
-  const pet = state.pet.data;
-  if (!pet?.birthDate) return;
-
-  try {
-    const schedule = generateHealthSchedule();
-    const now = new Date();
-    const upcoming = schedule.filter(e => e.date >= now).slice(0, 3);
-    const overdue = schedule.filter(e => e.status === 'overdue').slice(0, 2);
-
-    if (!upcoming.length && !overdue.length) return;
-    container.style.display = '';
-
-    const list = $('remindersList');
-    if (list && overdue.length > 0) {
-      list.insertAdjacentHTML('afterbegin', `
-        <div class="feed-item" style="border-left: 3px solid var(--danger);margin-bottom:0.5rem">
-          <strong>⚠️ ${overdue.length} прострочених подій здоров'я!</strong>
-          <div class="meta danger">Заплануйте візит до ветеринара</div>
-        </div>
-      `);
-    }
-  } catch {
-    // Silently fail
-  }
 }
 
 // ===== AGE PROGRAM HELPER =====
@@ -819,6 +800,7 @@ function initPullToRefresh() {
       indicator.classList.remove('ready');
       indicator.classList.add('refreshing');
       indicator.innerHTML = '<div class="ptr-spinner"></div>';
+      // Refresh data
       setTimeout(() => {
         render();
         indicator.classList.remove('visible', 'refreshing');
@@ -833,71 +815,4 @@ function initPullToRefresh() {
   }, { passive: true });
 }
 
-// ===== EMERGENCY CARD (added once) =====
-
-let emergencyCardBound = false;
-
-function renderEmergencyCard() {
-  if ($('emergencyCard')) return;
-  
-  const coursesContainer = $('recommendedCourses');
-  if (!coursesContainer) return;
-  
-  coursesContainer.insertAdjacentHTML('afterend', `
-    <div class="card emergency-card" id="emergencyCard">
-      <h4 class="card-title" style="color:var(--danger)">🚑 Екстрена допомога</h4>
-      <p class="text-muted" style="margin-bottom:0.75rem">Швидкі протоколи при невідкладних станах собаки</p>
-      <div id="emergencyProtocols"></div>
-      <button class="btn btn-danger full-width" id="showEmergencyBtn" type="button">🚨 Показати протоколи</button>
-    </div>
-  `);
-
-  if (emergencyCardBound) return;
-  emergencyCardBound = true;
-
-  const btn = $('showEmergencyBtn');
-  if (!btn) return;
-  
-  btn.addEventListener('click', async () => {
-    const list = $('emergencyProtocols');
-    if (!list) return;
-    
-    if (list.innerHTML) {
-      list.innerHTML = '';
-      btn.textContent = '🚨 Показати протоколи';
-      btn.classList.remove('btn-ghost');
-      btn.classList.add('btn-danger');
-      return;
-    }
-    
-    try {
-      const { getEmergencyProtocols } = await import('../training-programs.js');
-      const prots = getEmergencyProtocols();
-      
-      list.innerHTML = prots.map(p => `
-        <details style="margin-bottom:0.5rem;border:1px solid var(--danger-light);border-radius:var(--radius-sm);padding:0.5rem">
-          <summary style="font-weight:700;font-size:0.85rem;cursor:pointer;color:var(--danger)">
-            ${p.icon} ${p.title} <span class="text-muted" style="font-size:0.7rem">[${p.severity}]</span>
-          </summary>
-          <div style="padding:0.5rem 0">
-            <div style="font-size:0.78rem;color:var(--danger);margin-bottom:0.5rem">⚠️ ${p.dangerSigns}</div>
-            <ol style="font-size:0.82rem;color:var(--text-secondary);line-height:1.7;padding-left:1.2rem">
-              ${p.steps.map(s => `<li>${s}</li>`).join('')}
-            </ol>
-            ${p.toxicItems ? `<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--warning)">☠️ Токсичні: ${p.toxicItems.join(', ')}</div>` : ''}
-            ${p.note ? `<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">📌 ${p.note}</div>` : ''}
-          </div>
-        </details>
-      `).join('');
-      
-      btn.textContent = '🚨 Сховати протоколи';
-      btn.classList.remove('btn-danger');
-      btn.classList.add('btn-ghost');
-    } catch {
-      toast('Помилка завантаження протоколів', 'error');
-    }
-  });
-}
-
-import { generateHealthSchedule } from '../vaccination.js';
 export { getAgeProgramByWeeks };

@@ -21,9 +21,6 @@ const STORAGE_KEYS = {
   onboarded: 'dc_onboarded',
   weeklyDismissed: 'dc_weekly_dismissed',
   currentPetId: 'dc_current_pet_id',
-  clickerCount: 'dc_clicker_count',
-  chatHistory: 'dc_chat_history',
-  healthChecklist: 'dc_health_checklist',
 };
 
 /** @type {Map<string, Set<Function>>} */

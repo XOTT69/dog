@@ -25,6 +25,8 @@ db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
 let unsubPets = null;
 let unsubEvents = null;
 let unsubMembers = null;
+let unsubCalendar = null;
+let subscribedEventsPetId = undefined;
 
 // ===== HELPERS =====
 
@@ -46,6 +48,54 @@ function generateInviteCode() {
   return code;
 }
 
+function loadOfflineEvents() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.offlineEvents) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineEvents(items) {
+  localStorage.setItem(STORAGE_KEYS.offlineEvents, JSON.stringify(items));
+  state.events.pending = items;
+}
+
+function queuedForCurrentPet() {
+  const petId = state.ui.currentPetId;
+  return loadOfflineEvents().filter(item => !petId || item.petId === petId);
+}
+
+function mergeQueuedEvents(items) {
+  const queued = queuedForCurrentPet().map(item => ({
+    id: item.localId,
+    eventType: item.eventType,
+    petId: item.petId,
+    byUid: item.byUid,
+    byName: item.byName || 'Я',
+    note: item.note || '',
+    timeLabel: item.timeLabel || nowTime(),
+    value: item.value,
+    createdAt: item.createdAt,
+    pending: true,
+  }));
+  return [...queued, ...items];
+}
+
+function queueEvent(data) {
+  const queued = loadOfflineEvents();
+  const item = {
+    ...data,
+    localId: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+  };
+  queued.unshift(item);
+  saveOfflineEvents(queued);
+  state.events.items = mergeQueuedEvents(state.events.items.filter(e => !e.pending));
+  return item.localId;
+}
+
 /**
  * Get current active pet ID
  */
@@ -62,6 +112,13 @@ function _syncCurrentPet() {
 
   if (!pets.length) {
     state.pet.data = null;
+    state.ui.currentPetId = null;
+    localStorage.removeItem(STORAGE_KEYS.currentPetId);
+    if (unsubEvents) { unsubEvents(); unsubEvents = null; }
+    subscribedEventsPetId = null;
+    state.events.items = [];
+    state.events.loading = false;
+    state.events.pending = [];
     return;
   }
 
@@ -70,6 +127,7 @@ function _syncCurrentPet() {
     state.ui.currentPetId = current.id;
     localStorage.setItem(STORAGE_KEYS.currentPetId, current.id);
     state.pet.data = { ...current.data, id: current.id, petType: current.data.petType || 'dog' };
+    if (subscribedEventsPetId !== current.id) subscribeEvents();
   }
 }
 
@@ -104,10 +162,20 @@ export function initAuth(onReady) {
  * Sign in with Google
  */
 export async function loginGoogle() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  if (isIOS || isStandalone) {
+    await auth.signInWithRedirect(googleProvider);
+    return;
+  }
+
   try {
     await auth.signInWithPopup(googleProvider);
   } catch (e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
       await auth.signInWithRedirect(googleProvider);
     } else {
       throw e;
@@ -128,6 +196,9 @@ export async function logout() {
     state.pets.items = [];
     state.pet.data = null;
     state.events.items = [];
+    state.events.pending = [];
+    state.calendar.items = [];
+    state.calendar.loading = false;
     state.members.items = [];
     state.ui.currentPetId = null;
   });
@@ -287,6 +358,7 @@ export function subscribePets() {
  * Switch active pet
  */
 export function switchPet(petId) {
+  if (!petId || petId === state.ui.currentPetId) return;
   state.ui.currentPetId = petId;
   localStorage.setItem(STORAGE_KEYS.currentPetId, petId);
   _syncCurrentPet();
@@ -348,6 +420,11 @@ export function subscribeEvents() {
   if (!wsId) return;
 
   const petId = state.ui.currentPetId;
+  subscribedEventsPetId = petId || null;
+  batch(() => {
+    state.events.items = [];
+    state.events.loading = true;
+  });
 
   // Build query: filter by petId if available
   let query = db.collection('workspaces').doc(wsId).collection('events')
@@ -362,7 +439,8 @@ export function subscribeEvents() {
     const items = [];
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     batch(() => {
-      state.events.items = items;
+      state.events.pending = queuedForCurrentPet();
+      state.events.items = mergeQueuedEvents(items);
       state.events.loading = false;
     });
   }, (err) => console.error('[Firestore] Events error:', err));
@@ -381,10 +459,52 @@ export function subscribeMembers() {
     }, (err) => console.error('[Firestore] Members error:', err));
 }
 
+function normalizeCalendarItem(doc) {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    source: 'planned',
+    title: data.title || 'Задача',
+    type: data.type || 'note',
+    date: data.date || '',
+    time: data.time || '',
+    note: data.note || '',
+    repeat: data.repeat || 'once',
+    done: Boolean(data.done),
+    createdBy: data.createdBy || '',
+    createdByName: data.createdByName || '',
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
+  };
+}
+
+export function subscribeCalendarItems() {
+  if (unsubCalendar) unsubCalendar();
+  const wsId = state.workspace.id;
+  if (!wsId) return;
+
+  state.calendar.loading = true;
+  unsubCalendar = db.collection('workspaces').doc(wsId).collection('reminders')
+    .orderBy('date', 'asc')
+    .limit(300)
+    .onSnapshot((snap) => {
+      const items = [];
+      snap.forEach((doc) => items.push(normalizeCalendarItem(doc)));
+      batch(() => {
+        state.calendar.items = items;
+        state.calendar.loading = false;
+      });
+    }, (err) => {
+      console.error('[Firestore] Calendar error:', err);
+      state.calendar.loading = false;
+    });
+}
+
 function unsubAll() {
   if (unsubPets) { unsubPets(); unsubPets = null; }
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
+  if (unsubCalendar) { unsubCalendar(); unsubCalendar = null; }
 }
 
 /**
@@ -423,6 +543,7 @@ export async function addEvent(payload) {
   const user = state.auth.user;
   const petId = state.ui.currentPetId;
   if (!wsId || !user) throw new Error('No workspace or auth');
+  if (!petId) throw new Error('No pet selected');
 
   const data = {
     eventType: payload.eventType,
@@ -435,8 +556,20 @@ export async function addEvent(payload) {
   };
   if (payload.value != null) data.value = payload.value;
 
-  const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
-  return docRef.id;
+  if (!navigator.onLine) {
+    return queueEvent(data);
+  }
+
+  try {
+    const docRef = await db.collection('workspaces').doc(wsId).collection('events').add(data);
+    return docRef.id;
+  } catch (e) {
+    const msg = e.message?.toLowerCase() || '';
+    if (e.code === 'unavailable' || msg.includes('offline') || msg.includes('network')) {
+      return queueEvent(data);
+    }
+    throw e;
+  }
 }
 
 /**
@@ -446,6 +579,11 @@ export async function addEvent(payload) {
 export async function deleteEvent(eventId) {
   const wsId = state.workspace.id;
   if (!wsId || !eventId) return;
+  if (eventId.startsWith('local_')) {
+    saveOfflineEvents(loadOfflineEvents().filter(item => item.localId !== eventId));
+    state.events.items = state.events.items.filter(item => item.id !== eventId);
+    return;
+  }
   await db.collection('workspaces').doc(wsId).collection('events').doc(eventId).delete();
 }
 
@@ -473,11 +611,92 @@ export async function restoreEvent(eventData) {
   return ref.id;
 }
 
+export async function addCalendarItem(payload) {
+  const wsId = state.workspace.id;
+  const user = state.auth.user;
+  if (!wsId || !user) throw new Error('No workspace or auth');
+
+  const data = {
+    title: payload.title || 'Задача',
+    type: payload.type || 'note',
+    date: payload.date || '',
+    time: payload.time || '',
+    note: payload.note || '',
+    repeat: payload.repeat || 'once',
+    done: Boolean(payload.done),
+    createdBy: user.uid,
+    createdByName: user.displayName || 'Я',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const ref = await db.collection('workspaces').doc(wsId).collection('reminders').add(data);
+  return ref.id;
+}
+
+export async function updateCalendarItem(itemId, patch) {
+  const wsId = state.workspace.id;
+  if (!wsId || !itemId) return;
+
+  await db.collection('workspaces').doc(wsId).collection('reminders').doc(itemId).set({
+    ...patch,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function deleteCalendarItem(itemId) {
+  const wsId = state.workspace.id;
+  if (!wsId || !itemId) return;
+  await db.collection('workspaces').doc(wsId).collection('reminders').doc(itemId).delete();
+}
+
+export async function flushOfflineEvents() {
+  const wsId = state.workspace.id;
+  const user = state.auth.user;
+  if (!wsId || !user || !navigator.onLine) return 0;
+
+  const queued = loadOfflineEvents();
+  if (!queued.length) return 0;
+
+  const remaining = [];
+  let flushed = 0;
+
+  for (const item of queued) {
+    try {
+      await db.collection('workspaces').doc(wsId).collection('events').add({
+        eventType: item.eventType,
+        petId: item.petId || null,
+        byUid: item.byUid || user.uid,
+        byName: item.byName || user.displayName || 'Я',
+        note: item.note || '',
+        timeLabel: item.timeLabel || nowTime(),
+        ...(item.value != null ? { value: item.value } : {}),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      flushed++;
+    } catch {
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineEvents(remaining);
+  state.events.items = mergeQueuedEvents(state.events.items.filter(e => !e.pending));
+  return flushed;
+}
+
+export function getOfflineEventCount() {
+  return loadOfflineEvents().length;
+}
+
 // ===== PUSH =====
 
 export async function subscribePush() {
   try {
-    if (!firebase.messaging) return;
+    if (!firebase.messaging || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (typeof firebase.messaging.isSupported === 'function') {
+      const supported = await firebase.messaging.isSupported();
+      if (!supported) return;
+    }
     const messaging = firebase.messaging();
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return;

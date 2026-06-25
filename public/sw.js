@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'dogcoach-v2';
+const CACHE_VERSION = 'dogcoach-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   '/js/utils.js',
   '/js/firebase.js',
   '/js/render.js',
+  '/js/modal.js',
   '/js/audio.js',
   '/js/ai.js',
   '/js/timer.js',
@@ -20,6 +21,7 @@ const STATIC_ASSETS = [
   '/js/training-programs.js',
   '/js/medication.js',
   '/js/renders/home.js',
+  '/js/renders/calendar.js',
   '/js/renders/diary.js',
   '/js/renders/courses.js',
   '/js/renders/profile.js',

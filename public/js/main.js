@@ -3,8 +3,9 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
-import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribeCalendarItems, subscribePush, savePetProfile, flushOfflineEvents } from './firebase.js';
+import { setActiveTab, scheduleRender, toast, showLoading, hideLoading, resolveTabFromRoute } from './render.js';
+import { confirmDialog } from './modal.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { unlock as unlockAudio } from './audio.js';
 import { preloadAll } from './content-loader.js';
@@ -15,12 +16,14 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const show = (el) => el?.classList.remove('hidden');
 const hide = (el) => el?.classList.add('hidden');
+let launchActionHandled = false;
 
 // ===== BOOT =====
 
 function boot() {
   applyTheme();
   bindGlobalEvents();
+  setActiveTab(resolveTabFromRoute(), { skipHistory: true });
   initAuthFlow();
   updateOnlineStatus();
 }
@@ -45,6 +48,7 @@ function initAuthFlow() {
       subscribePets();
       subscribeMembers();
       subscribeEvents();
+      subscribeCalendarItems();
 
       // Wait for first data snapshot
       await waitForData();
@@ -55,7 +59,12 @@ function initAuthFlow() {
       } else {
         show($('appContent'));
         hideLoading();
+        setActiveTab(resolveTabFromRoute(), { skipHistory: true });
         scheduleRender();
+        handleLaunchAction();
+        flushOfflineEvents().then((flushed) => {
+          if (flushed > 0) toast(`Синхронізовано ${flushed} подій`, 'success');
+        }).catch(() => {});
 
         // Preload content in background
         setTimeout(() => preloadAll(), 1000);
@@ -80,15 +89,18 @@ function initAuthFlow() {
 function waitForData() {
   return new Promise((resolve) => {
     let resolved = false;
+    let unsub = null;
 
     const check = () => {
       if (!resolved && !state.pet.loading && !state.events.loading) {
         resolved = true;
+        unsub?.();
         resolve();
       }
     };
 
-    const unsub = subscribe(['pet', 'events'], check);
+    unsub = subscribe(['pet', 'events'], check);
+    check();
 
     // Fallback timeout
     setTimeout(() => {
@@ -99,6 +111,17 @@ function waitForData() {
       }
     }, 3000);
   });
+}
+
+function handleLaunchAction() {
+  if (launchActionHandled) return;
+  launchActionHandled = true;
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') !== 'add') return;
+
+  window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+  setTimeout(() => openSheet(), 350);
 }
 
 // ===== ONBOARDING =====
@@ -191,7 +214,9 @@ function bindOnboarding() {
       show($('appContent'));
       toast(`${$('obName')?.value.trim()} додано! 🎉`, 'success');
       showConfetti();
+      setActiveTab(resolveTabFromRoute(), { skipHistory: true });
       scheduleRender();
+      handleLaunchAction();
 
       // Preload content
       setTimeout(() => preloadAll(), 500);
@@ -247,7 +272,11 @@ function bindGlobalEvents() {
   document.addEventListener('click', unlockHandler, { once: true });
 
   // Online/offline
-  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('online', async () => {
+    updateOnlineStatus();
+    const flushed = await flushOfflineEvents();
+    if (flushed > 0) toast(`Синхронізовано ${flushed} подій`, 'success');
+  });
   window.addEventListener('offline', updateOnlineStatus);
 
   // Theme toggle
@@ -269,8 +298,13 @@ function bindGlobalEvents() {
     hideLoading();
   });
 
-  $('logoutBtn')?.addEventListener('click', () => {
-    if (confirm('Вийти?')) {
+  $('logoutBtn')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Вийти з акаунта?',
+      message: 'Локальні чернетки й налаштування залишаться на пристрої.',
+      confirmLabel: 'Вийти',
+    });
+    if (ok) {
       stopTimer();
       logout();
       hide($('appContent'));
@@ -283,6 +317,15 @@ function bindGlobalEvents() {
     setActiveTab(b.dataset.tab);
     haptic();
   }));
+
+  $$('[data-tab-jump]').forEach(b => b.addEventListener('click', () => {
+    setActiveTab(b.dataset.tabJump);
+    haptic();
+  }));
+
+  window.addEventListener('hashchange', () => {
+    setActiveTab(resolveTabFromRoute(), { skipHistory: true });
+  });
 
   // FAB
   $('fabAddEvent')?.addEventListener('click', () => {

@@ -6,7 +6,8 @@ import { state, STORAGE_KEYS } from '../state.js';
 import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
 import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
-import { toast } from '../render.js';
+import { setActiveTab, toast } from '../render.js';
+import { confirmDialog } from '../modal.js';
 import { getTrainingProgram, TRAINING_PROGRAMS, getTrainingProgress, toggleTrainingStep, getTrainingCompletionPercent, resetTrainingProgress } from '../training-programs.js';
 
 /** @type {boolean} */
@@ -15,12 +16,23 @@ let knowledgeRendered = false;
 let socialRendered = false;
 
 export async function render() {
+  renderAcademyProgress();
   renderProblemButtons();
   renderAIChat();
   await renderCourseGrid();
   await renderKnowledgeGrid();
   await renderSocialGrid();
   renderToiletGuide();
+}
+
+function renderAcademyProgress() {
+  const el = $('academyProgressPct');
+  if (!el) return;
+
+  const keys = Object.keys(TRAINING_PROGRAMS);
+  const values = keys.map(k => getTrainingCompletionPercent(k)).filter(v => v > 0);
+  const avg = values.length ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : 0;
+  el.textContent = `${avg}%`;
 }
 
 // ===== HIDDEN PROBLEMS (can hide irrelevant buttons) =====
@@ -53,9 +65,6 @@ function renderProblemButtons() {
   let manageMode = panel.dataset.manageMode === 'true';
 
   $$('.problem-btn').forEach(btn => {
-    if (btn.dataset.boundAI) return;
-    btn.dataset.boundAI = 'true';
-    
     const problemId = btn.dataset.problem;
     
     // Apply hidden class
@@ -64,6 +73,9 @@ function renderProblemButtons() {
     } else {
       btn.classList.remove('hidden-problem');
     }
+
+    if (btn.dataset.boundAI) return;
+    btn.dataset.boundAI = 'true';
     
     btn.addEventListener('click', () => {
       if (manageMode) {
@@ -181,14 +193,22 @@ function renderTrainingDetail(program, panel) {
       toggleTrainingStep(pid, idx);
       // Re-render the detail with updated progress
       renderTrainingDetail(program, panel);
+      renderAcademyProgress();
     });
   });
 
   // Reset progress
-  panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', () => {
-    if (confirm('Скинути прогрес тренування?')) {
+  panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Скинути прогрес?',
+      message: 'Чекліст цієї програми почнеться спочатку.',
+      confirmLabel: 'Скинути',
+      danger: true,
+    });
+    if (ok) {
       resetTrainingProgress(problemId);
       renderTrainingDetail(program, panel);
+      renderAcademyProgress();
     }
   });
 
@@ -196,8 +216,7 @@ function renderTrainingDetail(program, panel) {
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
-      const chatTab = document.querySelector('[data-tab="tabChat"]');
-      if (chatTab) chatTab.click();
+      setActiveTab('tabChat');
       setTimeout(() => handleAISubmit(prompt), 300);
     }
   });
@@ -225,6 +244,8 @@ function renderAIChat() {
 
   // Quick prompts
   $$('[data-ai-prompt]').forEach(btn => {
+    if (btn.dataset.aiBound) return;
+    btn.dataset.aiBound = 'true';
     btn.addEventListener('click', () => {
       handleAISubmit(btn.dataset.aiPrompt);
       haptic();

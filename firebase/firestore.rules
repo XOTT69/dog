@@ -29,28 +29,67 @@ service cloud.firestore {
     // Validate event data
     function isValidEvent() {
       let data = request.resource.data;
-      return data.eventType is string &&
+      return data.keys().hasOnly([
+               'eventType', 'petId', 'byUid', 'byName', 'note', 'timeLabel', 'value', 'createdAt'
+             ]) &&
+             data.eventType is string &&
              data.eventType.size() > 0 &&
              data.eventType.size() <= 30 &&
              data.byUid == request.auth.uid &&
              data.byName is string &&
              data.byName.size() <= 100 &&
+             (!('petId' in data) || data.petId == null || isValidString(data.petId, 50)) &&
              (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&
              (!('value' in data) || (data.value is number && data.value >= 0 && data.value <= 999)) &&
-             (!('timeLabel' in data) || (data.timeLabel is string && data.timeLabel.size() <= 10));
+             (!('timeLabel' in data) || (data.timeLabel is string && data.timeLabel.size() <= 10)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     // Validate pet data
     function isValidPet() {
       let data = request.resource.data;
-      return (!('name' in data) || isValidString(data.name, 50)) &&
+      return data.keys().hasOnly([
+               'name', 'birthDate', 'sex', 'breed', 'toiletMode', 'weight', 'issues', 'petType',
+               'photoURL', 'lastVaccine', 'lastDeworming', 'lastHeat', 'reminders',
+               'createdAt', 'updatedAt'
+             ]) &&
+             (!('name' in data) || isValidString(data.name, 50)) &&
+             (!('birthDate' in data) || isValidString(data.birthDate, 10)) &&
              (!('breed' in data) || isValidString(data.breed, 100)) &&
              (!('sex' in data) || data.sex in ['хлопчик', 'дівчинка']) &&
              (!('toiletMode' in data) || data.toiletMode in ['pad', 'outdoor', 'transition']) &&
              (!('petType' in data) || data.petType in ['dog', 'cat']) &&
              (!('issues' in data) || isValidString(data.issues, 500)) &&
              (!('weight' in data) || data.weight is string || data.weight is number) &&
-             (!('photoURL' in data) || isValidString(data.photoURL, 500));
+             (!('photoURL' in data) || isValidString(data.photoURL, 500)) &&
+             (!('lastVaccine' in data) || isValidString(data.lastVaccine, 10)) &&
+             (!('lastDeworming' in data) || isValidString(data.lastDeworming, 10)) &&
+             (!('lastHeat' in data) || isValidString(data.lastHeat, 10)) &&
+             (!('reminders' in data) || data.reminders is list) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Validate shared calendar reminder data
+    function isValidReminder() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+               'title', 'type', 'date', 'time', 'note', 'repeat', 'done',
+               'createdBy', 'createdByName', 'createdAt', 'updatedAt'
+             ]) &&
+             isValidString(data.title, 120) &&
+             data.title.size() > 0 &&
+             data.type in ['walk', 'food', 'training', 'health', 'hygiene', 'medication', 'note'] &&
+             isValidString(data.date, 10) &&
+             (!('time' in data) || isValidString(data.time, 10)) &&
+             (!('note' in data) || isValidString(data.note, 500)) &&
+             data.repeat in ['once', 'daily', 'weekly'] &&
+             data.done is bool &&
+             data.createdBy is string &&
+             data.createdByName is string &&
+             data.createdByName.size() <= 100 &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     // ===== USER PROFILES =====
@@ -100,7 +139,8 @@ service cloud.firestore {
         // Can update own data (e.g., push token)
         allow update: if isAuth() && memberUid == request.auth.uid &&
           request.resource.data.uid == resource.data.uid && // Can't change uid
-          request.resource.data.get('role', 'member') == resource.data.get('role', 'member'); // Can't self-promote
+          request.resource.data.get('role', 'member') == resource.data.get('role', 'member') && // Can't self-promote
+          (!('pushToken' in request.resource.data) || isValidString(request.resource.data.pushToken, 512));
 
         // Can remove self or owner can remove anyone
         allow delete: if isAuth() &&
@@ -132,7 +172,8 @@ service cloud.firestore {
 
         // Can update own events or owner can update any
         allow update: if isMember(workspaceId) &&
-          (resource.data.byUid == request.auth.uid || isOwner(workspaceId));
+          (resource.data.byUid == request.auth.uid || isOwner(workspaceId)) &&
+          isValidEvent();
 
         // Can delete own events or owner can delete any
         allow delete: if isMember(workspaceId) &&
@@ -147,10 +188,15 @@ service cloud.firestore {
           (resource.data.get('createdBy', '') == request.auth.uid || isOwner(workspaceId));
       }
 
-      // ===== REMINDERS (future) =====
+      // ===== REMINDERS =====
       match /reminders/{reminderId} {
         allow read: if isMember(workspaceId);
-        allow create, update: if isMember(workspaceId);
+        allow create: if isMember(workspaceId) &&
+          isValidReminder() &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if isMember(workspaceId) &&
+          isValidReminder() &&
+          request.resource.data.createdBy == resource.data.createdBy;
         allow delete: if isMember(workspaceId);
       }
     }

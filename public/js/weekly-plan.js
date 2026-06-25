@@ -3,7 +3,7 @@
  */
 
 import { state, STORAGE_KEYS } from './state.js';
-import { getAgeInWeeks, weekLabel, todayKey } from './utils.js';
+import { escapeHtml, getAgeInWeeks, weekLabel, todayKey } from './utils.js';
 import { fetchAIResponse } from './ai.js';
 
 /**
@@ -212,14 +212,14 @@ export async function renderWeeklyPlan(container) {
     return `
       <div class="weekly-day ${isToday ? 'today' : ''}">
         <div class="weekly-day-header">
-          <strong>${day.day}</strong>
+          <strong>${escapeHtml(day.day)}</strong>
           <span class="text-muted">${doneCount}/${total}</span>
         </div>
         <div class="weekly-tasks">
           ${day.tasks.map((task, taskIdx) => `
             <label class="weekly-task ${task.done ? 'done' : ''}">
               <input type="checkbox" data-weekly="${dayIdx}:${taskIdx}" ${task.done ? 'checked' : ''}>
-              <span>${task.title}</span>
+              <span>${escapeHtml(task.title)}</span>
             </label>
           `).join('')}
         </div>

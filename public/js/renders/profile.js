@@ -7,6 +7,7 @@ import { $, escapeHtml, avatarLetter, haptic, safeJsonParse } from '../utils.js'
 import { MS_PER_DAY } from '../constants.js';
 import { savePetProfile, subscribePush, getIdToken } from '../firebase.js';
 import { toast, showLoading, hideLoading } from '../render.js';
+import { confirmDialog, formDialog, infoDialog, promptDialog } from '../modal.js';
 import { renderHealthSchedule, isDewormingDue, isVaccinationDue } from '../vaccination.js';
 
 /** @type {boolean} */
@@ -298,6 +299,11 @@ function renderMedicationTracker() {
         <p class="text-muted" style="margin-bottom:0.75rem">Відстежуйте прийом ліків, вітамінів та профілактичних засобів.</p>
         <button class="btn btn-primary full-width" id="addFirstMedBtn" type="button">➕ Додати перший препарат</button>
       `;
+      bindMedicationEvents(container, {
+        getMedications, getTodaySchedule, getDueMedications,
+        MEDICATION_TYPES, logDose, addMedication, deleteMedication, getMedicationLog,
+        INTERVAL_SUGGESTIONS: m.INTERVAL_SUGGESTIONS,
+      });
       return;
     }
 
@@ -403,11 +409,17 @@ function bindMedicationEvents(container, api) {
   const { getMedications, logDose, addMedication, deleteMedication, getMedicationLog, MEDICATION_TYPES, INTERVAL_SUGGESTIONS } = api;
 
   // Log dose
-  container.addEventListener('click', (e) => {
+  container.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-med-log]');
     if (btn) {
       const medId = btn.dataset.medLog;
-      const note = prompt('Нотатка (необов\'язково):') || '';
+      const note = await promptDialog({
+        title: 'Записати прийом',
+        label: 'Нотатка',
+        placeholder: 'Необовʼязково',
+        multiline: true,
+        confirmLabel: 'Записати',
+      }) || '';
       logDose(medId, note);
       toast('✅ Записано!', 'success');
       renderMedicationTracker();
@@ -415,7 +427,7 @@ function bindMedicationEvents(container, api) {
   });
 
   // Show info / log
-  container.addEventListener('click', (e) => {
+  container.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-med-info]');
     if (btn) {
       const medId = btn.dataset.medInfo;
@@ -430,23 +442,34 @@ function bindMedicationEvents(container, api) {
         ? log.map(l => `<div style="font-size:0.78rem;color:var(--text-secondary)">${l.date} ${l.time} ${l.note ? '— ' + escapeHtml(l.note) : ''}</div>`).join('')
         : '<div class="text-muted">Ще не приймали</div>';
 
-      alert(`💊 ${med.name}
-Тип: ${typeInfo.label}
-Дозування: ${med.dosage || '—'}
-Інтервал: ${med.intervalDays > 0 ? `кожні ${med.intervalDays} дн.` : 'одноразово'}
-Нотатки: ${med.notes || '—'}
-
-📋 Останні прийоми:
-${logHtml}`);
+      await infoDialog({
+        title: med.name,
+        html: `
+          <div class="modal-facts">
+            <div><span>Тип</span><strong>${escapeHtml(typeInfo.label)}</strong></div>
+            <div><span>Дозування</span><strong>${escapeHtml(med.dosage || '—')}</strong></div>
+            <div><span>Інтервал</span><strong>${med.intervalDays > 0 ? `кожні ${med.intervalDays} дн.` : 'одноразово'}</strong></div>
+            <div><span>Нотатки</span><strong>${escapeHtml(med.notes || '—')}</strong></div>
+          </div>
+          <h4 class="modal-subtitle">Останні прийоми</h4>
+          ${logHtml}
+        `,
+      });
     }
   });
 
   // Delete medication
-  container.addEventListener('click', (e) => {
+  container.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-med-delete]');
     if (btn) {
       const medId = btn.dataset.medDelete;
-      if (confirm('Видалити цей препарат?')) {
+      const ok = await confirmDialog({
+        title: 'Видалити препарат?',
+        message: 'Історія прийомів для нього також більше не буде показуватись.',
+        confirmLabel: 'Видалити',
+        danger: true,
+      });
+      if (ok) {
         deleteMedication(medId);
         toast('Видалено', 'success');
         renderMedicationTracker();
@@ -473,31 +496,32 @@ ${logHtml}`);
   });
 }
 
-function showAddMedicationDialog(api) {
+async function showAddMedicationDialog(api) {
   const { MEDICATION_TYPES, INTERVAL_SUGGESTIONS } = api;
-  
-  // Build a simple modal-like prompt sequence
-  const name = prompt('Назва препарату:');
-  if (!name?.trim()) return;
 
   const typeKeys = Object.keys(MEDICATION_TYPES);
-  const typePrompt = typeKeys.map((k, i) => `${i + 1}. ${MEDICATION_TYPES[k].icon} ${MEDICATION_TYPES[k].label}`).join('\n');
-  const typeChoice = prompt(`Тип препарату:\n${typePrompt}\n\nВведіть номер (1-${typeKeys.length}):`);
-  const typeIdx = parseInt(typeChoice) - 1;
-  const type = typeKeys[typeIdx] || 'other';
-
-  const dosage = prompt('Дозування (необов\'язково):') || '';
-
-  const intervalPrompt = INTERVAL_SUGGESTIONS.map((s, i) => `${i + 1}. ${s.label}`).join('\n');
-  const intervalChoice = prompt(`Як часто приймати?\n${intervalPrompt}\n\nВведіть номер (1-${INTERVAL_SUGGESTIONS.length}):`);
-  const intervalIdx = parseInt(intervalChoice) - 1;
-  const intervalDays = INTERVAL_SUGGESTIONS[intervalIdx]?.days ?? 0;
-
-  const notes = prompt('Нотатки (необов\'язково):') || '';
+  const values = await formDialog({
+    title: 'Новий препарат',
+    submitLabel: 'Додати',
+    fields: [
+      { name: 'name', label: 'Назва препарату', required: true, placeholder: 'Наприклад: вітаміни' },
+      { name: 'type', label: 'Тип', type: 'select', options: typeKeys.map(k => ({ value: k, label: `${MEDICATION_TYPES[k].icon} ${MEDICATION_TYPES[k].label}` })) },
+      { name: 'dosage', label: 'Дозування', placeholder: 'Необовʼязково' },
+      { name: 'intervalDays', label: 'Як часто', type: 'select', options: INTERVAL_SUGGESTIONS.map(s => ({ value: String(s.days), label: s.label })) },
+      { name: 'notes', label: 'Нотатки', type: 'textarea', rows: 2 },
+    ],
+  });
+  if (!values?.name) return;
 
   try {
-    addMedication({ name: name.trim(), type, dosage, intervalDays, notes });
-    toast(`💊 ${name.trim()} додано!`, 'success');
+    addMedication({
+      name: values.name,
+      type: values.type || 'other',
+      dosage: values.dosage || '',
+      intervalDays: parseInt(values.intervalDays || '0', 10),
+      notes: values.notes || '',
+    });
+    toast(`💊 ${values.name} додано!`, 'success');
     renderMedicationTracker();
   } catch (e) {
     toast('Помилка додавання', 'error');

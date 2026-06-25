@@ -11,11 +11,12 @@ import { updateStreak, checkAchievements, showConfetti, ACHIEVEMENT_DEFS } from 
 import { startTimer, formatTimer, getTimerProgress } from '../timer.js';
 import { generateDailyPlan } from '../ai.js';
 import { toast } from '../render.js';
-import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
+import { getBreedProfile, getBreeds, getProtocols, getTips } from '../content-loader.js';
 import { getNextHealthEvents, getOverdueHealthEvents } from '../vaccination.js';
 import { renderWeeklyPlan } from '../weekly-plan.js';
 import { renderDailyLesson } from '../daily-lesson.js';
-import { switchPet, addPet, resubscribeEvents } from '../firebase.js';
+import { switchPet, addPet } from '../firebase.js';
+import { confirmDialog, formDialog } from '../modal.js';
 
 // ===== RENDER =====
 
@@ -92,7 +93,6 @@ function renderPetSwitcher() {
     btn.addEventListener('click', () => {
       if (btn.dataset.petId !== currentId) {
         switchPet(btn.dataset.petId);
-        resubscribeEvents();
         haptic();
         render();
       }
@@ -100,13 +100,19 @@ function renderPetSwitcher() {
     // Long press → delete
     let longPressTimer;
     btn.addEventListener('touchstart', (e) => {
-      longPressTimer = setTimeout(() => {
+      longPressTimer = setTimeout(async () => {
         e.preventDefault();
         if (state.pets.items.length <= 1) {
           toast('Неможливо видалити останню тварину', 'error');
           return;
         }
-        if (confirm(`Видалити ${btn.textContent.trim()}?`)) {
+        const ok = await confirmDialog({
+          title: 'Видалити тварину?',
+          message: `Видалити ${btn.textContent.trim()} з профілю?`,
+          confirmLabel: 'Видалити',
+          danger: true,
+        });
+        if (ok) {
           import('../firebase.js').then(({ removePet }) => {
             removePet(btn.dataset.petId).then(() => {
               toast('Видалено', 'success');
@@ -122,10 +128,21 @@ function renderPetSwitcher() {
 
   newScroll.querySelector('[data-pet-action="add"]')?.addEventListener('click', async () => {
     try {
-      const name = prompt('Як звати нову тварину?');
-      if (!name?.trim()) return;
-      await addPet({ name: name.trim(), petType: 'dog' });
-      toast(`${name.trim()} додано! 🎉`, 'success');
+      const values = await formDialog({
+        title: 'Нова тварина',
+        submitLabel: 'Додати',
+        fields: [
+          { name: 'name', label: "Ім'я", required: true, placeholder: 'Боня' },
+          { name: 'petType', label: 'Тип', type: 'select', options: [
+            { value: 'dog', label: 'Собака' },
+            { value: 'cat', label: 'Кіт' },
+          ] },
+          { name: 'breed', label: 'Порода', placeholder: 'Необовʼязково' },
+        ],
+      });
+      if (!values?.name) return;
+      await addPet({ name: values.name, petType: values.petType || 'dog', breed: values.breed || '' });
+      toast(`${values.name} додано!`, 'success');
       render();
     } catch (e) {
       toast('Помилка: ' + e.message, 'error');
@@ -285,7 +302,8 @@ function renderOneTap() {
 
       try {
         const eventId = await addEvent({ eventType: btn.dataset.onetap });
-        toast(`${items.find(i => i.type === btn.dataset.onetap)?.icon || '✓'} Записано`, 'success', () => {
+        const label = eventId.startsWith('local_') ? 'Збережено офлайн' : 'Записано';
+        toast(`${items.find(i => i.type === btn.dataset.onetap)?.icon || '✓'} ${label}`, 'success', () => {
           deleteEvent(eventId);
         });
       } catch (e) {
@@ -419,6 +437,7 @@ async function renderDailyLessonUI() {
   
   try {
     await renderDailyLesson(container);
+    card.style.display = container.style.display === 'none' ? 'none' : '';
   } catch {
     card.style.display = 'none';
   }
@@ -520,6 +539,9 @@ async function renderBreedCard() {
   if (!container) return;
 
   const pet = state.pet.data;
+  if (pet?.breed) {
+    try { await getBreeds(); } catch { /* keep card hidden if content fails */ }
+  }
   const profile = getBreedProfile(pet?.breed);
 
   if (!profile) { container.style.display = 'none'; return; }
@@ -529,16 +551,16 @@ async function renderBreedCard() {
   const trainLabel = { low: '🟠 Складна', mid: '🟡 Середня', high: '🟢 Легка', very_high: '🟢 Дуже легка' };
 
   container.innerHTML = `
-    <h4 class="card-title">🐕 ${profile.name}</h4>
+    <h4 class="card-title">🐕 ${escapeHtml(profile.name)}</h4>
     <div class="breed-meta-grid">
-      <div>⚡ ${energyLabel[profile.energy] || '?'}</div>
-      <div>🎓 ${trainLabel[profile.trainability] || '?'}</div>
-      <div>⚖️ ${profile.adultWeight || '?'}</div>
-      <div>🏃 ${profile.activity || '?'}</div>
+      <div>⚡ ${escapeHtml(energyLabel[profile.energy] || '?')}</div>
+      <div>🎓 ${escapeHtml(trainLabel[profile.trainability] || '?')}</div>
+      <div>⚖️ ${escapeHtml(profile.adultWeight || '?')}</div>
+      <div>🏃 ${escapeHtml(profile.activity || '?')}</div>
     </div>
-    ${profile.traits?.length ? `<div class="breed-traits"><strong>Характер:</strong> ${profile.traits.join(', ')}</div>` : ''}
-    ${profile.issues?.length ? `<div class="breed-issues"><strong>⚠️ Проблеми:</strong> ${profile.issues.join(', ')}</div>` : ''}
-    ${profile.tips ? `<div class="breed-tip">💡 ${profile.tips}</div>` : ''}
+    ${profile.traits?.length ? `<div class="breed-traits"><strong>Характер:</strong> ${profile.traits.map(escapeHtml).join(', ')}</div>` : ''}
+    ${profile.issues?.length ? `<div class="breed-issues"><strong>⚠️ Проблеми:</strong> ${profile.issues.map(escapeHtml).join(', ')}</div>` : ''}
+    ${profile.tips ? `<div class="breed-tip">💡 ${escapeHtml(profile.tips)}</div>` : ''}
   `;
 }
 

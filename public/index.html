@@ -2,11 +2,14 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#007AFF">
+  <meta name="color-scheme" content="light dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dog Coach">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
   <meta name="description" content="AI-тренер для собаки — щоденник, курси, здоров'я, поради">
   <title>Dog Coach AI</title>
   <link rel="manifest" href="/manifest.webmanifest">
@@ -327,6 +330,36 @@
         </div>
       </section>
 
+      <!-- ===== CALENDAR TAB ===== -->
+      <section id="tabCalendar" class="tab">
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">Планування</span>
+            <h3 class="page-title">Календар</h3>
+          </div>
+          <button class="btn btn-primary btn-sm" id="addCalendarItemBtn" type="button">Додати</button>
+        </div>
+        <div id="calendarSummary"></div>
+        <div class="calendar-quick" id="calendarQuickActions">
+          <button class="chip" data-calendar-quick="walk" type="button">Прогулянка</button>
+          <button class="chip" data-calendar-quick="food" type="button">Їжа</button>
+          <button class="chip" data-calendar-quick="training" type="button">Тренування</button>
+          <button class="chip" data-calendar-quick="medication" type="button">Ліки</button>
+          <button class="chip" data-calendar-quick="hygiene" type="button">Догляд</button>
+        </div>
+        <div class="calendar-days" id="calendarDays"></div>
+        <div class="card calendar-panel">
+          <div class="card-header">
+            <h4 id="calendarDateTitle">Сьогодні</h4>
+            <span class="badge">План</span>
+          </div>
+          <div id="calendarItems" class="calendar-items">
+            <div class="skeleton skeleton-row"></div>
+            <div class="skeleton skeleton-row"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== DIARY TAB ===== -->
       <section id="tabDiary" class="tab">
         <h3 class="page-title">📈 Щоденник</h3>
@@ -356,11 +389,34 @@
 
       <!-- ===== COURSES TAB ===== -->
       <section id="tabCourses" class="tab">
-        <h3 class="page-title">🎓 Навчання</h3>
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">Професійне навчання</span>
+            <h3 class="page-title">Академія</h3>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-tab-jump="tabChat" type="button">AI coach</button>
+        </div>
+
+        <div class="workspace-hero academy-hero">
+          <div>
+            <span class="eyebrow">Активна програма</span>
+            <h3>План, вправи, прогрес</h3>
+            <p>Оберіть проблему або курс, виконуйте короткі уроки й фіксуйте результат у щоденнику.</p>
+          </div>
+          <div class="hero-metric">
+            <strong id="academyProgressPct">0%</strong>
+            <span>прогрес</span>
+          </div>
+        </div>
 
         <!-- Quick Problem Select -->
-        <div class="card">
-          <h4 class="card-title">🔍 Що вирішуємо?</h4>
+        <div class="card academy-section">
+          <div class="card-header">
+            <div>
+              <span class="eyebrow">Каталог проблем</span>
+              <h4 class="card-title">Що тренуємо?</h4>
+            </div>
+          </div>
           <div class="problem-grid">
             <button class="problem-btn" data-problem="bite" type="button">
               <span class="problem-icon">🦷</span>
@@ -429,28 +485,48 @@
         <div id="trainingProgram" class="hidden"></div>
 
         <!-- Recommended Courses -->
-        <div class="filter-row" id="courseFilters">
-          <button class="chip active" data-course-level="all">Всі</button>
-          <button class="chip" data-course-level="базовий">🟢 Базовий</button>
-          <button class="chip" data-course-level="середній">🟡 Середній</button>
-          <button class="chip" data-course-level="просунутий">🔴 Просунутий</button>
-        </div>
-        <div id="courseGrid" class="course-grid">
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
+        <div class="card academy-section">
+          <div class="card-header">
+            <div>
+              <span class="eyebrow">Курси</span>
+              <h4 class="card-title">Програми по рівнях</h4>
+            </div>
+          </div>
+          <div class="filter-row" id="courseFilters">
+            <button class="chip active" data-course-level="all">Всі</button>
+            <button class="chip" data-course-level="базовий">Базовий</button>
+            <button class="chip" data-course-level="середній">Середній</button>
+            <button class="chip" data-course-level="просунутий">Просунутий</button>
+          </div>
+          <div id="courseGrid" class="course-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
         </div>
         <div id="selectedCourse"></div>
 
-        <h4 class="section-title mt-lg">📚 База знань</h4>
-        <div id="knowledgeGrid" class="knowledge-grid">
-          <div class="skeleton skeleton-card"></div>
+        <div class="academy-two-col">
+          <div class="card academy-section">
+            <span class="eyebrow">Довідник</span>
+            <h4 class="card-title">База знань</h4>
+            <div id="knowledgeGrid" class="knowledge-grid">
+              <div class="skeleton skeleton-card"></div>
+            </div>
+          </div>
+          <div class="card academy-section">
+            <span class="eyebrow">Соціалізація</span>
+            <h4 class="card-title">Чекліст середовищ</h4>
+            <div id="socialGrid" class="checklist-grid">
+              <div class="skeleton skeleton-row"></div>
+            </div>
+          </div>
         </div>
-        <h4 class="section-title mt-lg">🌍 Соціалізація</h4>
-        <div id="socialGrid" class="checklist-grid">
-          <div class="skeleton skeleton-row"></div>
+
+        <div class="card academy-section">
+          <span class="eyebrow">Алгоритм</span>
+          <h4 class="card-title">Туалет без хаосу</h4>
+          <div id="toiletGuide" class="knowledge-grid"></div>
         </div>
-        <h4 class="section-title mt-lg">🚽 Алгоритм туалету</h4>
-        <div id="toiletGuide" class="knowledge-grid"></div>
       </section>
 
       <!-- ===== CHAT TAB ===== -->
@@ -555,19 +631,19 @@
     <nav class="nav" aria-label="Навігація">
       <button class="nav-item active" data-tab="tabHome" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span>Дім</span>
+        <span>Сьогодні</span>
       </button>
-      <button class="nav-item" data-tab="tabDiary" type="button">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        <span>Щоденник</span>
+      <button class="nav-item" data-tab="tabCalendar" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Календар</span>
       </button>
       <button class="nav-item" data-tab="tabCourses" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         <span>Навчання</span>
       </button>
-      <button class="nav-item" data-tab="tabChat" type="button">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span>Чат</span>
+      <button class="nav-item" data-tab="tabDiary" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Щоденник</span>
       </button>
       <button class="nav-item" data-tab="tabProfile" type="button">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

@@ -9,9 +9,19 @@ const $ = (id) => document.getElementById(id);
 
 // Lazy-loaded render modules
 let homeRenderer = null;
+let calendarRenderer = null;
 let diaryRenderer = null;
 let coursesRenderer = null;
 let profileRenderer = null;
+
+const TAB_ROUTES = {
+  tabHome: 'today',
+  tabCalendar: 'calendar',
+  tabCourses: 'academy',
+  tabDiary: 'diary',
+  tabProfile: 'profile',
+  tabChat: 'coach',
+};
 
 /** @type {boolean} */
 let renderScheduled = false;
@@ -22,8 +32,15 @@ let renderScheduled = false;
  * Switch active tab
  * @param {string} tabId
  */
-export function setActiveTab(tabId) {
+export function setActiveTab(tabId, options = {}) {
+  if (!document.getElementById(tabId)) tabId = 'tabHome';
   state.ui.activeTab = tabId;
+  localStorage.setItem('dc_active_tab', tabId);
+
+  if (!options.skipHistory) {
+    const route = TAB_ROUTES[tabId] || 'today';
+    history.replaceState(null, '', `${location.pathname}${location.search}#${route}`);
+  }
 
   document.querySelectorAll('.tab').forEach(panel => {
     panel.classList.toggle('active', panel.id === tabId);
@@ -38,11 +55,20 @@ export function setActiveTab(tabId) {
   const nav = document.querySelector('.nav');
   const main = document.querySelector('.main');
 
-  // Normal mode — chat is now a regular tab with navbar visible
+  // Chat tab — remove main padding so chat-header sits right below .header
+  if (main) {
+    if (tabId === 'tabChat') {
+      main.style.paddingTop = '0';
+      main.style.paddingBottom = '0';
+    } else {
+      main.style.paddingTop = '';
+      main.style.paddingBottom = '';
+    }
+  }
+
   if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile' || tabId === 'tabChat');
   if (header) header.classList.remove('hidden');
   if (nav) nav.classList.remove('hidden');
-  if (main) main.style.paddingBottom = '';
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -86,6 +112,13 @@ async function renderActiveTab() {
           diaryRenderer = await import('./renders/diary.js');
         }
         diaryRenderer.render();
+        break;
+
+      case 'tabCalendar':
+        if (!calendarRenderer) {
+          calendarRenderer = await import('./renders/calendar.js');
+        }
+        calendarRenderer.render();
         break;
 
       case 'tabCourses':
@@ -168,8 +201,14 @@ export function toast(msg, type = '', undoCallback = null) {
   el.className = `toast ${type} ${undoCallback ? 'undo' : ''}`;
 
   if (undoCallback) {
-    el.innerHTML = `<span>${msg}</span><button class="undo-btn" type="button">Скасувати</button>`;
-    el.querySelector('.undo-btn').addEventListener('click', () => {
+    const text = document.createElement('span');
+    text.textContent = msg;
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'undo-btn';
+    undoBtn.type = 'button';
+    undoBtn.textContent = 'Скасувати';
+    el.append(text, undoBtn);
+    undoBtn.addEventListener('click', () => {
       undoCallback();
       el.classList.remove('show');
       setTimeout(() => el.remove(), 300);
@@ -202,7 +241,7 @@ export function hideLoading() {
 
 // ===== SUBSCRIBE TO STATE =====
 
-subscribe(['events', 'pet', 'gamification'], () => {
+subscribe(['events', 'pet', 'calendar', 'gamification'], () => {
   scheduleRender();
 });
 
@@ -216,3 +255,13 @@ subscribe('ui.theme', () => {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
 });
+
+export function resolveTabFromRoute() {
+  const route = location.hash.replace('#', '');
+  const byRoute = Object.entries(TAB_ROUTES).find(([, value]) => value === route)?.[0];
+  if (byRoute && document.getElementById(byRoute)) return byRoute;
+
+  const saved = localStorage.getItem('dc_active_tab');
+  if (saved && document.getElementById(saved)) return saved;
+  return 'tabHome';
+}

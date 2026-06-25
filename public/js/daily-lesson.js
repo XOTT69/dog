@@ -3,7 +3,7 @@
  */
 
 import { state, STORAGE_KEYS } from './state.js';
-import { getAgeInWeeks, weekLabel, todayKey, safeJsonParse } from './utils.js';
+import { escapeHtml, getAgeInWeeks, weekLabel, todayKey, safeJsonParse } from './utils.js';
 import { fetchAIResponse } from './ai.js';
 
 /**
@@ -124,19 +124,19 @@ export async function renderDailyLesson(container) {
       <div class="daily-lesson-header">
         <span class="daily-lesson-icon">🎯</span>
         <div>
-          <strong>${lesson.title}</strong>
-          <div class="text-muted">${lesson.description}</div>
+          <strong>${escapeHtml(lesson.title)}</strong>
+          <div class="text-muted">${escapeHtml(lesson.description)}</div>
         </div>
       </div>
       <div class="daily-lesson-steps">
         ${lesson.steps.map((step, i) => `
           <div class="daily-lesson-step">
             <span class="daily-lesson-num">${i + 1}</span>
-            <span>${step}</span>
+            <span>${escapeHtml(step)}</span>
           </div>
         `).join('')}
       </div>
-      ${lesson.tip ? `<div class="daily-lesson-tip">💡 ${lesson.tip}</div>` : ''}
+      ${lesson.tip ? `<div class="daily-lesson-tip">💡 ${escapeHtml(lesson.tip)}</div>` : ''}
     </div>
   `;
 }

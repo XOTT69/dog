@@ -1,24 +1,30 @@
 /**
- * @fileoverview Courses tab — AI chat, course grid, knowledge, social
+ * @fileoverview Academy tab — courses, training programs, knowledge and socialization
  */
 
 import { state, STORAGE_KEYS } from '../state.js';
-import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
+import { $, $$, escapeHtml, haptic } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
-import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
-import { setActiveTab, toast } from '../render.js';
+import { setActiveTab } from '../render.js';
 import { confirmDialog } from '../modal.js';
-import { getTrainingProgram, TRAINING_PROGRAMS, getTrainingProgress, toggleTrainingStep, getTrainingCompletionPercent, resetTrainingProgress } from '../training-programs.js';
+import {
+  getTrainingProgram,
+  TRAINING_PROGRAMS,
+  getTrainingProgress,
+  toggleTrainingStep,
+  getTrainingCompletionPercent,
+  resetTrainingProgress,
+} from '../training-programs.js';
 
-/** @type {boolean} */
-let coursesRendered = false;
 let knowledgeRendered = false;
 let socialRendered = false;
+
+const HIDDEN_PROBLEMS_KEY = 'dc_hidden_problems';
+const PENDING_PROMPT_KEY = 'dc_pending_ai_prompt';
 
 export async function render() {
   renderAcademyProgress();
   renderProblemButtons();
-  renderAIChat();
   await renderCourseGrid();
   await renderKnowledgeGrid();
   await renderSocialGrid();
@@ -29,111 +35,102 @@ function renderAcademyProgress() {
   const el = $('academyProgressPct');
   if (!el) return;
 
-  const keys = Object.keys(TRAINING_PROGRAMS);
-  const values = keys.map(k => getTrainingCompletionPercent(k)).filter(v => v > 0);
-  const avg = values.length ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : 0;
-  el.textContent = `${avg}%`;
-}
+  const values = Object.keys(TRAINING_PROGRAMS)
+    .map((key) => getTrainingCompletionPercent(key))
+    .filter((value) => value > 0);
+  const average = values.length
+    ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+    : 0;
 
-// ===== HIDDEN PROBLEMS (can hide irrelevant buttons) =====
-const HIDDEN_PROBLEMS_KEY = 'dc_hidden_problems';
+  el.textContent = `${average}%`;
+}
 
 function getHiddenProblems() {
   try {
     return JSON.parse(localStorage.getItem(HIDDEN_PROBLEMS_KEY) || '[]');
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function toggleHiddenProblem(problemId) {
   const hidden = getHiddenProblems();
-  const idx = hidden.indexOf(problemId);
-  if (idx === -1) {
-    hidden.push(problemId);
-  } else {
-    hidden.splice(idx, 1);
-  }
-  localStorage.setItem(HIDDEN_PROBLEMS_KEY, JSON.stringify(hidden));
-  renderProblemButtons(); // Re-render
-}
+  const index = hidden.indexOf(problemId);
 
-// ===== PROBLEM BUTTONS (Training Programs) =====
+  if (index === -1) hidden.push(problemId);
+  else hidden.splice(index, 1);
+
+  localStorage.setItem(HIDDEN_PROBLEMS_KEY, JSON.stringify(hidden));
+  renderProblemButtons();
+}
 
 function renderProblemButtons() {
   const panel = $('trainingProgram');
   if (!panel) return;
+
   const hiddenProblems = getHiddenProblems();
-  let manageMode = panel.dataset.manageMode === 'true';
+  const manageMode = panel.dataset.manageMode === 'true';
 
-  $$('.problem-btn').forEach(btn => {
-    const problemId = btn.dataset.problem;
-    
-    // Apply hidden class
-    if (hiddenProblems.includes(problemId) && !manageMode) {
-      btn.classList.add('hidden-problem');
-    } else {
-      btn.classList.remove('hidden-problem');
-    }
+  $$('.problem-btn').forEach((button) => {
+    const problemId = button.dataset.problem;
+    button.classList.toggle('hidden-problem', hiddenProblems.includes(problemId) && !manageMode);
 
-    if (btn.dataset.boundAI) return;
-    btn.dataset.boundAI = 'true';
-    
-    btn.addEventListener('click', () => {
-      if (manageMode) {
-        // In manage mode — toggle hidden
+    if (button.dataset.boundAcademy === 'true') return;
+    button.dataset.boundAcademy = 'true';
+
+    button.addEventListener('click', () => {
+      if (panel.dataset.manageMode === 'true') {
         toggleHiddenProblem(problemId);
         return;
       }
+
       const program = getTrainingProgram(problemId);
       if (!program) return;
 
-      // Toggle selection
-      $$('.problem-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
+      $$('.problem-btn').forEach((item) => item.classList.remove('selected'));
+      button.classList.add('selected');
       haptic();
-
       renderTrainingDetail(program, panel);
     });
   });
 
-  // Add manage button if not exists
-  let manageBtn = $('manageProblemsBtn');
   const problemCard = document.querySelector('.problem-grid')?.parentElement;
-  
-  if (problemCard && !manageBtn) {
-    const footer = document.createElement('div');
-    footer.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem';
-    footer.innerHTML = `
-      <button class="btn btn-ghost btn-sm full-width" id="manageProblemsBtn" type="button">
-        ⚙️ Керувати списком
-      </button>
-    `;
-    problemCard.appendChild(footer);
-    footer.querySelector('#manageProblemsBtn').addEventListener('click', () => {
-      panel.dataset.manageMode = panel.dataset.manageMode !== 'true' ? 'true' : '';
-      const btn = footer.querySelector('#manageProblemsBtn');
-      if (panel.dataset.manageMode === 'true') {
-        btn.textContent = '✅ Готово';
-        btn.classList.add('btn-primary');
-        btn.classList.remove('btn-ghost');
-      } else {
-        btn.textContent = '⚙️ Керувати списком';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-ghost');
-      }
-      renderProblemButtons();
-    });
-  }
+  if (!problemCard || $('manageProblemsBtn')) return;
+
+  const footer = document.createElement('div');
+  footer.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem';
+  footer.innerHTML = `
+    <button class="btn btn-ghost btn-sm full-width" id="manageProblemsBtn" type="button">
+      ⚙️ Керувати списком
+    </button>
+  `;
+  problemCard.appendChild(footer);
+
+  footer.querySelector('#manageProblemsBtn').addEventListener('click', () => {
+    panel.dataset.manageMode = panel.dataset.manageMode !== 'true' ? 'true' : '';
+    const button = footer.querySelector('#manageProblemsBtn');
+
+    if (panel.dataset.manageMode === 'true') {
+      button.textContent = '✅ Готово';
+      button.classList.add('btn-primary');
+      button.classList.remove('btn-ghost');
+    } else {
+      button.textContent = '⚙️ Керувати списком';
+      button.classList.remove('btn-primary');
+      button.classList.add('btn-ghost');
+    }
+
+    renderProblemButtons();
+  });
 }
 
 function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
-
-  // Get problemId from TRAINING_PROGRAMS
-  const problemId = Object.keys(TRAINING_PROGRAMS).find(k => TRAINING_PROGRAMS[k] === program) || '';
+  const problemId = Object.keys(TRAINING_PROGRAMS).find((key) => TRAINING_PROGRAMS[key] === program) || '';
   const progress = problemId ? getTrainingProgress(problemId) : { completedSteps: [] };
   const completedSet = new Set(progress.completedSteps);
-  const pct = problemId ? getTrainingCompletionPercent(problemId) : 0;
+  const percent = problemId ? getTrainingCompletionPercent(problemId) : 0;
 
   panel.classList.remove('hidden');
   panel.innerHTML = `
@@ -147,57 +144,54 @@ function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
-      ${pct > 0 ? `
+      ${percent > 0 ? `
         <div class="training-progress">
           <div class="training-progress-bar">
-            <div class="training-progress-fill" style="width:${pct}%"></div>
+            <div class="training-progress-fill" style="width:${percent}%"></div>
           </div>
-          <div class="training-progress-text">${pct}% виконано ${progress.completedAt ? '🎉' : ''}</div>
+          <div class="training-progress-text">${percent}% виконано ${progress.completedAt ? '🎉' : ''}</div>
         </div>
       ` : ''}
 
       <div class="training-steps" data-problem-id="${escapeHtml(problemId)}">
-        ${program.steps.map((step, i) => {
-          const done = completedSet.has(i);
+        ${program.steps.map((step, index) => {
+          const done = completedSet.has(index);
           return `
-          <div class="training-step ${done ? 'done' : ''}" data-step-index="${i}">
-            <div class="training-step-num" style="background:${done ? 'var(--success)' : 'var(--accent-gradient)'}">${done ? '✓' : (i + 1)}</div>
-            <div class="training-step-content">
-              <div class="training-step-title" style="${done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(step.title)}</div>
-              <div class="training-step-desc">${escapeHtml(step.desc)}</div>
+            <div class="training-step ${done ? 'done' : ''}" data-step-index="${index}">
+              <div class="training-step-num" style="background:${done ? 'var(--success)' : 'var(--accent-gradient)'}">${done ? '✓' : index + 1}</div>
+              <div class="training-step-content">
+                <div class="training-step-title" style="${done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(step.title)}</div>
+                <div class="training-step-desc">${escapeHtml(step.desc)}</div>
+              </div>
+              <div style="flex-shrink:0;padding-left:0.5rem">
+                <input type="checkbox" ${done ? 'checked' : ''} data-training-step="${problemId}:${index}" style="width:18px;height:18px;accent-color:var(--success)">
+              </div>
             </div>
-            <div style="flex-shrink:0;padding-left:0.5rem">
-              <input type="checkbox" ${done ? 'checked' : ''} data-training-step="${problemId}:${i}" style="width:18px;height:18px;accent-color:var(--success)">
-            </div>
-          </div>
-        `}).join('')}
+          `;
+        }).join('')}
       </div>
 
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
       <div style="display:flex;gap:0.5rem;margin-top:1rem">
-        <button class="btn btn-primary full-width" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+        <button class="btn btn-primary full-width" data-ask-chat="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
           🤖 Запитати AI
         </button>
-        ${pct > 0 ? `<button class="btn btn-ghost" id="resetTrainingProgressBtn" type="button" style="flex-shrink:0">↺</button>` : ''}
+        ${percent > 0 ? '<button class="btn btn-ghost" id="resetTrainingProgressBtn" type="button" style="flex-shrink:0">↺</button>' : ''}
       </div>
     </div>
   `;
 
-  // Bind training step checkboxes
-  panel.querySelectorAll('[data-training-step]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const [pid, idxStr] = cb.dataset.trainingStep.split(':');
-      const idx = parseInt(idxStr);
-      toggleTrainingStep(pid, idx);
-      // Re-render the detail with updated progress
+  panel.querySelectorAll('[data-training-step]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const [id, index] = checkbox.dataset.trainingStep.split(':');
+      toggleTrainingStep(id, parseInt(index, 10));
       renderTrainingDetail(program, panel);
       renderAcademyProgress();
     });
   });
 
-  // Reset progress
   panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', async () => {
     const ok = await confirmDialog({
       title: 'Скинути прогрес?',
@@ -205,6 +199,7 @@ function renderTrainingDetail(program, panel) {
       confirmLabel: 'Скинути',
       danger: true,
     });
+
     if (ok) {
       resetTrainingProgress(problemId);
       renderTrainingDetail(program, panel);
@@ -212,244 +207,23 @@ function renderTrainingDetail(program, panel) {
     }
   });
 
-  // Bind AI button
-  panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
-    const prompt = e.currentTarget.dataset.aiPrompt;
-    if (prompt) {
-      setActiveTab('tabChat');
-      setTimeout(() => handleAISubmit(prompt), 300);
-    }
+  panel.querySelector('[data-ask-chat]')?.addEventListener('click', (event) => {
+    sendPromptToChat(event.currentTarget.dataset.askChat);
   });
 
-  // Scroll to panel
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ===== AI CHAT =====
+function sendPromptToChat(prompt) {
+  const cleanPrompt = prompt?.trim();
+  if (!cleanPrompt) return;
 
-function renderAIChat() {
-  const form = $('aiForm');
-  if (!form || form.dataset.bound) return;
-  form.dataset.bound = 'true';
-
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = $('aiInput');
-    const msg = input?.value.trim();
-    if (!msg) return;
-    input.value = '';
-    input.style.height = 'auto';
-    handleAISubmit(msg);
-  });
-
-  // Quick prompts
-  $$('[data-ai-prompt]').forEach(btn => {
-    if (btn.dataset.aiBound) return;
-    btn.dataset.aiBound = 'true';
-    btn.addEventListener('click', () => {
-      handleAISubmit(btn.dataset.aiPrompt);
-      haptic();
-    });
-  });
-
-  // Clear chat
-  $('clearChatBtn')?.addEventListener('click', () => {
-    const chat = $('aiChat');
-    if (chat) chat.innerHTML = '';
-    clearChatHistory();
-    toast('Чат очищено 🧹', 'success');
-  });
-
-  // Voice input
-  initVoiceInput();
-
-  // Auto-resize textarea
-  const aiInput = $('aiInput');
-  if (aiInput) {
-    aiInput.addEventListener('input', () => {
-      aiInput.style.height = 'auto';
-      aiInput.style.height = `${Math.min(aiInput.scrollHeight, 100)}px`;
-    });
-    aiInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        form.dispatchEvent(new Event('submit'));
-      }
-    });
-  }
+  sessionStorage.setItem(PENDING_PROMPT_KEY, cleanPrompt);
+  setActiveTab('tabChat');
+  window.dispatchEvent(new CustomEvent('dogcoach:chat-prompt', {
+    detail: { prompt: cleanPrompt },
+  }));
 }
-
-async function handleAISubmit(prompt) {
-  if (!prompt.trim()) return;
-
-  // Auto-personalize prompt with dog data
-  const pet = state.pet.data;
-  const petName = pet?.name?.trim();
-  const breed = pet?.breed?.trim();
-  const age = pet?.birthDate ? getAgeInWeeks(pet.birthDate) : null;
-  const sex = pet?.sex?.trim();
-  const issues = pet?.issues?.trim();
-
-  let personalizedPrompt = prompt;
-  if (petName && !prompt.includes(petName)) {
-    // Replace generic "собака" with dog's name
-    personalizedPrompt = personalizedPrompt.replace(/собака/gi, petName);
-    personalizedPrompt = personalizedPrompt.replace(/Собака/gi, petName);
-  }
-
-  // Prepend context for AI
-  const contextParts = [];
-  if (petName) contextParts.push(`Собака: ${petName}`);
-  if (breed) contextParts.push(`Порода: ${breed}`);
-  if (age) contextParts.push(`Вік: ${age} тижнів`);
-  if (sex) contextParts.push(`Стать: ${sex}`);
-  if (issues) contextParts.push(`Проблеми: ${issues}`);
-
-  let fullPrompt = personalizedPrompt;
-  if (contextParts.length > 0) {
-    fullPrompt = `[${contextParts.join(', ')}] ${personalizedPrompt}`;
-  }
-
-  addChatMessage(prompt, 'user');
-  trackAIUsage();
-
-  // Show a streaming message element that we'll update in real-time
-  const chat = $('aiChat');
-  if (!chat) return;
-
-  const msgEl = document.createElement('div');
-  msgEl.className = 'ai-msg assistant streaming';
-  msgEl.textContent = '';
-  chat.appendChild(msgEl);
-  chat.scrollTop = chat.scrollHeight;
-
-  try {
-    await fetchAIResponse(fullPrompt, (chunk) => {
-      msgEl.textContent += chunk;
-      chat.scrollTop = chat.scrollHeight;
-    });
-    msgEl.classList.remove('streaming');
-
-    // Add share button to the response
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'msg-share-btn';
-    shareBtn.type = 'button';
-    shareBtn.textContent = '📤 Поділитися';
-    shareBtn.addEventListener('click', () => shareMessage(msgEl.textContent));
-    msgEl.appendChild(shareBtn);
-  } catch {
-    msgEl.textContent = 'Помилка. Спробуйте ще раз 🔄';
-    msgEl.classList.remove('streaming');
-  }
-}
-
-function addChatMessage(text, type) {
-  const chat = $('aiChat');
-  if (!chat) return;
-
-  const msg = document.createElement('div');
-  msg.className = `ai-msg ${type}`;
-  msg.textContent = text;
-
-  // Add share button to AI responses
-  if (type === 'assistant') {
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'msg-share-btn';
-    shareBtn.type = 'button';
-    shareBtn.textContent = '📤 Поділитися';
-    shareBtn.addEventListener('click', () => shareMessage(text));
-    msg.appendChild(shareBtn);
-  }
-
-  chat.appendChild(msg);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-async function shareMessage(text) {
-  const pet = state.pet.data;
-  const petName = pet?.name || 'Мій песик';
-  const shareText = `🐕 ${petName} — порада від Dog Coach AI:\n\n${text}\n\n— Dog Coach AI`;
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: shareText, title: 'Dog Coach AI' });
-      haptic();
-    } catch (e) {
-      // User cancelled
-    }
-  } else {
-    // Fallback: copy to clipboard
-    try {
-      await navigator.clipboard.writeText(shareText);
-      toast('Скопійовано в буфер обміну 📋', 'success');
-    } catch {
-      toast('Не вдалося скопіювати', 'error');
-    }
-  }
-}
-
-function showTyping() {
-  const chat = $('aiChat');
-  if (!chat) return;
-  const el = document.createElement('div');
-  el.className = 'ai-msg loading';
-  el.id = 'typingIndicator';
-  el.textContent = 'Думаю';
-  chat.appendChild(el);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-function removeTyping() {
-  $('typingIndicator')?.remove();
-}
-
-// ===== VOICE =====
-
-function initVoiceInput() {
-  const btn = $('voiceBtn');
-  if (!btn) return;
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { btn.style.display = 'none'; return; }
-
-  const rec = new SR();
-  rec.lang = 'uk-UA';
-  rec.continuous = false;
-  rec.interimResults = false;
-  let isRecording = false;
-
-  btn.addEventListener('click', () => {
-    if (isRecording) {
-      rec.stop();
-      btn.classList.remove('recording');
-      isRecording = false;
-    } else {
-      rec.start();
-      btn.classList.add('recording');
-      isRecording = true;
-      haptic();
-    }
-  });
-
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    const input = $('aiInput');
-    if (input) {
-      input.value = text;
-      input.style.height = 'auto';
-      input.style.height = `${Math.min(input.scrollHeight, 100)}px`;
-    }
-    btn.classList.remove('recording');
-    isRecording = false;
-  };
-
-  rec.onerror = rec.onend = () => {
-    btn.classList.remove('recording');
-    isRecording = false;
-  };
-}
-
-// ===== COURSES GRID =====
 
 async function renderCourseGrid() {
   const grid = $('courseGrid');
@@ -460,37 +234,31 @@ async function renderCourseGrid() {
     const courses = await getCourses();
     const filter = state.ui.courseFilter;
     const currentId = state.ui.currentCourseId;
+    const filtered = filter === 'all' ? courses : courses.filter((course) => course.level === filter);
 
-    const filtered = filter === 'all'
-      ? courses
-      : courses.filter(c => c.level === filter);
-
-    grid.innerHTML = filtered.map(c => {
-      const progress = getCourseProgress(c.id, c.checklist?.length || 0);
+    grid.innerHTML = filtered.map((course) => {
+      const progress = getCourseProgress(course.id, course.checklist?.length || 0);
       return `
-        <button type="button" class="course-btn ${c.id === currentId ? 'selected' : ''}" data-course-id="${c.id}">
-          <span class="c-badge">${c.badge}</span>
-          <strong>${c.title}</strong>
-          <div class="c-meta">${c.description}</div>
+        <button type="button" class="course-btn ${course.id === currentId ? 'selected' : ''}" data-course-id="${course.id}">
+          <span class="c-badge">${course.badge}</span>
+          <strong>${course.title}</strong>
+          <div class="c-meta">${course.description}</div>
           ${progress > 0 ? `<div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>` : ''}
-        </button>`;
+        </button>
+      `;
     }).join('');
 
-    // Bind course selection
-    grid.querySelectorAll('[data-course-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.ui.currentCourseId = btn.dataset.courseId;
+    grid.querySelectorAll('[data-course-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.ui.currentCourseId = button.dataset.courseId;
         haptic();
-        renderCourseGrid(); // Re-render with new selection
+        renderCourseGrid();
       });
     });
 
-    // Render selected course detail
-    const course = courses.find(c => c.id === currentId) || filtered[0] || courses[0];
-    if (course) {
-      renderCourseDetail(course, viewer);
-    }
-  } catch (e) {
+    const course = courses.find((item) => item.id === currentId) || filtered[0] || courses[0];
+    if (course) renderCourseDetail(course, viewer);
+  } catch {
     grid.innerHTML = '<p class="text-muted">Завантаження курсів...</p>';
   }
 }
@@ -504,25 +272,26 @@ function renderCourseDetail(course, container) {
       <h3>${course.title}</h3>
       <p style="color:var(--text-secondary);margin-bottom:1rem">${course.description}</p>
       <h4>Кроки</h4>
-      <ul>${course.steps.map(s => `<li>${s}</li>`).join('')}</ul>
+      <ul>${course.steps.map((step) => `<li>${step}</li>`).join('')}</ul>
       <h4>Помилки</h4>
-      <ul class="mistakes">${course.mistakes.map(s => `<li>${s}</li>`).join('')}</ul>
+      <ul class="mistakes">${course.mistakes.map((mistake) => `<li>${mistake}</li>`).join('')}</ul>
       <h4>Чекліст</h4>
-      <ul class="checks">${course.checklist.map((s, i) =>
-        `<li><label class="daily-item">
-          <input type="checkbox" data-course-check="${course.id}:${i}" ${done[i] ? 'checked' : ''}>
-          <span>${s}</span>
-        </label></li>`
-      ).join('')}</ul>
-    </div>`;
+      <ul class="checks">${course.checklist.map((item, index) => `
+        <li><label class="daily-item">
+          <input type="checkbox" data-course-check="${course.id}:${index}" ${done[index] ? 'checked' : ''}>
+          <span>${item}</span>
+        </label></li>
+      `).join('')}</ul>
+    </div>
+  `;
 
-  container.querySelectorAll('[data-course-check]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const [courseId, idx] = cb.dataset.courseCheck.split(':');
-      const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-      if (!p[courseId]) p[courseId] = {};
-      p[courseId][idx] = cb.checked;
-      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(p));
+  container.querySelectorAll('[data-course-check]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const [courseId, index] = checkbox.dataset.courseCheck.split(':');
+      const savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+      if (!savedProgress[courseId]) savedProgress[courseId] = {};
+      savedProgress[courseId][index] = checkbox.checked;
+      localStorage.setItem(STORAGE_KEYS.courseProgress, JSON.stringify(savedProgress));
       haptic();
     });
   });
@@ -530,12 +299,10 @@ function renderCourseDetail(course, container) {
 
 function getCourseProgress(courseId, totalChecks) {
   if (totalChecks === 0) return 0;
-  const p = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
-  const done = p[courseId] || {};
-  return Math.round(Object.values(done).filter(Boolean).length / totalChecks * 100);
+  const progress = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+  const done = progress[courseId] || {};
+  return Math.round((Object.values(done).filter(Boolean).length / totalChecks) * 100);
 }
-
-// ===== KNOWLEDGE =====
 
 async function renderKnowledgeGrid() {
   const grid = $('knowledgeGrid');
@@ -543,11 +310,11 @@ async function renderKnowledgeGrid() {
 
   try {
     const knowledge = await getKnowledge();
-    grid.innerHTML = knowledge.map(k => `
+    grid.innerHTML = knowledge.map((item) => `
       <div class="k-card">
-        <strong>${k.title}</strong>
-        <p>${k.text}</p>
-        <span class="k-tag">${k.tag}</span>
+        <strong>${item.title}</strong>
+        <p>${item.text}</p>
+        <span class="k-tag">${item.tag}</span>
       </div>
     `).join('');
     knowledgeRendered = true;
@@ -555,8 +322,6 @@ async function renderKnowledgeGrid() {
     grid.innerHTML = '<p class="text-muted">Завантаження...</p>';
   }
 }
-
-// ===== SOCIAL =====
 
 async function renderSocialGrid() {
   const grid = $('socialGrid');
@@ -566,27 +331,29 @@ async function renderSocialGrid() {
     const socialItems = await getSocial();
     const done = JSON.parse(localStorage.getItem(STORAGE_KEYS.social) || '{}');
     const totalDone = Object.values(done).filter(Boolean).length;
-    const totalItems = socialItems.reduce((s, g) => s + g.items.length, 0);
+    const totalItems = socialItems.reduce((sum, group) => sum + group.items.length, 0);
 
     grid.innerHTML = `<div style="margin-bottom:0.75rem"><span class="badge">${totalDone}/${totalItems} ✓</span></div>` +
-      socialItems.map(group => `
+      socialItems.map((group) => `
         <div class="social-group">
           <h5 class="social-group-title">${group.category}</h5>
-          ${group.items.map(item => {
+          ${group.items.map((item) => {
             const key = `${group.category}:${item}`;
-            return `<label class="social-item">
-              <input type="checkbox" data-social-key="${escapeHtml(key)}" ${done[key] ? 'checked' : ''}>
-              <span>${item}</span>
-            </label>`;
+            return `
+              <label class="social-item">
+                <input type="checkbox" data-social-key="${escapeHtml(key)}" ${done[key] ? 'checked' : ''}>
+                <span>${item}</span>
+              </label>
+            `;
           }).join('')}
         </div>
       `).join('');
 
-    grid.querySelectorAll('[data-social-key]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const d = JSON.parse(localStorage.getItem(STORAGE_KEYS.social) || '{}');
-        d[cb.dataset.socialKey] = cb.checked;
-        localStorage.setItem(STORAGE_KEYS.social, JSON.stringify(d));
+    grid.querySelectorAll('[data-social-key]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.social) || '{}');
+        saved[checkbox.dataset.socialKey] = checkbox.checked;
+        localStorage.setItem(STORAGE_KEYS.social, JSON.stringify(saved));
         haptic();
       });
     });
@@ -597,11 +364,9 @@ async function renderSocialGrid() {
   }
 }
 
-// ===== TOILET GUIDE =====
-
 function renderToiletGuide() {
   const grid = $('toiletGuide');
-  if (!grid || grid.dataset.rendered) return;
+  if (!grid || grid.dataset.rendered === 'true') return;
   grid.dataset.rendered = 'true';
 
   const guide = [
@@ -614,7 +379,7 @@ function renderToiletGuide() {
     { title: '7. Менше простору 📦', text: 'Собака не ходить де спить/їсть. Манеж!' },
   ];
 
-  grid.innerHTML = guide.map(s => `
-    <div class="k-card"><strong>${s.title}</strong><p>${s.text}</p></div>
+  grid.innerHTML = guide.map((step) => `
+    <div class="k-card"><strong>${step.title}</strong><p>${step.text}</p></div>
   `).join('');
 }

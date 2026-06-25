@@ -32,7 +32,9 @@ function applyTabVisibility(tabId) {
     panel.toggleAttribute('hidden', !active);
     panel.setAttribute('aria-hidden', String(!active));
 
-    if ('inert' in panel) panel.inert = !active;
+    if ('inert' in panel) {
+      panel.inert = !active;
+    }
 
     panel.style.display = active
       ? (panel.id === 'tabChat' ? 'flex' : 'block')
@@ -41,7 +43,9 @@ function applyTabVisibility(tabId) {
 }
 
 export function setActiveTab(tabId, options = {}) {
-  if (!document.getElementById(tabId)) tabId = 'tabHome';
+  if (!document.getElementById(tabId)) {
+    tabId = 'tabHome';
+  }
 
   state.ui.activeTab = tabId;
   localStorage.setItem('dc_active_tab', tabId);
@@ -66,9 +70,17 @@ export function setActiveTab(tabId, options = {}) {
     main.classList.toggle('main-chat', tabId === 'tabChat');
   }
 
-  if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile' || tabId === 'tabChat');
-  if (header) header.classList.remove('hidden');
-  if (nav) nav.classList.remove('hidden');
+  if (fab) {
+    fab.classList.toggle('hidden', tabId === 'tabProfile' || tabId === 'tabChat');
+  }
+
+  if (header) {
+    header.classList.remove('hidden');
+  }
+
+  if (nav) {
+    nav.classList.remove('hidden');
+  }
 
   window.scrollTo({ top: 0, behavior: 'auto' });
 
@@ -76,7 +88,9 @@ export function setActiveTab(tabId, options = {}) {
 }
 
 export function scheduleRender() {
-  if (renderScheduled) return;
+  if (renderScheduled) {
+    return;
+  }
 
   renderScheduled = true;
 
@@ -95,32 +109,44 @@ async function renderActiveTab() {
   try {
     switch (tab) {
       case 'tabHome':
-        if (!homeRenderer) homeRenderer = await import('./renders/home.js');
+        if (!homeRenderer) {
+          homeRenderer = await import('./renders/home.js');
+        }
         homeRenderer.render();
         break;
 
       case 'tabDiary':
-        if (!diaryRenderer) diaryRenderer = await import('./renders/diary.js');
+        if (!diaryRenderer) {
+          diaryRenderer = await import('./renders/diary.js');
+        }
         diaryRenderer.render();
         break;
 
       case 'tabCalendar':
-        if (!calendarRenderer) calendarRenderer = await import('./renders/calendar.js');
+        if (!calendarRenderer) {
+          calendarRenderer = await import('./renders/calendar.js');
+        }
         calendarRenderer.render();
         break;
 
       case 'tabCourses':
-        if (!coursesRenderer) coursesRenderer = await import('./renders/courses.js');
+        if (!coursesRenderer) {
+          coursesRenderer = await import('./renders/courses.js');
+        }
         coursesRenderer.render();
         break;
 
       case 'tabChat':
-        if (!coursesRenderer) coursesRenderer = await import('./renders/courses.js');
+        if (!coursesRenderer) {
+          coursesRenderer = await import('./renders/courses.js');
+        }
         coursesRenderer.render();
         break;
 
       case 'tabProfile':
-        if (!profileRenderer) profileRenderer = await import('./renders/profile.js');
+        if (!profileRenderer) {
+          profileRenderer = await import('./renders/profile.js');
+        }
         profileRenderer.render();
         break;
 
@@ -148,9 +174,17 @@ function renderHeader() {
   const weeks = getAgeInWeeks(pet?.birthDate);
   const ageStr = weekLabel(weeks);
 
-  if (nameEl) nameEl.textContent = petName;
-  if (subEl) subEl.textContent = `${ageStr} · ${pet?.breed || 'Песик'}`;
-  if (profileName) profileName.textContent = petName;
+  if (nameEl) {
+    nameEl.textContent = petName;
+  }
+
+  if (subEl) {
+    subEl.textContent = `${ageStr} · ${pet?.breed || 'Песик'}`;
+  }
+
+  if (profileName) {
+    profileName.textContent = petName;
+  }
 
   if (profileMeta) {
     profileMeta.textContent = [pet?.breed || '', ageStr, pet?.sex || '']
@@ -180,7 +214,9 @@ function renderHeader() {
 
 export function toast(msg, type = '', undoCallback = null) {
   const box = $('toastContainer');
-  if (!box) return;
+  if (!box) {
+    return;
+  }
 
   const el = document.createElement('div');
   el.className = `toast ${type} ${undoCallback ? 'undo' : ''}`;
@@ -218,12 +254,16 @@ export function toast(msg, type = '', undoCallback = null) {
 
 export function showLoading() {
   const el = $('loadingOverlay');
-  if (el) el.classList.remove('hidden');
+  if (el) {
+    el.classList.remove('hidden');
+  }
 }
 
 export function hideLoading() {
   const el = $('loadingOverlay');
-  if (el) el.classList.add('hidden');
+  if (el) {
+    el.classList.add('hidden');
+  }
 }
 
 subscribe(['events', 'pet', 'calendar', 'gamification'], () => {
@@ -239,17 +279,23 @@ subscribe('ui.theme', () => {
   document.documentElement.setAttribute('data-theme', theme);
 
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
+  if (meta) {
+    meta.content = theme === 'dark' ? '#0f0f1a' : '#0ea5e9';
+  }
 });
 
 export function resolveTabFromRoute() {
   const route = location.hash.replace('#', '');
   const byRoute = Object.entries(TAB_ROUTES).find(([, value]) => value === route)?.[0];
 
-  if (byRoute && document.getElementById(byRoute)) return byRoute;
+  if (byRoute && document.getElementById(byRoute)) {
+    return byRoute;
+  }
 
   const saved = localStorage.getItem('dc_active_tab');
-  if (saved && document.getElementById(saved)) return saved;
+  if (saved && document.getElementById(saved)) {
+    return saved;
+  }
 
   return 'tabHome';
 }

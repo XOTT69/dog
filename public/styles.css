@@ -276,7 +276,8 @@ input:focus, select:focus, textarea:focus {
 .chat-header-name { font-weight: 700; color: var(--text); }
 .chat-header-status { font-size: 0.65rem; color: var(--success); font-weight: 600; }
 .chat-container { display: flex; flex-direction: column; height: calc(100dvh - var(--header-h) - var(--nav-h) - 56px - env(safe-area-inset-bottom,0px)); min-height: 0; }
-#tabChat { display: flex; flex-direction: column; height: 100%; }
+#tabChat { display: none; flex-direction: column; height: 100%; }
+#tabChat.active { display: flex; }
 .chat-box { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.5rem 1rem; }
 .ai-msg { max-width: 88%; padding: 0.6rem 0.85rem; border-radius: var(--radius); font-size: 0.84rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; animation: msgIn 200ms var(--ease); }
 @keyframes msgIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }

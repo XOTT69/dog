@@ -21,11 +21,20 @@ let launchActionHandled = false;
 // ===== BOOT =====
 
 function boot() {
+  if (normalizeLocalhostForFirebaseAuth()) return;
   applyTheme();
   bindGlobalEvents();
   setActiveTab(resolveTabFromRoute(), { skipHistory: true });
   initAuthFlow();
   updateOnlineStatus();
+}
+
+function normalizeLocalhostForFirebaseAuth() {
+  if (window.location.hostname !== '127.0.0.1') return false;
+  const target = new URL(window.location.href);
+  target.hostname = 'localhost';
+  window.location.replace(target.toString());
+  return true;
 }
 
 // ===== AUTH FLOW =====
@@ -293,7 +302,12 @@ function bindGlobalEvents() {
     try {
       await loginGoogle();
     } catch (e) {
-      toast(e.message || 'Помилка входу', 'error');
+      const authMessages = {
+        'auth/unauthorized-domain': 'Додайте цей домен у Firebase Auth → Authorized domains',
+        'auth/popup-closed-by-user': 'Вхід скасовано',
+        'auth/network-request-failed': 'Немає зʼєднання з Google/Firebase',
+      };
+      toast(authMessages[e.code] || e.message || 'Помилка входу', 'error');
     }
     hideLoading();
   });

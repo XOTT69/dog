@@ -128,6 +128,13 @@ async function renderActiveTab() {
         coursesRenderer.render();
         break;
 
+      case 'tabChat':
+        if (!coursesRenderer) {
+          coursesRenderer = await import('./renders/courses.js');
+        }
+        coursesRenderer.render();
+        break;
+
       case 'tabProfile':
         if (!profileRenderer) {
           profileRenderer = await import('./renders/profile.js');

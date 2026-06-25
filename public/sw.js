@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'dogcoach-v4';
+const CACHE_VERSION = 'dogcoach-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

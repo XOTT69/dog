@@ -23,3 +23,42 @@ git push -u origin main
 5. Deploy.
 
 Після першого деплою також задеплой Firestore rules з папки `firebase/`.
+
+## Google login / redirect_uri_mismatch
+
+Якщо Google показує `Error 400: redirect_uri_mismatch`, це не помилка UI. Треба додати домени й redirect URI у Firebase/Google Console.
+
+### Firebase Console
+
+Authentication → Settings → Authorized domains:
+
+- `dogs-55f5e.firebaseapp.com`
+- `dogs-55f5e.web.app`
+- домен Vercel без `https://`, наприклад `your-app.vercel.app`
+- кастомний домен без `https://`, якщо він є
+- `localhost` для локального тесту
+
+### Google Cloud Console
+
+APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client.
+
+Authorized redirect URIs:
+
+- `https://dogs-55f5e.firebaseapp.com/__/auth/handler`
+- `https://dogs-55f5e.web.app/__/auth/handler`
+- `https://your-app.vercel.app/__/auth/handler`, якщо застосунок відкривається з Vercel
+- `https://your-custom-domain.com/__/auth/handler`, якщо є кастомний домен
+
+Authorized JavaScript origins:
+
+- `https://your-app.vercel.app`
+- `https://your-custom-domain.com`
+- `http://localhost:4177` для локального тесту
+
+У коді `authDomain` автоматично стає поточним production-доменом, тому для Vercel/custom domain redirect URI саме такий:
+
+```text
+https://ДОМЕН-ДЕ-ВІДКРИВАЄТЬСЯ-ДОДАТОК/__/auth/handler
+```
+
+Після зміни OAuth налаштувань зачекай 2-5 хвилин, зроби hard refresh або відкрий застосунок у приватному вікні.

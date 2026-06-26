@@ -1,50 +1,17 @@
 /**
  * @fileoverview AI interaction — cynologist + veterinary advisor
- * With chat history persistence in localStorage
+ * Now with chat history and better error handling
  */
 
 import { state, STORAGE_KEYS } from './state.js';
 import { getIdToken } from './firebase.js';
 import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY, MAX_CHAT_HISTORY } from './constants.js';
-import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate, safeJsonParse } from './utils.js';
+import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate } from './utils.js';
 
-// ===== CHAT HISTORY with localStorage persistence =====
+// ===== CHAT HISTORY =====
 
 /** @type {Array<{role: string, content: string}>} */
 let chatHistory = [];
-
-/**
- * Load chat history from localStorage
- */
-function loadChatHistory() {
-  const saved = localStorage.getItem(STORAGE_KEYS.chatHistory);
-  if (saved) {
-    const parsed = safeJsonParse(saved, []);
-    if (Array.isArray(parsed)) {
-      chatHistory = parsed.slice(-MAX_CHAT_HISTORY);
-    }
-  }
-}
-
-/**
- * Save chat history to localStorage
- */
-function persistChatHistory() {
-  try {
-    localStorage.setItem(STORAGE_KEYS.chatHistory, JSON.stringify(chatHistory.slice(-MAX_CHAT_HISTORY)));
-  } catch {
-    // localStorage full — truncate
-    chatHistory = chatHistory.slice(-10);
-    try {
-      localStorage.setItem(STORAGE_KEYS.chatHistory, JSON.stringify(chatHistory));
-    } catch {
-      // Silently fail
-    }
-  }
-}
-
-// Load history on module init
-loadChatHistory();
 
 /**
  * Add message to chat history
@@ -53,7 +20,10 @@ loadChatHistory();
  */
 export function addChatHistory(role, content) {
   chatHistory.push({ role, content });
-  persistChatHistory();
+  // Keep only last N messages
+  if (chatHistory.length > MAX_CHAT_HISTORY) {
+    chatHistory = chatHistory.slice(-MAX_CHAT_HISTORY);
+  }
 }
 
 /**
@@ -69,7 +39,6 @@ export function getChatHistory() {
  */
 export function clearChatHistory() {
   chatHistory = [];
-  localStorage.removeItem(STORAGE_KEYS.chatHistory);
 }
 
 /**
@@ -123,11 +92,9 @@ function buildSystemPrompt() {
 
   return `Ти — професійний український кінолог І ветеринарний консультант з 15-річним досвідом.
 
-ВАЖЛИВО: Відповідай ТІЛЬКИ звичайним текстом. НЕ використовуй JSON, код, markdown розмітку (блоки коду, жирний текст, заголовки тощо). НЕ використовуй квадратні дужки для списків. Використовуй ємодзі для візуального розділення.
-
 РОЛІ:
 🎓 КІНОЛОГ — поведінка, тренування, виховання, соціалізація
-🏥 ВЕТЕРИНАР — здоров'я, симптоми, перша допомога, харчування, профілактика
+🏥 ВЕТЕРИНАР — здоров'я, симптоми, першадопомога, харчування, профілактика
 
 ОБОВ'ЯЗКОВІ ПРАВИЛА:
 1. Відповідай ТІЛЬКИ українською мовою, грамотно і чітко.
@@ -142,7 +109,7 @@ function buildSystemPrompt() {
 ПРАВИЛА ДЛЯ ЗДОРОВ'Я:
 - Опиши що робити вдома ЗАРАЗ.
 - Чітко вкажи КОЛИ потрібно до ветеринара ТЕРМІНОВО (⚠️).
-- Не став діагнозів, але описуй можливі причини.
+- Не ставдіагнозів, але описуй можливі причини.
 - Для медикаментів: "зверніться до ветеринара для дозування".
 - Ніколи не рекомендуй людські ліки (ібупрофен, парацетамол ТОКСИЧНІ).
 
@@ -155,12 +122,11 @@ ${petContext}`;
 }
 
 /**
- * Call AI API with chat history — streaming version
+ * Call AI API with chat history
  * @param {string} userPrompt
- * @param {Function} [onChunk] - called with each text chunk as it arrives
- * @returns {Promise<string>} Full response text
+ * @returns {Promise<string>}
  */
-export async function fetchAIResponse(userPrompt, onChunk) {
+export async function fetchAIResponse(userPrompt) {
   const systemPrompt = buildSystemPrompt();
 
   try {
@@ -189,7 +155,7 @@ export async function fetchAIResponse(userPrompt, onChunk) {
         messages,
         temperature: 0.3,
         max_tokens: MAX_AI_TOKENS,
-        stream: !!onChunk,
+        stream: false,
       }),
     });
 
@@ -199,55 +165,6 @@ export async function fetchAIResponse(userPrompt, onChunk) {
       throw new Error(errorMsg);
     }
 
-    // Streaming mode
-    if (onChunk && response.body) {
-      let fullText = '';
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Parse SSE chunks
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // keep incomplete line
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text || '';
-              if (content) {
-                fullText += content;
-                onChunk(content);
-              }
-            } catch {
-              // Non-JSON chunk — try raw text
-              if (data && data !== '[DONE]') {
-                fullText += data;
-                onChunk(data);
-              }
-            }
-          }
-        }
-      }
-
-      const result = fullText.trim();
-      if (result) {
-        addChatHistory('user', userPrompt);
-        addChatHistory('assistant', result);
-        return result;
-      }
-      throw new Error('Empty response');
-    }
-
-    // Non-streaming fallback
     const data = await response.json();
 
     if (data.choices?.[0]?.message?.content) {
@@ -255,7 +172,6 @@ export async function fetchAIResponse(userPrompt, onChunk) {
       // Save to history
       addChatHistory('user', userPrompt);
       addChatHistory('assistant', result);
-      if (onChunk) onChunk(result);
       return result;
     }
     throw new Error('Empty response');
@@ -265,9 +181,7 @@ export async function fetchAIResponse(userPrompt, onChunk) {
     if (e.message.startsWith('⚠️') || e.message.startsWith('🚫') || e.message.startsWith('⏳')) {
       throw e;
     }
-    const fallback = getLocalFallback(userPrompt);
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    return getLocalFallback(userPrompt);
   }
 }
 

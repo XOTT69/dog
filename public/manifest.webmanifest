@@ -3,14 +3,12 @@
   "short_name": "Dog Coach",
   "description": "Професійний AI-помічник для виховання та тренування собаки",
   "lang": "uk-UA",
-  "id": "/",
   "start_url": "/",
   "scope": "/",
-  "display_override": ["standalone", "minimal-ui", "browser"],
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f2f2f7",
-  "theme_color": "#007AFF",
+  "background_color": "#f8f9fa",
+  "theme_color": "#0ea5e9",
   "categories": ["productivity", "lifestyle", "education"],
   "screenshots": [
     {

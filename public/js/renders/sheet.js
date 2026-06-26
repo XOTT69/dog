@@ -162,8 +162,8 @@ function bindSaveButton() {
     if (val) payload.value = parseFloat(val);
 
     try {
-      const eventId = await addEvent(payload);
-      toast(eventId.startsWith('local_') ? 'Збережено офлайн ✓' : 'Додано ✓', 'success');
+      await addEvent(payload);
+      toast('Додано ✓', 'success');
 
       // Clear fields
       const noteEl = $('eventNote');

@@ -29,13 +29,9 @@ export default async function handler(req, res) {
 
       const workspaceId = memberDoc.ref.parent.parent.id;
 
-      // Get pet data — use newer UUID format (skip 'primary')
-      const petsSnap = await db.collection('workspaces').doc(workspaceId).collection('dogs')
-        .where('name', '>', '')
-        .limit(1)
-        .get();
-      if (petsSnap.empty) continue;
-      const petDoc = petsSnap.docs[0];
+      // Get pet data
+      const petDoc = await db.collection('workspaces').doc(workspaceId).collection('dogs').doc('primary').get();
+      if (!petDoc.exists) continue;
       const pet = petDoc.data();
       const petName = pet.name || 'Песик';
 
@@ -63,52 +59,21 @@ export default async function handler(req, res) {
         notifications.push({ token, title: `🐾 ${petName} чекає!`, body: 'Сьогодні ще немає записів. Як справи з горшиком?' });
       }
 
-      // ===== VACCINATION & DEWORMING AUTO-CHECK =====
-      // Deworming check (last recorded)
+      // Deworming check
       if (pet.lastDeworming) {
         const lastDew = new Date(pet.lastDeworming);
         const daysSince = Math.floor((now - lastDew) / 86400000);
         if (daysSince >= 88 && daysSince <= 90) {
-          notifications.push({ token, title: `💊 Час дегельмінтизації!`, body: `${petName}: пройшло ${daysSince} днів з останньої обробки. Заплануйте прийом препарату.` });
-        } else if (daysSince >= 91 && daysSince <= 95) {
-          notifications.push({ token, title: `💊 Прострочено дегельмінтизацію!`, body: `${petName}: потребує обробки. Зробіть сьогодні!` });
+          notifications.push({ token, title: `💊 Час дегельмінтизації!`, body: `${petName}: пройшло ${daysSince} днів з останньої обробки.` });
         }
       }
 
-      // Vaccine check (last recorded)
+      // Vaccine check
       if (pet.lastVaccine) {
         const lastVac = new Date(pet.lastVaccine);
         const daysSince = Math.floor((now - lastVac) / 86400000);
         if (daysSince >= 358 && daysSince <= 365) {
-          notifications.push({ token, title: `💉 Річна вакцинація!`, body: `${petName}: час планової ревакцинації. Запишіться до ветеринара.` });
-        } else if (daysSince > 365 && daysSince <= 375) {
-          notifications.push({ token, title: `⚠️ Вакцинація прострочена!`, body: `${petName}: термін вакцинації минув. Зверніться до ветеринара.` });
-        }
-      }
-
-      // Puppy vaccination schedule auto-check (if no lastVaccine but pet is young)
-      if (!pet.lastVaccine && pet.birthDate) {
-        const birthDate = new Date(pet.birthDate);
-        const ageInWeeks = Math.floor((now - birthDate) / (7 * 86400000));
-        
-        // DHPP 1 (8 weeks)
-        if (ageInWeeks >= 7 && ageInWeeks <= 9) {
-          notifications.push({ token, title: `💉 Перша вакцинація!`, body: `${petName}: ${ageInWeeks} тижнів. Пора на DHPP-1!` });
-        }
-        // DHPP 2 (12 weeks)
-        else if (ageInWeeks >= 11 && ageInWeeks <= 13) {
-          notifications.push({ token, title: `💉 Друга вакцинація!`, body: `${petName}: ${ageInWeeks} тижнів. Пора на DHPP-2!` });
-        }
-        // DHPP 3 + Rabies (16 weeks)
-        else if (ageInWeeks >= 15 && ageInWeeks <= 17) {
-          notifications.push({ token, title: `💉 Третя вакцинація + Сказ!`, body: `${petName}: ${ageInWeeks} тижнів. Фінальна вакцинація!` });
-        }
-        // Deworming for puppies (every 2 weeks until 3 months)
-        else if (ageInWeeks <= 12 && ageInWeeks >= 4 && ageInWeeks % 2 === 0) {
-          const puppyDewDaysSince = pet.lastDeworming ? Math.floor((now - new Date(pet.lastDeworming)) / 86400000) : 999;
-          if (puppyDewDaysSince >= 12) {
-            notifications.push({ token, title: `💊 Дегельмінтизація цуценяти!`, body: `${petName}: ${ageInWeeks} тижнів — обробіть від глистів (кожні 2 тижні до 12 тижнів).` });
-          }
+          notifications.push({ token, title: `💉 Вакцинація!`, body: `${petName}: минув майже рік з останньої вакцини.` });
         }
       }
     }

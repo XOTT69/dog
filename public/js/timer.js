@@ -8,16 +8,6 @@ import { playAlarm } from './audio.js';
 /** @type {number|null} */
 let intervalId = null;
 
-function startInterval() {
-  intervalId = setInterval(() => {
-    state.timer.seconds = Math.max(0, state.timer.seconds - 1);
-    if (state.timer.seconds <= 0) {
-      stopTimer();
-      onTimerComplete();
-    }
-  }, 1000);
-}
-
 /**
  * Start timer with given duration
  * @param {number} seconds
@@ -27,7 +17,14 @@ export function startTimer(seconds) {
   state.timer.total = seconds;
   state.timer.seconds = seconds;
   state.timer.running = true;
-  startInterval();
+
+  intervalId = setInterval(() => {
+    state.timer.seconds--;
+    if (state.timer.seconds <= 0) {
+      stopTimer();
+      onTimerComplete();
+    }
+  }, 1000);
 }
 
 /**
@@ -58,7 +55,13 @@ export function toggleTimer() {
     stopTimer();
   } else if (state.timer.total > 0) {
     state.timer.running = true;
-    startInterval();
+    intervalId = setInterval(() => {
+      state.timer.seconds--;
+      if (state.timer.seconds <= 0) {
+        stopTimer();
+        onTimerComplete();
+      }
+    }, 1000);
   }
 }
 

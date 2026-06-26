@@ -22,14 +22,4 @@ git push -u origin main
    - `CRON_SECRET` для `/api/send-push`.
 5. Deploy.
 
-## Firebase Auth для Vercel
-
-У Firebase Console відкрий Authentication -> Settings -> Authorized domains і додай домени, з яких відкривається застосунок:
-
-- production-домен Vercel, наприклад `your-app.vercel.app`;
-- custom domain, якщо підключений;
-- `localhost` для локальної перевірки.
-
-Preview-домени Vercel мають окремі URL. Якщо тестуєш логін на preview deployment, додай і цей preview-домен або тестуй Google login тільки на production-домені.
-
 Після першого деплою також задеплой Firestore rules з папки `firebase/`.

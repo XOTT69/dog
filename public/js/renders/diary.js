@@ -263,13 +263,12 @@ function renderFeed() {
       : '';
     const valStr = item.value ? ` · ${escapeHtml(item.value)} кг` : '';
     const noteStr = item.note ? ` · ${escapeHtml(item.note)}` : '';
-    const pendingStr = item.pending ? ' · синхронізується' : '';
 
     return `
       <div class="feed-item" data-event-id="${escapeHtml(item.id)}">
         <div>
           <strong>${conf.icon} ${conf.label}</strong>
-          <div class="meta">${escapeHtml(timeStr)}${valStr}${noteStr}${pendingStr}</div>
+          <div class="meta">${escapeHtml(timeStr)}${valStr}${noteStr}</div>
         </div>
         <button type="button" class="btn btn-ghost btn-sm feed-delete" data-delete="${escapeHtml(item.id)}" aria-label="Видалити">✕</button>
       </div>`;

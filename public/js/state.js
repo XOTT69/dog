@@ -4,7 +4,7 @@
  * Supports nested paths and batch updates.
  */
 
-/** @typedef {'auth'|'workspace'|'pet'|'events'|'calendar'|'members'|'ui'|'timer'|'achievements'} StateSection */
+/** @typedef {'auth'|'workspace'|'pet'|'events'|'members'|'ui'|'timer'|'achievements'} StateSection */
 
 // ===== CONSTANTS =====
 const STORAGE_KEYS = {
@@ -21,11 +21,6 @@ const STORAGE_KEYS = {
   onboarded: 'dc_onboarded',
   weeklyDismissed: 'dc_weekly_dismissed',
   currentPetId: 'dc_current_pet_id',
-  clickerCount: 'dc_clicker_count',
-  chatHistory: 'dc_chat_history',
-  healthChecklist: 'dc_health_checklist',
-  offlineEvents: 'dc_offline_events',
-  calendarItems: 'dc_calendar_items',
 };
 
 /** @type {Map<string, Set<Function>>} */
@@ -67,13 +62,6 @@ const initialState = {
 
   // Events
   events: {
-    items: [],
-    loading: true,
-    pending: [],
-  },
-
-  // Shared calendar tasks
-  calendar: {
     items: [],
     loading: true,
   },

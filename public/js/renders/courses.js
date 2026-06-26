@@ -1,13 +1,13 @@
 /**
- * @fileoverview Courses tab — course grid, training programs, knowledge, social
+ * @fileoverview Courses tab — AI chat, course grid, knowledge, social
  */
 
 import { state, STORAGE_KEYS } from '../state.js';
-import { $, $$, escapeHtml, haptic } from '../utils.js';
+import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
-import { setActiveTab } from '../render.js';
-import { confirmDialog } from '../modal.js';
-import { getTrainingProgram, TRAINING_PROGRAMS, getTrainingProgress, toggleTrainingStep, getTrainingCompletionPercent, resetTrainingProgress } from '../training-programs.js';
+import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
+import { toast } from '../render.js';
+import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -15,43 +15,12 @@ let knowledgeRendered = false;
 let socialRendered = false;
 
 export async function render() {
-  renderAcademyProgress();
   renderProblemButtons();
+  renderAIChat();
   await renderCourseGrid();
   await renderKnowledgeGrid();
   await renderSocialGrid();
   renderToiletGuide();
-}
-
-function renderAcademyProgress() {
-  const el = $('academyProgressPct');
-  if (!el) return;
-
-  const keys = Object.keys(TRAINING_PROGRAMS);
-  const values = keys.map(k => getTrainingCompletionPercent(k)).filter(v => v > 0);
-  const avg = values.length ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : 0;
-  el.textContent = `${avg}%`;
-}
-
-// ===== HIDDEN PROBLEMS (can hide irrelevant buttons) =====
-const HIDDEN_PROBLEMS_KEY = 'dc_hidden_problems';
-
-function getHiddenProblems() {
-  try {
-    return JSON.parse(localStorage.getItem(HIDDEN_PROBLEMS_KEY) || '[]');
-  } catch { return []; }
-}
-
-function toggleHiddenProblem(problemId) {
-  const hidden = getHiddenProblems();
-  const idx = hidden.indexOf(problemId);
-  if (idx === -1) {
-    hidden.push(problemId);
-  } else {
-    hidden.splice(idx, 1);
-  }
-  localStorage.setItem(HIDDEN_PROBLEMS_KEY, JSON.stringify(hidden));
-  renderProblemButtons(); // Re-render
 }
 
 // ===== PROBLEM BUTTONS (Training Programs) =====
@@ -59,28 +28,12 @@ function toggleHiddenProblem(problemId) {
 function renderProblemButtons() {
   const panel = $('trainingProgram');
   if (!panel) return;
-  const hiddenProblems = getHiddenProblems();
-  let manageMode = panel.dataset.manageMode === 'true';
 
   $$('.problem-btn').forEach(btn => {
-    const problemId = btn.dataset.problem;
-    
-    // Apply hidden class
-    if (hiddenProblems.includes(problemId) && !manageMode) {
-      btn.classList.add('hidden-problem');
-    } else {
-      btn.classList.remove('hidden-problem');
-    }
-
-    if (btn.dataset.boundAI) return;
-    btn.dataset.boundAI = 'true';
-    
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
     btn.addEventListener('click', () => {
-      if (manageMode) {
-        // In manage mode — toggle hidden
-        toggleHiddenProblem(problemId);
-        return;
-      }
+      const problemId = btn.dataset.problem;
       const program = getTrainingProgram(problemId);
       if (!program) return;
 
@@ -92,46 +45,11 @@ function renderProblemButtons() {
       renderTrainingDetail(program, panel);
     });
   });
-
-  // Add manage button if not exists
-  let manageBtn = $('manageProblemsBtn');
-  const problemCard = document.querySelector('.problem-grid')?.parentElement;
-  
-  if (problemCard && !manageBtn) {
-    const footer = document.createElement('div');
-    footer.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem';
-    footer.innerHTML = `
-      <button class="btn btn-ghost btn-sm full-width" id="manageProblemsBtn" type="button">
-        ⚙️ Керувати списком
-      </button>
-    `;
-    problemCard.appendChild(footer);
-    footer.querySelector('#manageProblemsBtn').addEventListener('click', () => {
-      panel.dataset.manageMode = panel.dataset.manageMode !== 'true' ? 'true' : '';
-      const btn = footer.querySelector('#manageProblemsBtn');
-      if (panel.dataset.manageMode === 'true') {
-        btn.textContent = '✅ Готово';
-        btn.classList.add('btn-primary');
-        btn.classList.remove('btn-ghost');
-      } else {
-        btn.textContent = '⚙️ Керувати списком';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-ghost');
-      }
-      renderProblemButtons();
-    });
-  }
 }
 
 function renderTrainingDetail(program, panel) {
   const pet = state.pet.data;
   const petName = pet?.name || 'ваш песик';
-
-  // Get problemId from TRAINING_PROGRAMS
-  const problemId = Object.keys(TRAINING_PROGRAMS).find(k => TRAINING_PROGRAMS[k] === program) || '';
-  const progress = problemId ? getTrainingProgress(problemId) : { completedSteps: [] };
-  const completedSet = new Set(progress.completedSteps);
-  const pct = problemId ? getTrainingCompletionPercent(problemId) : 0;
 
   panel.classList.remove('hidden');
   panel.innerHTML = `
@@ -145,76 +63,35 @@ function renderTrainingDetail(program, panel) {
         <span class="training-duration">${escapeHtml(program.duration)}</span>
       </div>
 
-      ${pct > 0 ? `
-        <div class="training-progress">
-          <div class="training-progress-bar">
-            <div class="training-progress-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="training-progress-text">${pct}% виконано ${progress.completedAt ? '🎉' : ''}</div>
-        </div>
-      ` : ''}
-
-      <div class="training-steps" data-problem-id="${escapeHtml(problemId)}">
-        ${program.steps.map((step, i) => {
-          const done = completedSet.has(i);
-          return `
-          <div class="training-step ${done ? 'done' : ''}" data-step-index="${i}">
-            <div class="training-step-num" style="background:${done ? 'var(--success)' : 'var(--accent-gradient)'}">${done ? '✓' : (i + 1)}</div>
+      <div class="training-steps">
+        ${program.steps.map((step, i) => `
+          <div class="training-step">
+            <div class="training-step-num">${i + 1}</div>
             <div class="training-step-content">
-              <div class="training-step-title" style="${done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(step.title)}</div>
+              <div class="training-step-title">${escapeHtml(step.title)}</div>
               <div class="training-step-desc">${escapeHtml(step.desc)}</div>
             </div>
-            <div style="flex-shrink:0;padding-left:0.5rem">
-              <input type="checkbox" ${done ? 'checked' : ''} data-training-step="${problemId}:${i}" style="width:18px;height:18px;accent-color:var(--success)">
-            </div>
           </div>
-        `}).join('')}
+        `).join('')}
       </div>
 
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
-      <div style="display:flex;gap:0.5rem;margin-top:1rem">
-        <button class="btn btn-primary full-width" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
-          🤖 Запитати AI
-        </button>
-        ${pct > 0 ? `<button class="btn btn-ghost" id="resetTrainingProgressBtn" type="button" style="flex-shrink:0">↺</button>` : ''}
-      </div>
+      <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+        🤖 Запитати AI детальніше
+      </button>
     </div>
   `;
-
-  // Bind training step checkboxes
-  panel.querySelectorAll('[data-training-step]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const [pid, idxStr] = cb.dataset.trainingStep.split(':');
-      const idx = parseInt(idxStr);
-      toggleTrainingStep(pid, idx);
-      // Re-render the detail with updated progress
-      renderTrainingDetail(program, panel);
-      renderAcademyProgress();
-    });
-  });
-
-  // Reset progress
-  panel.querySelector('#resetTrainingProgressBtn')?.addEventListener('click', async () => {
-    const ok = await confirmDialog({
-      title: 'Скинути прогрес?',
-      message: 'Чекліст цієї програми почнеться спочатку.',
-      confirmLabel: 'Скинути',
-      danger: true,
-    });
-    if (ok) {
-      resetTrainingProgress(problemId);
-      renderTrainingDetail(program, panel);
-      renderAcademyProgress();
-    }
-  });
 
   // Bind AI button
   panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
     const prompt = e.currentTarget.dataset.aiPrompt;
     if (prompt) {
-      openCoach(prompt);
+      // Switch to chat tab
+      const chatTab = document.querySelector('[data-tab="tabChat"]');
+      if (chatTab) chatTab.click();
+      setTimeout(() => handleAISubmit(prompt), 300);
     }
   });
 
@@ -222,14 +99,207 @@ function renderTrainingDetail(program, panel) {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function openCoach(prompt) {
-  setActiveTab('tabChat');
-  const chat = await import('./chat.js');
-  if (prompt) {
-    setTimeout(() => chat.submitPrompt(prompt), 250);
-  } else {
-    chat.render();
+// ===== AI CHAT =====
+
+function renderAIChat() {
+  const form = $('aiForm');
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = 'true';
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = $('aiInput');
+    const msg = input?.value.trim();
+    if (!msg) return;
+    input.value = '';
+    input.style.height = 'auto';
+    handleAISubmit(msg);
+  });
+
+  // Quick prompts
+  $$('[data-ai-prompt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      handleAISubmit(btn.dataset.aiPrompt);
+      haptic();
+    });
+  });
+
+  // Clear chat
+  $('clearChatBtn')?.addEventListener('click', () => {
+    const chat = $('aiChat');
+    if (chat) chat.innerHTML = '';
+    clearChatHistory();
+    toast('Чат очищено 🧹', 'success');
+  });
+
+  // Voice input
+  initVoiceInput();
+
+  // Auto-resize textarea
+  const aiInput = $('aiInput');
+  if (aiInput) {
+    aiInput.addEventListener('input', () => {
+      aiInput.style.height = 'auto';
+      aiInput.style.height = `${Math.min(aiInput.scrollHeight, 100)}px`;
+    });
+    aiInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.dispatchEvent(new Event('submit'));
+      }
+    });
   }
+}
+
+async function handleAISubmit(prompt) {
+  if (!prompt.trim()) return;
+
+  // Auto-personalize prompt with dog data
+  const pet = state.pet.data;
+  const petName = pet?.name?.trim();
+  const breed = pet?.breed?.trim();
+  const age = pet?.birthDate ? getAgeInWeeks(pet.birthDate) : null;
+  const sex = pet?.sex?.trim();
+  const issues = pet?.issues?.trim();
+
+  let personalizedPrompt = prompt;
+  if (petName && !prompt.includes(petName)) {
+    // Replace generic "собака" with dog's name
+    personalizedPrompt = personalizedPrompt.replace(/собака/gi, petName);
+    personalizedPrompt = personalizedPrompt.replace(/Собака/gi, petName);
+  }
+
+  // Prepend context for AI
+  const contextParts = [];
+  if (petName) contextParts.push(`Собака: ${petName}`);
+  if (breed) contextParts.push(`Порода: ${breed}`);
+  if (age) contextParts.push(`Вік: ${age} тижнів`);
+  if (sex) contextParts.push(`Стать: ${sex}`);
+  if (issues) contextParts.push(`Проблеми: ${issues}`);
+
+  let fullPrompt = personalizedPrompt;
+  if (contextParts.length > 0) {
+    fullPrompt = `[${contextParts.join(', ')}] ${personalizedPrompt}`;
+  }
+
+  addChatMessage(prompt, 'user');
+  showTyping();
+  trackAIUsage();
+
+  try {
+    const response = await fetchAIResponse(fullPrompt);
+    removeTyping();
+    addChatMessage(response, 'assistant');
+  } catch {
+    removeTyping();
+    addChatMessage('Помилка. Спробуйте ще раз 🔄', 'assistant');
+  }
+}
+
+function addChatMessage(text, type) {
+  const chat = $('aiChat');
+  if (!chat) return;
+
+  const msg = document.createElement('div');
+  msg.className = `ai-msg ${type}`;
+  msg.textContent = text;
+
+  // Add share button to AI responses
+  if (type === 'assistant') {
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'msg-share-btn';
+    shareBtn.type = 'button';
+    shareBtn.textContent = '📤 Поділитися';
+    shareBtn.addEventListener('click', () => shareMessage(text));
+    msg.appendChild(shareBtn);
+  }
+
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function shareMessage(text) {
+  const pet = state.pet.data;
+  const petName = pet?.name || 'Мій песик';
+  const shareText = `🐕 ${petName} — порада від Dog Coach AI:\n\n${text}\n\n— Dog Coach AI`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: shareText, title: 'Dog Coach AI' });
+      haptic();
+    } catch (e) {
+      // User cancelled
+    }
+  } else {
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareText);
+      toast('Скопійовано в буфер обміну 📋', 'success');
+    } catch {
+      toast('Не вдалося скопіювати', 'error');
+    }
+  }
+}
+
+function showTyping() {
+  const chat = $('aiChat');
+  if (!chat) return;
+  const el = document.createElement('div');
+  el.className = 'ai-msg loading';
+  el.id = 'typingIndicator';
+  el.textContent = 'Думаю';
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function removeTyping() {
+  $('typingIndicator')?.remove();
+}
+
+// ===== VOICE =====
+
+function initVoiceInput() {
+  const btn = $('voiceBtn');
+  if (!btn) return;
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { btn.style.display = 'none'; return; }
+
+  const rec = new SR();
+  rec.lang = 'uk-UA';
+  rec.continuous = false;
+  rec.interimResults = false;
+  let isRecording = false;
+
+  btn.addEventListener('click', () => {
+    if (isRecording) {
+      rec.stop();
+      btn.classList.remove('recording');
+      isRecording = false;
+    } else {
+      rec.start();
+      btn.classList.add('recording');
+      isRecording = true;
+      haptic();
+    }
+  });
+
+  rec.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    const input = $('aiInput');
+    if (input) {
+      input.value = text;
+      input.style.height = 'auto';
+      input.style.height = `${Math.min(input.scrollHeight, 100)}px`;
+    }
+    btn.classList.remove('recording');
+    isRecording = false;
+  };
+
+  rec.onerror = rec.onend = () => {
+    btn.classList.remove('recording');
+    isRecording = false;
+  };
 }
 
 // ===== COURSES GRID =====

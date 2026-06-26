@@ -3,7 +3,7 @@
  */
 
 import { state, STORAGE_KEYS } from './state.js';
-import { escapeHtml, getAgeInWeeks, weekLabel, todayKey } from './utils.js';
+import { getAgeInWeeks, weekLabel, todayKey } from './utils.js';
 import { fetchAIResponse } from './ai.js';
 
 /**
@@ -41,10 +41,8 @@ export async function getWeeklyPlan() {
 
   try {
     const response = await fetchAIResponse(prompt);
-    // Clean response: remove ```json, ``` markers, and any text before/after JSON
-    const cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     // Try to parse JSON from response
-    const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const days = JSON.parse(jsonMatch[0]);
       const weekStart = getWeekStart(new Date());
@@ -212,14 +210,14 @@ export async function renderWeeklyPlan(container) {
     return `
       <div class="weekly-day ${isToday ? 'today' : ''}">
         <div class="weekly-day-header">
-          <strong>${escapeHtml(day.day)}</strong>
+          <strong>${day.day}</strong>
           <span class="text-muted">${doneCount}/${total}</span>
         </div>
         <div class="weekly-tasks">
           ${day.tasks.map((task, taskIdx) => `
             <label class="weekly-task ${task.done ? 'done' : ''}">
               <input type="checkbox" data-weekly="${dayIdx}:${taskIdx}" ${task.done ? 'checked' : ''}>
-              <span>${escapeHtml(task.title)}</span>
+              <span>${task.title}</span>
             </label>
           `).join('')}
         </div>

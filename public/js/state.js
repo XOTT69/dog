@@ -71,6 +71,12 @@ const initialState = {
     items: [],
   },
 
+  // AI chat
+  aiChat: {
+    items: [],
+    loading: true,
+  },
+
   // UI state
   ui: {
     activeTab: 'tabHome',
@@ -82,6 +88,8 @@ const initialState = {
     diaryFilter: 'all',
     courseFilter: 'all',
     currentCourseId: 'pee-pad',
+    academySection: 'programs',
+    calendarFilter: 'all',
     contentLoaded: false,
   },
 

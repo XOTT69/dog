@@ -3,11 +3,10 @@
  */
 
 import { state, STORAGE_KEYS } from '../state.js';
-import { $, $$, escapeHtml, haptic, getAgeInWeeks } from '../utils.js';
+import { $, $$, escapeHtml, haptic, tsToDate } from '../utils.js';
 import { getCourses, getKnowledge, getSocial } from '../content-loader.js';
-import { fetchAIResponse, trackAIUsage, clearChatHistory } from '../ai.js';
-import { toast } from '../render.js';
-import { getTrainingProgram, TRAINING_PROGRAMS } from '../training-programs.js';
+import { setActiveTab } from '../render.js';
+import { getTrainingProgram } from '../training-programs.js';
 
 /** @type {boolean} */
 let coursesRendered = false;
@@ -15,12 +14,45 @@ let knowledgeRendered = false;
 let socialRendered = false;
 
 export async function render() {
+  renderAcademyShell();
   renderProblemButtons();
-  renderAIChat();
   await renderCourseGrid();
   await renderKnowledgeGrid();
   await renderSocialGrid();
   renderToiletGuide();
+  renderAcademyProgress();
+  renderAcademyLesson();
+}
+
+function renderAcademyShell() {
+  const tabs = $('academySections');
+  if (tabs && !tabs.dataset.bound) {
+    tabs.dataset.bound = 'true';
+    tabs.querySelectorAll('[data-academy-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.ui.academySection = btn.dataset.academySection;
+        renderAcademyShell();
+        haptic();
+      });
+    });
+  }
+
+  const active = state.ui.academySection || 'programs';
+  $$('#academySections [data-academy-section]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.academySection === active);
+  });
+  $$('[data-academy-panel]').forEach(panel => {
+    const isActive = panel.dataset.academyPanel === active;
+    panel.classList.toggle('hidden', !isActive);
+    panel.hidden = !isActive;
+    panel.setAttribute('aria-hidden', String(!isActive));
+  });
+
+  const aiBtn = $('academyAiBtn');
+  if (aiBtn && !aiBtn.dataset.bound) {
+    aiBtn.dataset.bound = 'true';
+    aiBtn.addEventListener('click', () => openAiCoach());
+  }
 }
 
 // ===== PROBLEM BUTTONS (Training Programs) =====
@@ -78,228 +110,26 @@ function renderTrainingDetail(program, panel) {
       ${program.tip ? `<div class="training-tip">💡 ${escapeHtml(program.tip)}</div>` : ''}
       ${program.mistake ? `<div class="training-mistake">⚠️ ${escapeHtml(program.mistake)}</div>` : ''}
 
-      <button class="btn btn-primary full-width mt-lg" data-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
-        🤖 Запитати AI детальніше
+      <button class="btn btn-primary full-width mt-lg" data-academy-ai-prompt="Як відучити ${escapeHtml(petName)} ${escapeHtml(program.title.toLowerCase())}? Детальний план на 2 тижні." type="button">
+        Запитати AI детальніше
       </button>
     </div>
   `;
 
   // Bind AI button
-  panel.querySelector('[data-ai-prompt]')?.addEventListener('click', (e) => {
-    const prompt = e.currentTarget.dataset.aiPrompt;
-    if (prompt) {
-      // Switch to chat tab
-      const chatTab = document.querySelector('[data-tab="tabChat"]');
-      if (chatTab) chatTab.click();
-      setTimeout(() => handleAISubmit(prompt), 300);
-    }
+  panel.querySelector('[data-academy-ai-prompt]')?.addEventListener('click', (e) => {
+    const prompt = e.currentTarget.dataset.academyAiPrompt;
+    if (prompt) openAiCoach(prompt);
   });
 
   // Scroll to panel
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ===== AI CHAT =====
-
-function renderAIChat() {
-  const form = $('aiForm');
-  if (!form || form.dataset.bound) return;
-  form.dataset.bound = 'true';
-
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = $('aiInput');
-    const msg = input?.value.trim();
-    if (!msg) return;
-    input.value = '';
-    input.style.height = 'auto';
-    handleAISubmit(msg);
-  });
-
-  // Quick prompts
-  $$('[data-ai-prompt]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      handleAISubmit(btn.dataset.aiPrompt);
-      haptic();
-    });
-  });
-
-  // Clear chat
-  $('clearChatBtn')?.addEventListener('click', () => {
-    const chat = $('aiChat');
-    if (chat) chat.innerHTML = '';
-    clearChatHistory();
-    toast('Чат очищено 🧹', 'success');
-  });
-
-  // Voice input
-  initVoiceInput();
-
-  // Auto-resize textarea
-  const aiInput = $('aiInput');
-  if (aiInput) {
-    aiInput.addEventListener('input', () => {
-      aiInput.style.height = 'auto';
-      aiInput.style.height = `${Math.min(aiInput.scrollHeight, 100)}px`;
-    });
-    aiInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        form.dispatchEvent(new Event('submit'));
-      }
-    });
-  }
-}
-
-async function handleAISubmit(prompt) {
-  if (!prompt.trim()) return;
-
-  // Auto-personalize prompt with dog data
-  const pet = state.pet.data;
-  const petName = pet?.name?.trim();
-  const breed = pet?.breed?.trim();
-  const age = pet?.birthDate ? getAgeInWeeks(pet.birthDate) : null;
-  const sex = pet?.sex?.trim();
-  const issues = pet?.issues?.trim();
-
-  let personalizedPrompt = prompt;
-  if (petName && !prompt.includes(petName)) {
-    // Replace generic "собака" with dog's name
-    personalizedPrompt = personalizedPrompt.replace(/собака/gi, petName);
-    personalizedPrompt = personalizedPrompt.replace(/Собака/gi, petName);
-  }
-
-  // Prepend context for AI
-  const contextParts = [];
-  if (petName) contextParts.push(`Собака: ${petName}`);
-  if (breed) contextParts.push(`Порода: ${breed}`);
-  if (age) contextParts.push(`Вік: ${age} тижнів`);
-  if (sex) contextParts.push(`Стать: ${sex}`);
-  if (issues) contextParts.push(`Проблеми: ${issues}`);
-
-  let fullPrompt = personalizedPrompt;
-  if (contextParts.length > 0) {
-    fullPrompt = `[${contextParts.join(', ')}] ${personalizedPrompt}`;
-  }
-
-  addChatMessage(prompt, 'user');
-  showTyping();
-  trackAIUsage();
-
-  try {
-    const response = await fetchAIResponse(fullPrompt);
-    removeTyping();
-    addChatMessage(response, 'assistant');
-  } catch {
-    removeTyping();
-    addChatMessage('Помилка. Спробуйте ще раз 🔄', 'assistant');
-  }
-}
-
-function addChatMessage(text, type) {
-  const chat = $('aiChat');
-  if (!chat) return;
-
-  const msg = document.createElement('div');
-  msg.className = `ai-msg ${type}`;
-  msg.textContent = text;
-
-  // Add share button to AI responses
-  if (type === 'assistant') {
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'msg-share-btn';
-    shareBtn.type = 'button';
-    shareBtn.textContent = '📤 Поділитися';
-    shareBtn.addEventListener('click', () => shareMessage(text));
-    msg.appendChild(shareBtn);
-  }
-
-  chat.appendChild(msg);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-async function shareMessage(text) {
-  const pet = state.pet.data;
-  const petName = pet?.name || 'Мій песик';
-  const shareText = `🐕 ${petName} — порада від Dog Coach AI:\n\n${text}\n\n— Dog Coach AI`;
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: shareText, title: 'Dog Coach AI' });
-      haptic();
-    } catch (e) {
-      // User cancelled
-    }
-  } else {
-    // Fallback: copy to clipboard
-    try {
-      await navigator.clipboard.writeText(shareText);
-      toast('Скопійовано в буфер обміну 📋', 'success');
-    } catch {
-      toast('Не вдалося скопіювати', 'error');
-    }
-  }
-}
-
-function showTyping() {
-  const chat = $('aiChat');
-  if (!chat) return;
-  const el = document.createElement('div');
-  el.className = 'ai-msg loading';
-  el.id = 'typingIndicator';
-  el.textContent = 'Думаю';
-  chat.appendChild(el);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-function removeTyping() {
-  $('typingIndicator')?.remove();
-}
-
-// ===== VOICE =====
-
-function initVoiceInput() {
-  const btn = $('voiceBtn');
-  if (!btn) return;
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { btn.style.display = 'none'; return; }
-
-  const rec = new SR();
-  rec.lang = 'uk-UA';
-  rec.continuous = false;
-  rec.interimResults = false;
-  let isRecording = false;
-
-  btn.addEventListener('click', () => {
-    if (isRecording) {
-      rec.stop();
-      btn.classList.remove('recording');
-      isRecording = false;
-    } else {
-      rec.start();
-      btn.classList.add('recording');
-      isRecording = true;
-      haptic();
-    }
-  });
-
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    const input = $('aiInput');
-    if (input) {
-      input.value = text;
-      input.style.height = 'auto';
-      input.style.height = `${Math.min(input.scrollHeight, 100)}px`;
-    }
-    btn.classList.remove('recording');
-    isRecording = false;
-  };
-
-  rec.onerror = rec.onend = () => {
-    btn.classList.remove('recording');
-    isRecording = false;
-  };
+async function openAiCoach(prompt = 'Склади персональний план тренування на цей тиждень.') {
+  setActiveTab('tabChat');
+  const ai = await import('./ai-tab.js');
+  ai.submitPrompt(prompt);
 }
 
 // ===== COURSES GRID =====
@@ -470,4 +300,57 @@ function renderToiletGuide() {
   grid.innerHTML = guide.map(s => `
     <div class="k-card"><strong>${s.title}</strong><p>${s.text}</p></div>
   `).join('');
+}
+
+function renderAcademyProgress() {
+  const now = Date.now();
+  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const last7 = state.events.items.filter(e => {
+    const date = tsToDate(e.createdAt);
+    return date && date.getTime() >= weekAgo;
+  });
+  const trainings = last7.filter(e => e.eventType === 'training').length;
+  const walks = last7.filter(e => e.eventType === 'walk').length;
+  const checks = JSON.parse(localStorage.getItem(STORAGE_KEYS.courseProgress) || '{}');
+  const completedChecks = Object.values(checks)
+    .flatMap(course => Object.values(course || {}))
+    .filter(Boolean).length;
+
+  const title = $('academyProgressTitle');
+  const meta = $('academyProgressMeta');
+  if (title) title.textContent = `${trainings} тренувань за 7 днів`;
+  if (meta) meta.textContent = completedChecks > 0
+    ? `${completedChecks} пунктів курсів закрито, ${walks} прогулянок записано`
+    : 'Почніть з однієї програми або короткого уроку дня.';
+
+  const grid = $('academyProgressGrid');
+  if (!grid) return;
+  grid.innerHTML = [
+    { label: 'Тренування', value: trainings, hint: 'за 7 днів' },
+    { label: 'Прогулянки', value: walks, hint: 'за 7 днів' },
+    { label: 'Чеклісти', value: completedChecks, hint: 'закрито' },
+  ].map(item => `
+    <div class="metric-tile">
+      <strong>${item.value}</strong>
+      <span>${item.label}</span>
+      <small>${item.hint}</small>
+    </div>
+  `).join('');
+}
+
+function renderAcademyLesson() {
+  const el = $('academyLesson');
+  if (!el) return;
+  const petName = state.pet.data?.name || 'собакою';
+  el.innerHTML = `
+    <div class="lesson-card">
+      <span class="eyebrow">5 хвилин</span>
+      <h4>Контакт очима перед рухом</h4>
+      <p>Станьте поруч із ${escapeHtml(petName)}, дочекайтесь погляду, скажіть маркер і дайте ласощі. Повторіть 5 разів, потім зробіть один крок і нагородіть за спокійний контакт.</p>
+      <div class="checklist-compact">
+        <label><input type="checkbox"> 5 повторів без натягу</label>
+        <label><input type="checkbox"> завершили на успіху</label>
+      </div>
+    </div>
+  `;
 }

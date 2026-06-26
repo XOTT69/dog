@@ -12,6 +12,8 @@ let homeRenderer = null;
 let diaryRenderer = null;
 let coursesRenderer = null;
 let profileRenderer = null;
+let calendarRenderer = null;
+let aiRenderer = null;
 
 /** @type {boolean} */
 let renderScheduled = false;
@@ -23,10 +25,18 @@ let renderScheduled = false;
  * @param {string} tabId
  */
 export function setActiveTab(tabId) {
+  const target = document.getElementById(tabId);
+  if (!target?.classList.contains('tab')) return;
+
   state.ui.activeTab = tabId;
 
   document.querySelectorAll('.tab').forEach(panel => {
-    panel.classList.toggle('active', panel.id === tabId);
+    const isActive = panel.id === tabId;
+    panel.classList.toggle('active', isActive);
+    panel.hidden = !isActive;
+    panel.setAttribute('aria-hidden', String(!isActive));
+    if ('inert' in panel) panel.inert = !isActive;
+    panel.style.display = isActive ? (panel.id === 'tabChat' ? 'flex' : 'block') : 'none';
   });
 
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -43,13 +53,19 @@ export function setActiveTab(tabId) {
     if (fab) fab.classList.add('hidden');
     if (header) header.classList.add('hidden');
     if (nav) nav.classList.add('hidden');
-    if (main) main.style.paddingBottom = '1.25rem';
+    if (main) {
+      main.classList.add('main-chat');
+      main.style.paddingBottom = '0';
+    }
   } else {
     // Normal mode
     if (fab) fab.classList.toggle('hidden', tabId === 'tabProfile');
     if (header) header.classList.remove('hidden');
     if (nav) nav.classList.remove('hidden');
-    if (main) main.style.paddingBottom = '';
+    if (main) {
+      main.classList.remove('main-chat');
+      main.style.paddingBottom = '';
+    }
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -96,11 +112,25 @@ async function renderActiveTab() {
         diaryRenderer.render();
         break;
 
+      case 'tabCalendar':
+        if (!calendarRenderer) {
+          calendarRenderer = await import('./renders/calendar.js');
+        }
+        calendarRenderer.render();
+        break;
+
       case 'tabCourses':
         if (!coursesRenderer) {
           coursesRenderer = await import('./renders/courses.js');
         }
         coursesRenderer.render();
+        break;
+
+      case 'tabChat':
+        if (!aiRenderer) {
+          aiRenderer = await import('./renders/ai-tab.js');
+        }
+        aiRenderer.render();
         break;
 
       case 'tabProfile':
@@ -206,6 +236,110 @@ export function showLoading() {
 export function hideLoading() {
   const el = $('loadingOverlay');
   if (el) el.classList.add('hidden');
+}
+
+// ===== CONFIRM DIALOG =====
+
+/**
+ * Show an app-native confirmation dialog.
+ * @param {{title?: string, message?: string, okText?: string, cancelText?: string, danger?: boolean}} options
+ * @returns {Promise<boolean>}
+ */
+export function confirmDialog(options = {}) {
+  const dialog = $('confirmDialog');
+  const title = $('confirmTitle');
+  const message = $('confirmMessage');
+  const ok = $('confirmOkBtn');
+  const cancel = $('confirmCancelBtn');
+  if (!dialog || !ok || !cancel) return Promise.resolve(false);
+
+  if (title) title.textContent = options.title || 'Підтвердити дію';
+  if (message) message.textContent = options.message || '';
+  ok.textContent = options.okText || 'Підтвердити';
+  cancel.textContent = options.cancelText || 'Скасувати';
+  ok.classList.toggle('btn-danger', Boolean(options.danger));
+
+  dialog.classList.remove('hidden');
+  dialog.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    const cleanup = (result) => {
+      dialog.classList.add('hidden');
+      dialog.setAttribute('aria-hidden', 'true');
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      dialog.querySelector('[data-confirm-cancel]')?.removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    };
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    const onKey = (e) => {
+      if (e.key === 'Escape') cleanup(false);
+    };
+
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    dialog.querySelector('[data-confirm-cancel]')?.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKey);
+    ok.focus();
+  });
+}
+
+/**
+ * Show an app-native text input dialog.
+ * @param {{title?: string, message?: string, placeholder?: string, okText?: string, cancelText?: string}} options
+ * @returns {Promise<string|null>}
+ */
+export function promptDialog(options = {}) {
+  const dialog = $('confirmDialog');
+  const title = $('confirmTitle');
+  const message = $('confirmMessage');
+  const ok = $('confirmOkBtn');
+  const cancel = $('confirmCancelBtn');
+  const actions = dialog?.querySelector('.modal-actions');
+  if (!dialog || !ok || !cancel || !actions) return Promise.resolve(null);
+
+  if (title) title.textContent = options.title || 'Введіть значення';
+  if (message) message.textContent = options.message || '';
+  ok.textContent = options.okText || 'Додати';
+  cancel.textContent = options.cancelText || 'Скасувати';
+  ok.classList.remove('btn-danger');
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'modal-input';
+  input.placeholder = options.placeholder || '';
+  input.autocomplete = 'off';
+  actions.before(input);
+
+  dialog.classList.remove('hidden');
+  dialog.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    const cleanup = (value) => {
+      dialog.classList.add('hidden');
+      dialog.setAttribute('aria-hidden', 'true');
+      input.remove();
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      dialog.querySelector('[data-confirm-cancel]')?.removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    const onOk = () => cleanup(input.value.trim() || null);
+    const onCancel = () => cleanup(null);
+    const onKey = (e) => {
+      if (e.key === 'Escape') cleanup(null);
+      if (e.key === 'Enter') cleanup(input.value.trim() || null);
+    };
+
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    dialog.querySelector('[data-confirm-cancel]')?.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKey);
+    input.focus();
+  });
 }
 
 // ===== SUBSCRIBE TO STATE =====

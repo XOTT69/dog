@@ -10,7 +10,7 @@ import { addEvent, deleteEvent, restoreEvent } from '../firebase.js';
 import { updateStreak, checkAchievements, showConfetti, ACHIEVEMENT_DEFS } from '../achievements.js';
 import { startTimer, formatTimer, getTimerProgress } from '../timer.js';
 import { generateDailyPlan } from '../ai.js';
-import { toast } from '../render.js';
+import { toast, promptDialog } from '../render.js';
 import { getBreedProfile, getProtocols, getTips } from '../content-loader.js';
 import { getNextHealthEvents, getOverdueHealthEvents } from '../vaccination.js';
 import { renderWeeklyPlan } from '../weekly-plan.js';
@@ -95,7 +95,12 @@ function renderPetSwitcher() {
   // Add pet button
   scroll.querySelector('[data-pet-action="add"]')?.addEventListener('click', async () => {
     try {
-      const name = prompt('Як звати нову тварину?');
+      const name = await promptDialog({
+        title: 'Нова тварина',
+        message: 'Додайте імʼя, щоб швидко створити профіль.',
+        placeholder: 'Імʼя',
+        okText: 'Додати',
+      });
       if (!name?.trim()) return;
       await addPet({ name: name.trim(), petType: 'dog' });
       toast(`${name.trim()} додано! 🎉`, 'success');

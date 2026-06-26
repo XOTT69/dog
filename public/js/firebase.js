@@ -25,6 +25,7 @@ db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
 let unsubPets = null;
 let unsubEvents = null;
 let unsubMembers = null;
+let unsubAiMessages = null;
 
 // ===== HELPERS =====
 
@@ -80,23 +81,33 @@ function _syncCurrentPet() {
  * @param {Function} onReady - Called once user state is determined
  */
 export function initAuth(onReady) {
-  auth.onAuthStateChanged((user) => {
+  const redirectResult = auth.getRedirectResult()
+    .then((result) => {
+      localStorage.removeItem('dc_auth_redirect_pending');
+      return result?.user || null;
+    })
+    .catch((e) => {
+      localStorage.removeItem('dc_auth_redirect_pending');
+      if (e.code && e.code !== 'auth/no-auth-event') {
+        console.error('[Auth] Redirect error:', e);
+      }
+      return null;
+    });
+
+  auth.onAuthStateChanged(async (user) => {
+    const redirectUser = await redirectResult;
+    const effectiveUser = user || redirectUser || auth.currentUser;
+
     batch(() => {
-      state.auth.user = user ? {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+      state.auth.user = effectiveUser ? {
+        uid: effectiveUser.uid,
+        email: effectiveUser.email,
+        displayName: effectiveUser.displayName,
+        photoURL: effectiveUser.photoURL,
       } : null;
       state.auth.loading = false;
     });
-    onReady(user);
-  });
-
-  auth.getRedirectResult().catch((e) => {
-    if (e.code && e.code !== 'auth/no-auth-event') {
-      console.error('[Auth] Redirect error:', e);
-    }
+    onReady(effectiveUser);
   });
 }
 
@@ -108,6 +119,7 @@ export async function loginGoogle() {
     await auth.signInWithPopup(googleProvider);
   } catch (e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      localStorage.setItem('dc_auth_redirect_pending', 'true');
       await auth.signInWithRedirect(googleProvider);
     } else {
       throw e;
@@ -129,6 +141,7 @@ export async function logout() {
     state.pet.data = null;
     state.events.items = [];
     state.members.items = [];
+    state.aiChat.items = [];
     state.ui.currentPetId = null;
   });
 }
@@ -269,6 +282,7 @@ export function subscribePets() {
       batch(() => {
         state.pets.items = items;
         state.pets.loading = false;
+        state.pet.loading = false;
 
         // Sync currentPetId
         const savedId = localStorage.getItem(STORAGE_KEYS.currentPetId);
@@ -281,6 +295,30 @@ export function subscribePets() {
         _syncCurrentPet();
       });
     }, (err) => console.error('[Firestore] Pets error:', err));
+}
+
+/**
+ * Subscribe to AI chat messages in workspace.
+ */
+export function subscribeAiMessages() {
+  if (unsubAiMessages) unsubAiMessages();
+  const wsId = state.workspace.id;
+  if (!wsId) return;
+
+  unsubAiMessages = db.collection('workspaces').doc(wsId).collection('aiMessages')
+    .orderBy('createdAt', 'asc')
+    .limit(80)
+    .onSnapshot((snap) => {
+      const items = [];
+      snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+      batch(() => {
+        state.aiChat.items = items;
+        state.aiChat.loading = false;
+      });
+    }, (err) => {
+      console.error('[Firestore] AI chat error:', err);
+      state.aiChat.loading = false;
+    });
 }
 
 /**
@@ -377,6 +415,7 @@ function unsubAll() {
   if (unsubPets) { unsubPets(); unsubPets = null; }
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
+  if (unsubAiMessages) { unsubAiMessages(); unsubAiMessages = null; }
 }
 
 // ===== MUTATIONS =====
@@ -455,6 +494,37 @@ export async function restoreEvent(eventData) {
 
   const ref = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return ref.id;
+}
+
+/**
+ * Save an AI chat message.
+ * @param {{role: 'user'|'assistant', content: string}} payload
+ */
+export async function saveAiMessage(payload) {
+  const wsId = state.workspace.id;
+  const user = state.auth.user;
+  if (!wsId || !user) throw new Error('No workspace or auth');
+
+  await db.collection('workspaces').doc(wsId).collection('aiMessages').add({
+    role: payload.role,
+    content: payload.content,
+    byUid: user.uid,
+    petId: state.ui.currentPetId || null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+/**
+ * Clear AI chat messages for the current workspace.
+ */
+export async function clearAiMessages() {
+  const wsId = state.workspace.id;
+  if (!wsId) throw new Error('No workspace');
+
+  const snap = await db.collection('workspaces').doc(wsId).collection('aiMessages').limit(120).get();
+  const writeBatch = db.batch();
+  snap.forEach((doc) => writeBatch.delete(doc.ref));
+  await writeBatch.commit();
 }
 
 // ===== PUSH =====

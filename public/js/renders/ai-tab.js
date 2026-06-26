@@ -4,13 +4,13 @@
 
 import { state, subscribe } from '../state.js';
 import { $, haptic, getAgeInWeeks, weekLabel } from '../utils.js';
-import { fetchAIResponseStream, trackAIUsage } from '../ai.js';
+import { fetchAIResponse, trackAIUsage } from '../ai.js';
 import { saveAiMessage, clearAiMessages } from '../firebase.js';
-import { toast } from '../render.js';
+import { toast, confirmDialog } from '../render.js';
 
 const PROMPT_CATEGORIES = {
   training: {
-    label: '🎓 Тренування',
+    label: 'Тренування',
     prompts: [
       'Як навчити команду Сидіти?',
       'Як зупинити гавкіт?',
@@ -19,7 +19,7 @@ const PROMPT_CATEGORIES = {
     ],
   },
   toilet: {
-    label: '🚽 Туалет',
+    label: 'Туалет',
     prompts: [
       'Як привчити до пелюшки?',
       'Переходимо з пелюшки на вулицю',
@@ -28,7 +28,7 @@ const PROMPT_CATEGORIES = {
     ],
   },
   health: {
-    label: '🏥 Здоров\'я',
+    label: 'Здоров\'я',
     prompts: [
       'Собака блює — що робити?',
       'Коли потрібен ветеринар терміново?',
@@ -37,7 +37,7 @@ const PROMPT_CATEGORIES = {
     ],
   },
   behavior: {
-    label: '🐾 Поведінка',
+    label: 'Поведінка',
     prompts: [
       'Що робити якщо гризе все?',
       'Соціалізація цуценя — з чого почати',
@@ -63,11 +63,16 @@ export function render() {
   syncChatFromState();
 }
 
+export function submitPrompt(prompt) {
+  if (!prompt?.trim()) return;
+  handleSubmit(prompt);
+}
+
 function subscribeToChat() {
   if (stateSubscribed) return;
   stateSubscribed = true;
   subscribe('aiChat', () => {
-    if (state.ui.activeTab === 'tabAI') {
+    if (state.ui.activeTab === 'tabChat') {
       syncChatFromState();
     }
   });
@@ -147,7 +152,13 @@ function bindEvents() {
   });
 
   $('clearChatBtn')?.addEventListener('click', async () => {
-    if (!confirm('Очистити всю історію чату?')) return;
+    const ok = await confirmDialog({
+      title: 'Очистити чат?',
+      message: 'Історія AI-повідомлень для цього простору буде видалена.',
+      okText: 'Очистити',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await clearAiMessages();
       isStreaming = false;
@@ -215,14 +226,14 @@ function showWelcomeIfEmpty() {
   const welcome = document.createElement('div');
   welcome.className = 'ai-welcome';
   welcome.innerHTML = `
-    <div class="ai-welcome-icon">🐕‍🦺</div>
+    <div class="ai-welcome-icon">AI</div>
     <h4>Привіт! Я ваш AI-кінолог</h4>
     <p>Допоможу з тренуванням, туалетом, здоров'ям і поведінкою <strong>${name}</strong>. Оберіть тему вище або напишіть своє питання.</p>
     <div class="ai-welcome-tags">
-      <span>🎓 Тренування</span>
-      <span>🚽 Туалет</span>
-      <span>🏥 Здоров'я</span>
-      <span>🐾 Поведінка</span>
+      <span>Тренування</span>
+      <span>Туалет</span>
+      <span>Здоров'я</span>
+      <span>Поведінка</span>
     </div>
   `;
   chat.appendChild(welcome);
@@ -237,28 +248,15 @@ async function handleSubmit(prompt) {
   if (input) input.disabled = true;
   if (sendBtn) sendBtn.disabled = true;
 
-  const history = state.aiChat.items.map(m => ({ role: m.role, content: m.content }));
-
   try {
     await saveAiMessage({ role: 'user', content: prompt });
     trackAIUsage();
 
     isStreaming = true;
-    streamingText = '';
+    streamingText = 'Думаю...';
     syncChatFromState();
 
-    const response = await fetchAIResponseStream(
-      prompt,
-      (full) => {
-        streamingText = full;
-        const el = $('streamingMsg');
-        if (el) {
-          el.textContent = full;
-          scrollChatToBottom();
-        }
-      },
-      history
-    );
+    const response = await fetchAIResponse(prompt);
 
     isStreaming = false;
     streamingText = '';
@@ -267,7 +265,7 @@ async function handleSubmit(prompt) {
     isStreaming = false;
     streamingText = '';
     syncChatFromState();
-    appendMessageEl('Помилка з\'єднання. Спробуйте ще раз 🔄', 'assistant');
+    appendMessageEl('Помилка з\'єднання. Спробуйте ще раз.', 'assistant');
     toast('Помилка AI', 'error');
   } finally {
     isSubmitting = false;

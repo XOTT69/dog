@@ -3,8 +3,8 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, savePetProfile } from './firebase.js';
-import { setActiveTab, scheduleRender, toast, showLoading, hideLoading } from './render.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, subscribeAiMessages, savePetProfile } from './firebase.js';
+import { setActiveTab, scheduleRender, toast, showLoading, hideLoading, confirmDialog } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { unlock as unlockAudio } from './audio.js';
 import { preloadAll } from './content-loader.js';
@@ -45,6 +45,7 @@ function initAuthFlow() {
       subscribePets();
       subscribeMembers();
       subscribeEvents();
+      subscribeAiMessages();
 
       // Wait for first data snapshot
       await waitForData();
@@ -265,12 +266,19 @@ function bindGlobalEvents() {
       await loginGoogle();
     } catch (e) {
       toast(e.message || 'Помилка входу', 'error');
+    } finally {
+      hideLoading();
     }
-    hideLoading();
   });
 
-  $('logoutBtn')?.addEventListener('click', () => {
-    if (confirm('Вийти?')) {
+  $('logoutBtn')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Вийти з акаунта?',
+      message: 'Дані залишаться у вашому просторі, ви зможете повернутися через Google.',
+      okText: 'Вийти',
+      danger: true,
+    });
+    if (ok) {
       stopTimer();
       logout();
       hide($('appContent'));
@@ -301,7 +309,7 @@ function bindGlobalEvents() {
 
   // Chat back button → go to home
   $('chatBackBtn')?.addEventListener('click', () => {
-    setActiveTab('tabHome');
+    setActiveTab('tabCourses');
     haptic();
   });
 

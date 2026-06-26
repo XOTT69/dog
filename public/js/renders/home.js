@@ -27,6 +27,7 @@ export function render() {
   updateStreak();
   renderStreak();
   renderDailyTip();
+  renderEmergencyCard();
   renderKpis();
   renderOneTap();
   renderTimer();
@@ -53,6 +54,35 @@ export function render() {
     newAch.forEach(a => toast(`${a.icon} ${a.label}!`, 'success'));
     showConfetti();
   }
+}
+
+function renderEmergencyCard() {
+  const card = $('emergencyVetCard');
+  const btn = $('emergencyDetailsBtn');
+  if (!card || !btn || btn.dataset.bound) return;
+
+  btn.dataset.bound = 'true';
+  btn.addEventListener('click', () => {
+    let details = card.querySelector('.emergency-details');
+    if (!details) {
+      details = document.createElement('div');
+      details.className = 'emergency-details';
+      details.innerHTML = `
+        <strong>Їхати зараз, якщо є:</strong>
+        <ul>
+          <li>утруднене дихання, синюшні ясна або колапс;</li>
+          <li>судоми, сильна слабкість, втрата свідомості;</li>
+          <li>кров у блювоті, калі або сечі;</li>
+          <li>блювота 3+ рази, здуття живота, спроби блювати без результату;</li>
+          <li>підозра на отруту, ліки для людей, шоколад, ксиліт або сторонній предмет.</li>
+        </ul>
+      `;
+      card.appendChild(details);
+    }
+    const isOpen = details.classList.toggle('open');
+    btn.textContent = isOpen ? 'Сховати' : 'Деталі';
+    haptic();
+  });
 }
 
 // ===== PET SWITCHER =====
@@ -715,18 +745,31 @@ function renderReminders() {
   const healthEvents = getNextHealthEvents(5);
   const overdueEvents = getOverdueHealthEvents();
   
+  const today = localDateKey();
+
+  // Get calendar reminders
+  const calendarReminders = state.reminders.items
+    .filter(r => !r.done && (!r.date || r.date >= today))
+    .slice(0, 6);
+
   // Get custom reminders from pet data
   const customReminders = state.pet.data?.reminders || [];
   
   const allReminders = [...overdueEvents.map(e => ({
     label: e.name,
-    nextDate: e.date.toISOString().slice(0, 10),
+    nextDate: localDateKey(e.date),
     type: e.type,
     overdue: true,
   })), ...healthEvents.map(e => ({
     label: e.name,
-    nextDate: e.date.toISOString().slice(0, 10),
+    nextDate: localDateKey(e.date),
     type: e.type,
+    overdue: false,
+  })), ...calendarReminders.map(r => ({
+    label: r.title,
+    nextDate: r.date,
+    type: r.type || 'custom',
+    time: r.time || '',
     overdue: false,
   })), ...customReminders.map(r => ({
     label: r.label,
@@ -743,9 +786,20 @@ function renderReminders() {
     const d = new Date(r.nextDate);
     const days = daysBetween(now, d);
     const cls = days < 0 ? 'danger' : days <= 3 ? 'warning' : '';
-    const typeIcon = { vaccine: '💉', deworming: '💊', vet: '🏥', custom: '🔔' }[r.type] || '🔔';
+    const typeIcon = {
+      vaccine: '💉',
+      deworming: '💊',
+      vet: '🏥',
+      medicine: '💊',
+      walk: '🚶',
+      food: '🍖',
+      training: '🎓',
+      grooming: '✂️',
+      heat: '🩸',
+      custom: '🔔',
+    }[r.type] || '🔔';
     const txt = days < 0 ? `⚠️ Прострочено ${Math.abs(days)} дн.`
-      : days === 0 ? '⏰ Сьогодні!'
+      : days === 0 ? `⏰ Сьогодні${r.time ? ` о ${escapeHtml(r.time)}` : ''}`
       : days <= 3 ? `⏰ Через ${days} дн.`
       : d.toLocaleDateString('uk');
     return `<div class="feed-item"><div><strong>${typeIcon} ${escapeHtml(r.label)}</strong><div class="meta ${cls}">${txt}</div></div></div>`;

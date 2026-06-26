@@ -6,7 +6,7 @@
 
 import { state, batch, STORAGE_KEYS } from './state.js';
 import { FIREBASE_CONFIG, MAX_EVENTS_QUERY, VAPID_KEY } from './constants.js';
-import { nowTime } from './utils.js';
+import { localDateKey, nowTime } from './utils.js';
 
 // ===== INIT =====
 const app = firebase.initializeApp(FIREBASE_CONFIG);
@@ -26,6 +26,7 @@ let unsubPets = null;
 let unsubEvents = null;
 let unsubMembers = null;
 let unsubAiMessages = null;
+let unsubReminders = null;
 
 // ===== HELPERS =====
 
@@ -140,6 +141,7 @@ export async function logout() {
     state.pets.items = [];
     state.pet.data = null;
     state.events.items = [];
+    state.reminders.items = [];
     state.members.items = [];
     state.aiChat.items = [];
     state.ui.currentPetId = null;
@@ -398,6 +400,28 @@ export function subscribeEvents() {
     }, (err) => console.error('[Firestore] Events error:', err));
 }
 
+export function subscribeReminders() {
+  if (unsubReminders) unsubReminders();
+  const wsId = state.workspace.id;
+  if (!wsId) return;
+
+  unsubReminders = db.collection('workspaces').doc(wsId).collection('reminders')
+    .orderBy('date', 'asc')
+    .orderBy('time', 'asc')
+    .limit(200)
+    .onSnapshot((snap) => {
+      const items = [];
+      snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+      batch(() => {
+        state.reminders.items = items;
+        state.reminders.loading = false;
+      });
+    }, (err) => {
+      console.error('[Firestore] Reminders error:', err);
+      state.reminders.loading = false;
+    });
+}
+
 export function subscribeMembers() {
   if (unsubMembers) unsubMembers();
   const wsId = state.workspace.id;
@@ -416,6 +440,7 @@ function unsubAll() {
   if (unsubEvents) { unsubEvents(); unsubEvents = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubAiMessages) { unsubAiMessages(); unsubAiMessages = null; }
+  if (unsubReminders) { unsubReminders(); unsubReminders = null; }
 }
 
 // ===== MUTATIONS =====
@@ -494,6 +519,56 @@ export async function restoreEvent(eventData) {
 
   const ref = await db.collection('workspaces').doc(wsId).collection('events').add(data);
   return ref.id;
+}
+
+/**
+ * Add a calendar reminder/task.
+ * @param {Object} payload
+ * @returns {Promise<string>}
+ */
+export async function addReminder(payload) {
+  const wsId = state.workspace.id;
+  const user = state.auth.user;
+  if (!wsId || !user) throw new Error('No workspace or auth');
+
+  const data = {
+    title: payload.title || 'Нагадування',
+    type: payload.type || 'custom',
+    date: payload.date || localDateKey(),
+    time: payload.time || '',
+    note: payload.note || '',
+    repeat: payload.repeat || 'once',
+    done: false,
+    createdBy: user.uid,
+    createdByName: user.displayName || 'Я',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const ref = await db.collection('workspaces').doc(wsId).collection('reminders').add(data);
+  return ref.id;
+}
+
+/**
+ * Update reminder fields.
+ * @param {string} reminderId
+ * @param {Object} patch
+ */
+export async function updateReminder(reminderId, patch) {
+  const wsId = state.workspace.id;
+  if (!wsId || !reminderId) return;
+  await db.collection('workspaces').doc(wsId).collection('reminders').doc(reminderId)
+    .set({ ...patch, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/**
+ * Delete a reminder.
+ * @param {string} reminderId
+ */
+export async function deleteReminder(reminderId) {
+  const wsId = state.workspace.id;
+  if (!wsId || !reminderId) return;
+  await db.collection('workspaces').doc(wsId).collection('reminders').doc(reminderId).delete();
 }
 
 /**

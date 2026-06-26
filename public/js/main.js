@@ -3,7 +3,7 @@
  */
 
 import { state, batch, subscribe, persistTheme, STORAGE_KEYS } from './state.js';
-import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, subscribeAiMessages, savePetProfile } from './firebase.js';
+import { initAuth, loginGoogle, logout, ensureWorkspace, subscribePets, switchPet, addPet, subscribeEvents, subscribeMembers, subscribePush, subscribeAiMessages, subscribeReminders, savePetProfile } from './firebase.js';
 import { setActiveTab, scheduleRender, toast, showLoading, hideLoading, confirmDialog } from './render.js';
 import { startTimer, stopTimer, resetTimer, toggleTimer } from './timer.js';
 import { unlock as unlockAudio } from './audio.js';
@@ -45,6 +45,7 @@ function initAuthFlow() {
       subscribePets();
       subscribeMembers();
       subscribeEvents();
+      subscribeReminders();
       subscribeAiMessages();
 
       // Wait for first data snapshot

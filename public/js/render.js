@@ -344,7 +344,7 @@ export function promptDialog(options = {}) {
 
 // ===== SUBSCRIBE TO STATE =====
 
-subscribe(['events', 'pet', 'gamification'], () => {
+subscribe(['events', 'reminders', 'pet', 'gamification'], () => {
   scheduleRender();
 });
 

@@ -79,7 +79,10 @@ service cloud.firestore {
              ]) &&
              isValidString(data.title, 120) &&
              data.title.size() > 0 &&
-             data.type in ['walk', 'food', 'training', 'health', 'hygiene', 'medication', 'note'] &&
+             data.type in [
+               'walk', 'food', 'training', 'health', 'hygiene', 'medication', 'medicine',
+               'vaccine', 'grooming', 'vet', 'heat', 'custom', 'note'
+             ] &&
              isValidString(data.date, 10) &&
              (!('time' in data) || isValidString(data.time, 10)) &&
              (!('note' in data) || isValidString(data.note, 500)) &&

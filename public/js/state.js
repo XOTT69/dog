@@ -4,7 +4,7 @@
  * Supports nested paths and batch updates.
  */
 
-/** @typedef {'auth'|'workspace'|'pet'|'events'|'members'|'ui'|'timer'|'achievements'} StateSection */
+/** @typedef {'auth'|'workspace'|'pet'|'events'|'reminders'|'members'|'aiChat'|'ui'|'timer'|'achievements'} StateSection */
 
 // ===== CONSTANTS =====
 const STORAGE_KEYS = {
@@ -62,6 +62,12 @@ const initialState = {
 
   // Events
   events: {
+    items: [],
+    loading: true,
+  },
+
+  // Calendar reminders/tasks
+  reminders: {
     items: [],
     loading: true,
   },

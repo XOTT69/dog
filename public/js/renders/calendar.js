@@ -3,13 +3,15 @@
  */
 
 import { state } from '../state.js';
-import { $, $$, escapeHtml, haptic, startOfToday, tsToDate } from '../utils.js';
+import { $, $$, escapeHtml, haptic, localDateKey, startOfToday, tsToDate } from '../utils.js';
+import { addReminder, updateReminder, deleteReminder } from '../firebase.js';
+import { toast, confirmDialog } from '../render.js';
 
 const CATEGORY_MAP = {
   walk: ['walk'],
-  food: ['food', 'water'],
+  food: ['food', 'water', 'meal_morning', 'meal_day', 'meal_evening', 'treat'],
   training: ['training'],
-  health: ['medicine', 'vaccine', 'vet', 'grooming', 'heat', 'weight'],
+  health: ['medicine', 'vaccine', 'vet', 'vet_visit', 'grooming', 'heat', 'weight', 'symptom'],
 };
 
 const EVENT_LABELS = {
@@ -24,9 +26,15 @@ const EVENT_LABELS = {
   medicine: 'Ліки',
   vaccine: 'Вакцинація',
   vet: 'Ветеринар',
+  vet_visit: 'Ветеринар',
   grooming: 'Грумінг',
   heat: 'Тічка',
   weight: 'Вага',
+  meal_morning: 'Сніданок',
+  meal_day: 'Обід',
+  meal_evening: 'Вечеря',
+  treat: 'Ласощі',
+  symptom: 'Симптом',
 };
 
 const PLANNER_ITEMS = [
@@ -64,7 +72,10 @@ function bindCalendar() {
     });
   });
 
-  $('calendarAddBtn')?.addEventListener('click', openEventSheet);
+  $('calendarAddBtn')?.addEventListener('click', () => openReminderModal('custom'));
+  $('calendarReminderForm')?.addEventListener('submit', saveReminder);
+  $('reminderCancelBtn')?.addEventListener('click', closeReminderModal);
+  document.querySelector('[data-reminder-close]')?.addEventListener('click', closeReminderModal);
 }
 
 function renderAgenda() {
@@ -81,14 +92,44 @@ function renderAgenda() {
       if (filter === 'all') return true;
       return CATEGORY_MAP[filter]?.includes(event.eventType);
     })
-    .slice(0, 12);
+    .map(event => ({
+      kind: 'event',
+      id: event.id,
+      type: event.eventType,
+      title: EVENT_LABELS[event.eventType] || event.eventType,
+      note: event.note || 'Запис із щоденника',
+      time: event.timeLabel || '',
+      done: true,
+    }));
+
+  const todayKey = localDateKey(today);
+  const todaysReminders = state.reminders.items
+    .filter(reminder => {
+      if (reminder.date !== todayKey) return false;
+      if (filter === 'all') return true;
+      if (filter === 'health') return CATEGORY_MAP.health.includes(reminder.type);
+      return reminder.type === filter;
+    })
+    .map(reminder => ({
+      kind: 'reminder',
+      id: reminder.id,
+      type: reminder.type,
+      title: reminder.title,
+      note: reminder.note || repeatLabel(reminder.repeat),
+      time: reminder.time || '',
+      done: Boolean(reminder.done),
+    }));
+
+  const agendaItems = [...todaysReminders, ...todaysEvents]
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+    .slice(0, 16);
 
   if (title) {
-    const count = todaysEvents.length;
+    const count = agendaItems.length;
     title.textContent = count ? `Сьогодні: ${count} подій` : 'Сьогодні';
   }
 
-  if (!todaysEvents.length) {
+  if (!agendaItems.length) {
     agenda.innerHTML = `
       <div class="empty-state compact">
         <div class="empty-state-title">Поки немає запланованих подій</div>
@@ -98,18 +139,41 @@ function renderAgenda() {
     return;
   }
 
-  agenda.innerHTML = todaysEvents.map(event => {
-    const label = EVENT_LABELS[event.eventType] || event.eventType;
+  agenda.innerHTML = agendaItems.map(item => {
+    const isReminder = item.kind === 'reminder';
     return `
-      <div class="agenda-item">
+      <div class="agenda-item ${item.done ? 'done' : ''}">
+        ${isReminder ? `<input type="checkbox" data-reminder-done="${escapeHtml(item.id)}" ${item.done ? 'checked' : ''} aria-label="Виконано">` : '<span class="agenda-dot"></span>'}
         <div>
-          <strong>${escapeHtml(label)}</strong>
-          <span>${escapeHtml(event.note || 'Без нотатки')}</span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.note || 'Без нотатки')}</span>
         </div>
-        <time>${escapeHtml(event.timeLabel || '—')}</time>
+        <time>${escapeHtml(item.time || '—')}</time>
+        ${isReminder ? `<button class="icon-mini" data-reminder-delete="${escapeHtml(item.id)}" type="button" aria-label="Видалити">×</button>` : ''}
       </div>
     `;
   }).join('');
+
+  agenda.querySelectorAll('[data-reminder-done]').forEach(input => {
+    input.addEventListener('change', async () => {
+      await updateReminder(input.dataset.reminderDone, { done: input.checked });
+      haptic();
+    });
+  });
+
+  agenda.querySelectorAll('[data-reminder-delete]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: 'Видалити нагадування?',
+        message: 'Ця задача зникне з календаря.',
+        okText: 'Видалити',
+        danger: true,
+      });
+      if (!ok) return;
+      await deleteReminder(btn.dataset.reminderDelete);
+      toast('Нагадування видалено', 'success');
+    });
+  });
 }
 
 function renderPlannerGrid() {
@@ -125,7 +189,7 @@ function renderPlannerGrid() {
 
   grid.querySelectorAll('[data-planner]').forEach(btn => {
     btn.addEventListener('click', () => {
-      openEventSheet();
+      openReminderModal(btn.dataset.planner);
       haptic();
     });
   });
@@ -133,6 +197,90 @@ function renderPlannerGrid() {
   grid.dataset.rendered = 'true';
 }
 
-function openEventSheet() {
-  document.getElementById('fabAddEvent')?.click();
+function openReminderModal(type = 'custom') {
+  const modal = $('calendarReminderModal');
+  if (!modal) return;
+
+  const date = $('reminderDate');
+  const typeEl = $('reminderType');
+  const title = $('reminderTitle');
+  const note = $('reminderNote');
+  const time = $('reminderTime');
+  const repeat = $('reminderRepeat');
+
+  if (date) date.value = localDateKey();
+  if (typeEl) typeEl.value = normalizeReminderType(type);
+  if (title) title.value = defaultTitle(typeEl?.value || type);
+  if (note) note.value = '';
+  if (time) time.value = '';
+  if (repeat) repeat.value = ['walk', 'food', 'training', 'medicine'].includes(typeEl?.value || type)
+    ? 'daily'
+    : 'once';
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => title?.focus(), 50);
+}
+
+function closeReminderModal() {
+  const modal = $('calendarReminderModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+async function saveReminder(e) {
+  e.preventDefault();
+  const title = $('reminderTitle')?.value.trim();
+  if (!title) {
+    toast('Додайте назву', 'error');
+    return;
+  }
+
+  try {
+    await addReminder({
+      title,
+      type: $('reminderType')?.value || 'custom',
+      date: $('reminderDate')?.value || localDateKey(),
+      time: $('reminderTime')?.value || '',
+      repeat: $('reminderRepeat')?.value || 'once',
+      note: $('reminderNote')?.value.trim() || '',
+    });
+    toast('Додано в календар', 'success');
+    closeReminderModal();
+  } catch (err) {
+    console.error('[Calendar] Reminder save error:', err);
+    toast('Не вдалося додати', 'error');
+  }
+}
+
+function normalizeReminderType(type) {
+  if (type === 'medication') return 'medicine';
+  if (['walk', 'food', 'training', 'medicine', 'vaccine', 'grooming', 'vet', 'heat', 'custom'].includes(type)) {
+    return type;
+  }
+  return 'custom';
+}
+
+function defaultTitle(type) {
+  const labels = {
+    walk: 'Прогулянка',
+    food: 'Годування',
+    training: 'Тренування',
+    medicine: 'Ліки',
+    vaccine: 'Вакцинація',
+    grooming: 'Грумінг',
+    vet: 'Ветеринар',
+    heat: 'Тічка',
+    custom: 'Нагадування',
+  };
+  return labels[type] || labels.custom;
+}
+
+function repeatLabel(repeat) {
+  return {
+    once: 'Разово',
+    daily: 'Щодня',
+    weekly: 'Щотижня',
+  }[repeat] || 'Разово';
 }

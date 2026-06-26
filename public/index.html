@@ -190,6 +190,15 @@
           <p id="dailyTipText">Завантаження...</p>
         </div>
 
+        <div class="emergency-card" id="emergencyVetCard">
+          <div>
+            <span class="eyebrow">Терміново до ветеринара</span>
+            <h4>Симптоми, які не можна чекати</h4>
+            <p>Багаторазова блювота, кров, судоми, сильна млявість, проблеми з диханням або відмова від води.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="emergencyDetailsBtn" type="button">Деталі</button>
+        </div>
+
         <div class="card" id="dailyLessonCard" style="display:none">
           <div class="card-header">
             <h4>🎯 Урок дня</h4>
@@ -667,6 +676,59 @@
           <button class="btn btn-primary full-width" id="saveEventBtn" type="button">Зберегти</button>
         </div>
       </div>
+    </div>
+
+    <!-- CALENDAR REMINDER MODAL -->
+    <div id="calendarReminderModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="modal-bg" data-reminder-close></div>
+      <form class="modal-panel reminder-form" id="calendarReminderForm">
+        <h3>Нове нагадування</h3>
+        <p class="text-muted">Додайте разову або повторювану задачу в календар.</p>
+        <div class="form-grid">
+          <div class="field full">
+            <label for="reminderTitle">Назва</label>
+            <input id="reminderTitle" type="text" placeholder="Наприклад: вечірня прогулянка" maxlength="120" required>
+          </div>
+          <div class="field">
+            <label for="reminderType">Тип</label>
+            <select id="reminderType">
+              <option value="walk">Прогулянка</option>
+              <option value="food">Годування</option>
+              <option value="training">Тренування</option>
+              <option value="medicine">Ліки</option>
+              <option value="vaccine">Вакцинація</option>
+              <option value="grooming">Грумінг</option>
+              <option value="vet">Ветеринар</option>
+              <option value="heat">Тічка</option>
+              <option value="custom">Своє</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="reminderRepeat">Повтор</label>
+            <select id="reminderRepeat">
+              <option value="once">Разово</option>
+              <option value="daily">Щодня</option>
+              <option value="weekly">Щотижня</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="reminderDate">Дата</label>
+            <input id="reminderDate" type="date" required>
+          </div>
+          <div class="field">
+            <label for="reminderTime">Час</label>
+            <input id="reminderTime" type="time">
+          </div>
+          <div class="field full">
+            <label for="reminderNote">Нотатка</label>
+            <textarea id="reminderNote" rows="2" placeholder="Доза, адреса клініки або деталі..." maxlength="500"></textarea>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" type="button" id="reminderCancelBtn">Скасувати</button>
+          <button class="btn btn-primary" type="submit">Додати</button>
+        </div>
+      </form>
     </div>
 
     <!-- CONFIRM MODAL -->

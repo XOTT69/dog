@@ -49,10 +49,11 @@ service cloud.firestore {
     function isValidPet() {
       let data = request.resource.data;
       return data.keys().hasOnly([
-               'name', 'birthDate', 'sex', 'breed', 'toiletMode', 'weight', 'issues', 'petType',
-               'photoURL', 'lastVaccine', 'lastDeworming', 'lastHeat', 'reminders',
-               'createdAt', 'updatedAt'
-             ]) &&
+	               'name', 'birthDate', 'sex', 'breed', 'toiletMode', 'weight', 'issues', 'petType',
+	               'photoURL', 'lastVaccine', 'lastDeworming', 'lastHeat', 'reminders',
+	               'anxietyLevel', 'socializationLevel', 'foodMotivation', 'playMotivation', 'activityLevel',
+	               'createdAt', 'updatedAt'
+	             ]) &&
              (!('name' in data) || isValidString(data.name, 50)) &&
              (!('birthDate' in data) || isValidString(data.birthDate, 10)) &&
              (!('breed' in data) || isValidString(data.breed, 100)) &&
@@ -65,18 +66,23 @@ service cloud.firestore {
              (!('lastVaccine' in data) || isValidString(data.lastVaccine, 10)) &&
              (!('lastDeworming' in data) || isValidString(data.lastDeworming, 10)) &&
              (!('lastHeat' in data) || isValidString(data.lastHeat, 10)) &&
-             (!('reminders' in data) || data.reminders is list) &&
-             (!('createdAt' in data) || data.createdAt is timestamp) &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
+	             (!('reminders' in data) || data.reminders is list) &&
+	             (!('anxietyLevel' in data) || data.anxietyLevel in ['low', 'medium', 'high']) &&
+	             (!('socializationLevel' in data) || data.socializationLevel in ['low', 'medium', 'high']) &&
+	             (!('foodMotivation' in data) || data.foodMotivation in ['low', 'medium', 'high']) &&
+	             (!('playMotivation' in data) || data.playMotivation in ['low', 'medium', 'high']) &&
+	             (!('activityLevel' in data) || data.activityLevel in ['low', 'medium', 'high']) &&
+	             (!('createdAt' in data) || data.createdAt is timestamp) &&
+	             (!('updatedAt' in data) || data.updatedAt is timestamp);
+	    }
 
     // Validate shared calendar reminder data
     function isValidReminder() {
       let data = request.resource.data;
       return data.keys().hasOnly([
-               'title', 'type', 'date', 'time', 'note', 'repeat', 'done',
-               'createdBy', 'createdByName', 'createdAt', 'updatedAt'
-             ]) &&
+	               'title', 'type', 'date', 'time', 'note', 'repeat', 'done',
+	               'intervalHours', 'anchor', 'createdBy', 'createdByName', 'createdAt', 'updatedAt'
+	             ]) &&
              isValidString(data.title, 120) &&
              data.title.size() > 0 &&
              data.type in [
@@ -86,14 +92,42 @@ service cloud.firestore {
              isValidString(data.date, 10) &&
              (!('time' in data) || isValidString(data.time, 10)) &&
              (!('note' in data) || isValidString(data.note, 500)) &&
-             data.repeat in ['once', 'daily', 'weekly'] &&
-             data.done is bool &&
+	             data.repeat in ['once', 'daily', 'weekly', 'interval', 'after_meal', 'after_sleep'] &&
+	             (!('intervalHours' in data) || (data.intervalHours is number && data.intervalHours >= 1 && data.intervalHours <= 24)) &&
+	             (!('anchor' in data) || data.anchor in ['meal', 'sleep', 'custom']) &&
+	             data.done is bool &&
              data.createdBy is string &&
              data.createdByName is string &&
              data.createdByName.size() <= 100 &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
+	    }
+
+	    function isValidRoutine() {
+	      let data = request.resource.data;
+	      return data.keys().hasOnly([
+	               'petId', 'title', 'category', 'reps', 'durationMin', 'difficulty', 'status', 'note',
+	               'createdBy', 'createdByName', 'createdAt', 'updatedAt'
+	             ]) &&
+	             (!('petId' in data) || data.petId == null || isValidString(data.petId, 50)) &&
+	             isValidString(data.title, 120) &&
+	             data.title.size() > 0 &&
+	             data.category in ['basic', 'toilet', 'leash', 'recall', 'calm', 'social', 'care', 'custom'] &&
+	             data.reps is number &&
+	             data.reps >= 1 &&
+	             data.reps <= 100 &&
+	             data.durationMin is number &&
+	             data.durationMin >= 1 &&
+	             data.durationMin <= 120 &&
+	             data.difficulty in ['easy', 'medium', 'hard'] &&
+	             data.status in ['new', 'progress', 'mastered'] &&
+	             (!('note' in data) || isValidString(data.note, 500)) &&
+	             data.createdBy is string &&
+	             data.createdByName is string &&
+	             data.createdByName.size() <= 100 &&
+	             (!('createdAt' in data) || data.createdAt is timestamp) &&
+	             (!('updatedAt' in data) || data.updatedAt is timestamp);
+	    }
 
     // Validate AI chat messages
     function isValidAiMessage() {
@@ -209,7 +243,12 @@ service cloud.firestore {
       // ===== ROUTINES (future) =====
       match /routines/{routineId} {
         allow read: if isMember(workspaceId);
-        allow create, update: if isMember(workspaceId);
+        allow create: if isMember(workspaceId) &&
+          isValidRoutine() &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if isMember(workspaceId) &&
+          isValidRoutine() &&
+          request.resource.data.createdBy == resource.data.createdBy;
         allow delete: if isMember(workspaceId) &&
           (resource.data.get('createdBy', '') == request.auth.uid || isOwner(workspaceId));
       }

@@ -141,6 +141,9 @@
           <option value="once">Разово</option>
           <option value="daily">Щодня</option>
           <option value="weekly">Щотижня</option>
+          <option value="interval">Кожні 3 години</option>
+          <option value="after_meal">Після їжі</option>
+          <option value="after_sleep">Після сну</option>
         </select></label>
         <label>Дата<input id="reminderDate" type="date" required></label>
         <label>Час<input id="reminderTime" type="time"></label>
@@ -171,10 +174,61 @@
         <label>Остання вакцина<input id="petVaccineInput" type="date"></label>
         <label>Дегельмінтизація<input id="petDewormingInput" type="date"></label>
         <label>Тічка<input id="petHeatInput" type="date"></label>
+        <label>Тривожність<select id="petAnxietyInput"><option value="low">Низька</option><option value="medium">Середня</option><option value="high">Висока</option></select></label>
+        <label>Соціалізація<select id="petSocialInput"><option value="low">Низька</option><option value="medium">Середня</option><option value="high">Висока</option></select></label>
+        <label>Мотивація їжею<select id="petFoodMotivationInput"><option value="low">Низька</option><option value="medium">Середня</option><option value="high">Висока</option></select></label>
+        <label>Мотивація грою<select id="petPlayMotivationInput"><option value="low">Низька</option><option value="medium">Середня</option><option value="high">Висока</option></select></label>
+        <label>Активність<select id="petActivityInput"><option value="low">Низька</option><option value="medium">Середня</option><option value="high">Висока</option></select></label>
         <label class="span-2">Фокус / проблеми<textarea id="petIssuesInput" rows="3" maxlength="500"></textarea></label>
       </div>
       <button class="primary-btn full" type="submit">Зберегти профіль</button>
     </form>
+  </div>
+
+  <div id="routineModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="routineModal"></div>
+    <form id="routineForm" class="modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="overline">Тренування</span>
+          <h2>Нова вправа</h2>
+        </div>
+        <button class="ghost-icon" type="button" data-close-modal="routineModal" aria-label="Закрити">×</button>
+      </div>
+      <div class="field-grid">
+        <label class="span-2">Вправа<input id="routineTitle" type="text" maxlength="120" required placeholder="Наприклад: Контакт перед прогулянкою"></label>
+        <label>Категорія<select id="routineCategory">
+          <option value="basic">База</option>
+          <option value="toilet">Туалет</option>
+          <option value="leash">Повідок</option>
+          <option value="recall">Підклик</option>
+          <option value="calm">Спокій</option>
+          <option value="social">Соціалізація</option>
+          <option value="care">Догляд</option>
+          <option value="custom">Своє</option>
+        </select></label>
+        <label>Повтори<input id="routineReps" type="number" min="1" max="100" value="5"></label>
+        <label>Тривалість, хв<input id="routineDuration" type="number" min="1" max="120" value="5"></label>
+        <label>Складність<select id="routineDifficulty"><option value="easy">Легка</option><option value="medium">Середня</option><option value="hard">Складна</option></select></label>
+        <label>Статус<select id="routineStatus"><option value="new">Нове</option><option value="progress">В процесі</option><option value="mastered">Засвоєно</option></select></label>
+        <label class="span-2">Нотатка<textarea id="routineNote" rows="3" maxlength="500" placeholder="Критерій успіху, типові помилки, коли зупинитись..."></textarea></label>
+      </div>
+      <button class="primary-btn full" type="submit">Додати вправу</button>
+    </form>
+  </div>
+
+  <div id="emergencyModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="emergencyModal"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="overline">Екстрений протокол</span>
+          <h2 id="emergencyTitle">Що робити</h2>
+        </div>
+        <button class="ghost-icon" type="button" data-close-modal="emergencyModal" aria-label="Закрити">×</button>
+      </div>
+      <div id="emergencyContent"></div>
+    </div>
   </div>
 
   <div id="aiModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">

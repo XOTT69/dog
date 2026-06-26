@@ -58,7 +58,7 @@ export const VACCINE_INTERVAL_DAYS = 365;
 export const HEAT_CYCLE_DAYS = 180;
 
 // ===== CACHE =====
-export const SW_CACHE_VERSION = 'dogcoach-v5';
+export const SW_CACHE_VERSION = 'dogcoach-v6';
 export const AI_PLAN_CACHE_HOURS = 24;
 
 export const FIREBASE_CONFIG = {

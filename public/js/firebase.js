@@ -28,6 +28,7 @@ let unsubEvents = null;
 let unsubMembers = null;
 let unsubAiMessages = null;
 let unsubReminders = null;
+let unsubRoutines = null;
 
 // ===== HELPERS =====
 
@@ -144,6 +145,7 @@ export async function logout() {
     state.pet.data = null;
     state.events.items = [];
     state.reminders.items = [];
+    state.routines.items = [];
     state.members.items = [];
     state.aiChat.items = [];
     state.ui.currentPetId = null;
@@ -424,6 +426,27 @@ export function subscribeReminders() {
     });
 }
 
+export function subscribeRoutines() {
+  if (unsubRoutines) unsubRoutines();
+  const wsId = state.workspace.id;
+  if (!wsId) return;
+
+  unsubRoutines = db.collection('workspaces').doc(wsId).collection('routines')
+    .orderBy('createdAt', 'desc')
+    .limit(120)
+    .onSnapshot((snap) => {
+      const items = [];
+      snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+      batch(() => {
+        state.routines.items = items;
+        state.routines.loading = false;
+      });
+    }, (err) => {
+      console.error('[Firestore] Routines error:', err);
+      state.routines.loading = false;
+    });
+}
+
 export function subscribeMembers() {
   if (unsubMembers) unsubMembers();
   const wsId = state.workspace.id;
@@ -443,6 +466,7 @@ function unsubAll() {
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubAiMessages) { unsubAiMessages(); unsubAiMessages = null; }
   if (unsubReminders) { unsubReminders(); unsubReminders = null; }
+  if (unsubRoutines) { unsubRoutines(); unsubRoutines = null; }
 }
 
 // ===== MUTATIONS =====
@@ -546,6 +570,8 @@ export async function addReminder(payload) {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
+  if (payload.intervalHours != null) data.intervalHours = Number(payload.intervalHours);
+  if (payload.anchor) data.anchor = payload.anchor;
 
   const ref = await db.collection('workspaces').doc(wsId).collection('reminders').add(data);
   return ref.id;
@@ -571,6 +597,43 @@ export async function deleteReminder(reminderId) {
   const wsId = state.workspace.id;
   if (!wsId || !reminderId) return;
   await db.collection('workspaces').doc(wsId).collection('reminders').doc(reminderId).delete();
+}
+
+export async function addRoutine(payload) {
+  const wsId = state.workspace.id;
+  const user = state.auth.user;
+  if (!wsId || !user) throw new Error('No workspace or auth');
+
+  const data = {
+    petId: state.ui.currentPetId || null,
+    title: payload.title || 'Нова вправа',
+    category: payload.category || 'custom',
+    reps: Number(payload.reps || 3),
+    durationMin: Number(payload.durationMin || 5),
+    difficulty: payload.difficulty || 'easy',
+    status: payload.status || 'new',
+    note: payload.note || '',
+    createdBy: user.uid,
+    createdByName: user.displayName || 'Я',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const ref = await db.collection('workspaces').doc(wsId).collection('routines').add(data);
+  return ref.id;
+}
+
+export async function updateRoutine(routineId, patch) {
+  const wsId = state.workspace.id;
+  if (!wsId || !routineId) return;
+  await db.collection('workspaces').doc(wsId).collection('routines').doc(routineId)
+    .set({ ...patch, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+}
+
+export async function deleteRoutine(routineId) {
+  const wsId = state.workspace.id;
+  if (!wsId || !routineId) return;
+  await db.collection('workspaces').doc(wsId).collection('routines').doc(routineId).delete();
 }
 
 /**

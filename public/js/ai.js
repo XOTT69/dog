@@ -7,6 +7,7 @@ import { state, STORAGE_KEYS } from './state.js';
 import { getIdToken } from './firebase.js';
 import { AI_PRIMARY_MODEL, MAX_AI_TOKENS, MS_PER_DAY, MAX_CHAT_HISTORY } from './constants.js';
 import { getAgeInWeeks, weekLabel, calcToiletStats, todayKey, tsToDate } from './utils.js';
+import { petKind, pronoun } from './grammar.js';
 
 // ===== CHAT HISTORY =====
 
@@ -74,7 +75,8 @@ function buildSystemPrompt() {
 
   let petContext = '';
   if (pet) {
-    petContext = `\nКОНТЕКСТ СОБАКИ:\n- Ім'я: ${pet.name || '?'}\n- Вік: ${weekLabel(weeks)}\n- Порода: ${pet.breed || 'метис'}\n- Стать: ${pet.sex || '?'}\n- Вага: ${pet.weight || '?'} кг\n- Режим туалету: ${toiletLabel}`;
+    petContext = `\nКОНТЕКСТ ТВАРИНИ:\n- Ім'я: ${pet.name || '?'}\n- Тип: ${petKind(pet, 'profile')}\n- Вік: ${weekLabel(weeks)}\n- Порода: ${pet.breed || 'метис'}\n- Стать: ${pet.sex || '?'}\n- Займенник: ${pronoun(pet)} / ${pronoun(pet, 'object')}\n- Вага: ${pet.weight || '?'} кг\n- Режим туалету: ${toiletLabel}`;
+    petContext += `\n- Оцінка: тривожність ${pet.anxietyLevel || 'medium'}, соціалізація ${pet.socializationLevel || 'medium'}, мотивація їжею ${pet.foodMotivation || 'medium'}, мотивація грою ${pet.playMotivation || 'medium'}`;
     if (pet.issues) petContext += `\n- Проблеми: ${pet.issues}`;
 
     // Stats
@@ -101,7 +103,8 @@ function buildSystemPrompt() {
 2. Відповідай САМЕ на те, що питає користувач. Не змінюй тему!
 3. Давай конкретні покрокові інструкції (3–7 пунктів).
 4. Кожен крок — 1–2 речення, зрозумілі навіть новачку.
-5. Враховуй вік, породу, вагу, стать собаки.
+	5. Враховуй вік, породу, вагу, стать собаки.
+	5а. Узгоджуй українські дієслова і прикметники з родом тварини: хлопчик — чоловічий рід, дівчинка — жіночий.
 6. Для цуценят до 16 тижнів — обережність, адаптація.
 7. Ніяких покарань, крику, фізичного впливу.
 8. Використовуй клікер/маркер "Так!" як основний інструмент тренувань.

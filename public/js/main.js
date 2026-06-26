@@ -7,8 +7,10 @@ import { state, subscribe, persistTheme } from './state.js';
 import {
   initAuth, loginGoogle, logout, ensureWorkspace,
   subscribePets, subscribeEvents, subscribeReminders, subscribeMembers, subscribeAiMessages,
+  subscribeRoutines,
   switchPet, addPet, savePetProfile, addEvent,
   addReminder, updateReminder, deleteReminder,
+  addRoutine, updateRoutine, deleteRoutine,
   subscribePush, saveAiMessage, clearAiMessages, getIdToken,
 } from './firebase.js';
 import { getCourses, getKnowledge, getProtocols, preloadAll } from './content-loader.js';
@@ -19,6 +21,7 @@ import {
   $, $$, escapeHtml, haptic, localDateKey, nowTime, startOfToday, todayKey,
   tsToDate, getAgeInWeeks, weekLabel, avatarLetter, calcToiletStats, daysBetween,
 } from './utils.js';
+import { bathroomAction, calm, did, petKind, pronoun, ready } from './grammar.js';
 
 const EVENT_TYPES = [
   { id: 'pee_success', label: 'Пісяв правильно', group: 'toilet', short: 'Туалет', value: false },
@@ -49,15 +52,88 @@ const REMINDER_TYPES = [
   { id: 'custom', label: 'Своє', repeat: 'once' },
 ];
 
+const LEVEL_LABELS = {
+  low: 'Низький',
+  medium: 'Середній',
+  high: 'Високий',
+};
+
+const ROUTINE_CATEGORIES = {
+  basic: 'База',
+  toilet: 'Туалет',
+  leash: 'Повідок',
+  recall: 'Підклик',
+  calm: 'Спокій',
+  social: 'Соціалізація',
+  care: 'Догляд',
+  custom: 'Своє',
+};
+
+const ROUTINE_STATUS = {
+  new: 'Нове',
+  progress: 'В процесі',
+  mastered: 'Засвоєно',
+};
+
+const ROUTINE_DIFFICULTY = {
+  easy: 'Легка',
+  medium: 'Середня',
+  hard: 'Складна',
+};
+
+const EMERGENCY_PROTOCOLS = [
+  {
+    id: 'poison',
+    title: 'Підозра на отруєння',
+    signal: 'Швидка реакція критична',
+    symptoms: ['Раптова блювота або слинотеча', 'Слабкість, тремор, судоми', 'Кров, піна, різкий запах з пащі', 'Зʼїла таблетки, шоколад, родентицид, невідому речовину'],
+    actions: ['Заберіть доступ до речовини', 'Сфотографуйте упаковку або залишки', 'Не викликайте блювоту без ветеринара', 'Одразу телефонуйте у клініку і їдьте'],
+    stop: 'Не давайте молоко, олію, активоване вугілля або людські ліки без команди ветеринара.',
+  },
+  {
+    id: 'breathing',
+    title: 'Проблеми з диханням',
+    signal: 'Негайно до ветеринара',
+    symptoms: ['Дихає з відкритою пащею у спокої', 'Сині або дуже бліді ясна', 'Хрипи, задуха, не може лягти', 'Сильна слабкість або непритомність'],
+    actions: ['Зберігайте спокій і не перегрівайте', 'Зніміть тісний нашийник або одяг', 'Не лийте воду в пащу', 'Везіть у найближчу клініку'],
+    stop: 'Не чекайте “поки мине”. Дихання — червоний прапор.',
+  },
+  {
+    id: 'bloat',
+    title: 'Здуття живота',
+    signal: 'Особливо небезпечно для великих собак',
+    symptoms: ['Живіт різко збільшився або твердий', 'Намагається блювати, але нічого не виходить', 'Неспокій, слинотеча, слабкість', 'Швидке дихання після їжі або активності'],
+    actions: ['Не годуйте і не поїть', 'Не масажуйте живіт', 'Телефонуйте в клініку дорогою', 'Їдьте негайно'],
+    stop: 'Це може бути заворот шлунка. Рахунок може йти на хвилини.',
+  },
+  {
+    id: 'seizure',
+    title: 'Судоми',
+    signal: 'Контролюйте час',
+    symptoms: ['Падіння, тремтіння, втрата контролю', 'Піна або слина', 'Після нападу дезорієнтація', 'Напад довше 2-3 хв або повторюється'],
+    actions: ['Приберіть предмети навколо', 'Не лізьте в пащу', 'Засічіть час', 'Після нападу тримайте у тиші і телефонуйте ветеринару'],
+    stop: 'Якщо напад довше 5 хв або серія нападів — це екстрено.',
+  },
+  {
+    id: 'trauma',
+    title: 'Травма або сильний біль',
+    signal: 'Не змушуйте рухатись',
+    symptoms: ['Кульгавість, крик, не дає торкнутись', 'Кровотеча або відкрита рана', 'Падіння, ДТП, укус', 'Підозра на перелом або хребет'],
+    actions: ['Обмежте рух', 'Накладіть легкий тиск на кровотечу чистою тканиною', 'Не давайте знеболювальні для людей', 'Їдьте у клініку'],
+    stop: 'Ібупрофен, парацетамол та інші людські препарати можуть бути токсичними.',
+  },
+];
+
 const app = {
   tab: 'tabToday',
   eventType: 'pee_success',
-  academySection: 'programs',
+  academySection: 'plan',
   diaryFilter: 'all',
   calendarFilter: 'all',
   petModalMode: 'edit',
   aiPending: false,
   renderQueued: false,
+  lastFocus: null,
 };
 
 boot();
@@ -86,6 +162,7 @@ function initAuthFlow() {
       subscribePets();
       subscribeEvents();
       subscribeReminders();
+      subscribeRoutines();
       subscribeMembers();
       subscribeAiMessages();
       await waitForInitialData();
@@ -148,7 +225,7 @@ function bindGlobalEvents() {
   document.addEventListener('touchstart', unlock, { once: true });
   document.addEventListener('click', unlock, { once: true });
 
-  subscribe(['pet', 'pets', 'events', 'reminders', 'members', 'aiChat', 'ui.theme'], scheduleRender);
+  subscribe(['pet', 'pets', 'events', 'reminders', 'routines', 'members', 'aiChat', 'ui.theme'], scheduleRender);
 }
 
 async function handleDelegatedSubmit(e) {
@@ -171,6 +248,7 @@ function bindForms() {
 
   $('eventForm')?.addEventListener('submit', saveEventFromForm);
   $('reminderForm')?.addEventListener('submit', saveReminderFromForm);
+  $('routineForm')?.addEventListener('submit', saveRoutineFromForm);
   $('petForm')?.addEventListener('submit', savePetFromForm);
   $('aiForm')?.addEventListener('submit', submitAi);
 }
@@ -236,6 +314,25 @@ async function handleClick(e) {
     return;
   }
 
+  const emergency = e.target.closest('[data-emergency]');
+  if (emergency) {
+    openEmergencyModal(emergency.dataset.emergency);
+    return;
+  }
+
+  const routineStatus = e.target.closest('[data-routine-status]');
+  if (routineStatus) {
+    await updateRoutine(routineStatus.dataset.routineStatus, { status: routineStatus.value });
+    return;
+  }
+
+  const routineDelete = e.target.closest('[data-routine-delete]');
+  if (routineDelete) {
+    const ok = await confirmDialog('Видалити вправу?', 'Вона зникне з плану тренування.', 'Видалити', true);
+    if (ok) await deleteRoutine(routineDelete.dataset.routineDelete);
+    return;
+  }
+
   const academy = e.target.closest('[data-academy]');
   if (academy) {
     app.academySection = academy.dataset.academy;
@@ -262,6 +359,7 @@ async function runAction(action) {
   switch (action) {
     case 'open-event': openEventModal(); break;
     case 'open-reminder': openReminderModal('custom'); break;
+    case 'open-routine': openRoutineModal(); break;
     case 'open-pet': openPetModal('edit'); break;
     case 'add-pet': openPetModal('new'); break;
     case 'open-ai': openAiModal(); break;
@@ -297,6 +395,7 @@ function setTab(tabId) {
     screen.classList.toggle('active', active);
     screen.hidden = !active;
     screen.setAttribute('aria-hidden', String(!active));
+    screen.inert = !active;
   });
   $$('.nav-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tabId));
   renderActiveTab();
@@ -343,16 +442,21 @@ function renderToday() {
   const stats = calcToiletStats(todayEvents);
   const reminders = getTodayReminders();
   const next = reminders.find((r) => !r.done);
+  const smart = getSmartToday(pet, todayEvents, reminders);
 
   view.innerHTML = `
     <section class="hero-card">
       <div class="hero-top">
         <div>
           <span class="overline">Сьогодні</span>
-          <h2>${next ? escapeHtml(next.title) : 'План на день чистий'}</h2>
-          <p>${next ? `${escapeHtml(next.time || 'Без часу')} · ${repeatLabel(next.repeat)}` : 'Додайте прогулянку, годування або тренування.'}</p>
+          <h2>${escapeHtml(smart.title)}</h2>
+          <p>${escapeHtml(smart.reason)}</p>
         </div>
         <button class="secondary-btn" data-action="open-ai" type="button">AI</button>
+      </div>
+      <div class="smart-strip">
+        <span>${escapeHtml(smart.priority)}</span>
+        <strong>${escapeHtml(next ? `${next.time || 'Без часу'} · ${next.title}` : `${petKind(pet)} ${ready(pet)} до плану`)}</strong>
       </div>
       <div class="hero-actions">
         <button class="primary-btn" data-action="open-event" type="button">Швидкий запис</button>
@@ -370,10 +474,14 @@ function renderToday() {
       <span class="overline">Екстрено</span>
       <h2>Коли не чекати</h2>
       <p>Їдьте до ветеринара зараз, якщо є проблеми з диханням, судоми, кров, сильна млявість, багаторазова блювота, здуття живота або підозра на отруєння.</p>
-      <ul>
-        <li>Людські ліки не давати без ветеринара.</li>
-        <li>При отруєнні або сторонньому предметі час критичний.</li>
-      </ul>
+      <div class="emergency-grid">
+        ${EMERGENCY_PROTOCOLS.slice(0, 5).map(protocol => `
+          <button class="emergency-chip" data-emergency="${protocol.id}" type="button">
+            <strong>${escapeHtml(protocol.title)}</strong>
+            <span>${escapeHtml(protocol.signal)}</span>
+          </button>
+        `).join('')}
+      </div>
     </section>
 
     <div class="section-head"><div><h2>Швидкий запис</h2><p>Найчастіші дії для ${escapeHtml(pet.name || 'тварини')}</p></div></div>
@@ -426,7 +534,7 @@ async function renderAcademy() {
       </div>
     </section>
     <div class="tabs">
-      ${['programs:Програми','problems:Проблеми','lesson:Урок дня','knowledge:База'].map(item => {
+      ${['plan:План','programs:Програми','problems:Проблеми','lesson:Урок дня','knowledge:База'].map(item => {
         const [id, label] = item.split(':');
         return `<button class="tab-pill ${app.academySection === id ? 'active' : ''}" data-academy="${id}" type="button">${label}</button>`;
       }).join('')}
@@ -440,11 +548,13 @@ async function renderAcademyContent() {
   const box = $('academyContent');
   if (!box) return;
   try {
-    if (app.academySection === 'programs') {
+    if (app.academySection === 'plan') {
+      box.innerHTML = renderTrainingPlan();
+    } else if (app.academySection === 'programs') {
       const courses = await getCourses();
       box.innerHTML = courses.slice(0, 8).map(c => `
         <article class="course-card">
-          <h3>${escapeHtml(c.title)}</h3><p>${escapeHtml(c.description)}</p>
+          <h3>${escapeHtml(c.title)}</h3><p>${escapeHtml(personalizeCopy(c.description))}</p>
           <footer><span>${escapeHtml(c.level || 'курс')}</span><button class="text-btn" data-action="open-ai" type="button">Питання</button></footer>
         </article>
       `).join('');
@@ -453,7 +563,7 @@ async function renderAcademyContent() {
       box.innerHTML = protocols.slice(0, 8).map(p => `
         <article class="course-card">
           <h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.duration || 'Покроковий план')}</p>
-          <ol class="steps-list">${(p.steps || []).slice(0, 4).map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+          <ol class="steps-list">${(p.steps || []).slice(0, 4).map(s => `<li>${escapeHtml(personalizeCopy(s))}</li>`).join('')}</ol>
         </article>
       `).join('');
     } else if (app.academySection === 'lesson') {
@@ -467,7 +577,7 @@ async function renderAcademyContent() {
     } else {
       const knowledge = await getKnowledge();
       box.innerHTML = knowledge.map(k => `
-        <article class="course-card"><h3>${escapeHtml(k.title)}</h3><p>${escapeHtml(k.text)}</p><footer><span>${escapeHtml(k.tag || 'знання')}</span></footer></article>
+        <article class="course-card"><h3>${escapeHtml(k.title)}</h3><p>${escapeHtml(personalizeCopy(k.text))}</p><footer><span>${escapeHtml(k.tag || 'знання')}</span></footer></article>
       `).join('');
     }
   } catch {
@@ -483,6 +593,13 @@ function renderDiary() {
     <section class="hero-card">
       <div><span class="overline">Щоденник</span><h2>${events.length} записів</h2><p>Історія, фільтри і базова аналітика.</p></div>
     </section>
+    <section class="insight-grid">
+      <article class="metric-card"><strong>${events.filter(e => e.eventType === 'weight').length}</strong><span>заміри ваги</span></article>
+      <article class="metric-card"><strong>${events.filter(e => ['medicine', 'vet_visit'].includes(e.eventType)).length}</strong><span>здоровʼя</span></article>
+      <article class="metric-card"><strong>${events.filter(e => e.eventType === 'walk').length}</strong><span>прогулянки</span></article>
+    </section>
+    <div class="section-head"><div><h2>Health timeline</h2><p>Вага, ліки, вакцинації, ветеринар і догляд</p></div></div>
+    <section class="timeline-list">${renderHealthTimeline()}</section>
     <div class="filters">
       ${['all:Усе','toilet:Туалет','food:Їжа','activity:Активність','health:Здоровʼя'].map(item => {
         const [id, label] = item.split(':');
@@ -522,10 +639,142 @@ function renderProfile() {
       <article class="profile-card"><h3>Сповіщення</h3><p>${pushStatus()}</p><button class="text-btn" data-action="enable-push" type="button">Увімкнути</button></article>
       <article class="profile-card"><h3>Дані</h3><p>Експорт щоденника і профілю.</p><button class="text-btn" data-action="export" type="button">Експорт JSON</button></article>
     </div>
+    <div class="section-head"><div><h2>Оцінка тварини</h2><p>Режим, мотивація і поведінковий профіль</p></div></div>
+    <section class="assessment-grid">${renderPetAssessment(pet)}</section>
+    <div class="section-head"><div><h2>Активність команди</h2><p>Хто що додав у спільний простір</p></div></div>
+    <section class="timeline-list">${renderTeamActivity()}</section>
     <div class="section-head"><div><h2>Здоров'я</h2><p>Автоматичний графік за віком</p></div></div>
     <section class="panel"><div id="healthScheduleMount"></div></section>
   `;
   renderHealthSchedule($('healthScheduleMount'));
+}
+
+function renderPetAssessment(pet) {
+  const items = [
+    ['Вік', weekLabel(getAgeInWeeks(pet.birthDate)) || 'Не вказано'],
+    ['Туалет', toiletModeLabel(pet.toiletMode)],
+    ['Тривожність', LEVEL_LABELS[pet.anxietyLevel || 'medium']],
+    ['Соціалізація', LEVEL_LABELS[pet.socializationLevel || 'medium']],
+    ['Їжа', LEVEL_LABELS[pet.foodMotivation || 'medium']],
+    ['Гра', LEVEL_LABELS[pet.playMotivation || 'medium']],
+  ];
+  return items.map(([label, value]) => `
+    <article class="assessment-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </article>
+  `).join('');
+}
+
+function renderTrainingPlan() {
+  const routines = state.routines.items.filter(r => !r.petId || r.petId === state.ui.currentPetId);
+  return `
+    <section class="tool-panel">
+      <div class="section-head compact">
+        <div><h2>План тренування</h2><p>Вправи, повтори, складність і статус прогресу.</p></div>
+        <button class="primary-btn" data-action="open-routine" type="button">Створити</button>
+      </div>
+      <div class="routine-list">
+        ${routines.length ? routines.map(renderRoutineRow).join('') : `
+          <div class="empty-state">
+            План ще порожній. Додайте першу вправу: контакт, туалет, повідок або спокій.
+          </div>
+        `}
+      </div>
+    </section>
+  `;
+}
+
+function renderRoutineRow(item) {
+  return `
+    <article class="routine-row">
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml([
+          ROUTINE_CATEGORIES[item.category] || 'Своє',
+          `${item.reps || 1} повторів`,
+          `${item.durationMin || 5} хв`,
+          ROUTINE_DIFFICULTY[item.difficulty] || 'Легка',
+          item.createdByName ? `додав ${item.createdByName}` : '',
+        ].filter(Boolean).join(' · '))}</small>
+        ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ''}
+      </div>
+      <div class="routine-actions">
+        <select data-routine-status="${escapeHtml(item.id)}" aria-label="Статус вправи">
+          ${Object.entries(ROUTINE_STATUS).map(([id, label]) => `<option value="${id}" ${item.status === id ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+        <button class="row-delete" data-routine-delete="${escapeHtml(item.id)}" type="button" aria-label="Видалити вправу">×</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderHealthTimeline() {
+  const pet = state.pet.data || {};
+  const items = [];
+  const pushProfileDate = (date, title, note) => {
+    if (!date) return;
+    items.push({ date, title, note, by: 'Профіль' });
+  };
+  pushProfileDate(pet.lastVaccine, 'Остання вакцинація', 'Профіль здоровʼя');
+  pushProfileDate(pet.lastDeworming, 'Дегельмінтизація', 'Профіль здоровʼя');
+  pushProfileDate(pet.lastHeat, 'Тічка', 'Профіль здоровʼя');
+
+  state.events.items
+    .filter(e => ['weight', 'medicine', 'vet_visit', 'grooming'].includes(e.eventType))
+    .forEach((e) => {
+      const date = tsToDate(e.createdAt);
+      items.push({
+        date: date ? localDateKey(date) : '',
+        title: eventLabel(e.eventType),
+        note: e.value ? `${e.value} кг` : e.note,
+        by: e.byName || 'Команда',
+      });
+    });
+
+  state.reminders.items
+    .filter(r => ['medicine', 'vaccine', 'vet', 'grooming', 'heat'].includes(r.type))
+    .forEach((r) => items.push({ date: r.date, title: r.title, note: r.note || repeatLabel(r.repeat), by: r.createdByName || 'Команда' }));
+
+  items.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!items.length) return '<div class="empty-state">Поки немає медичних записів. Додайте вагу, ліки, вакцину або візит до ветеринара.</div>';
+  return items.slice(0, 12).map(item => `
+    <article class="timeline-row">
+      <time>${escapeHtml(item.date || '—')}</time>
+      <div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml([item.note, item.by].filter(Boolean).join(' · '))}</small></div>
+    </article>
+  `).join('');
+}
+
+function renderTeamActivity() {
+  const items = [
+    ...state.events.items.slice(0, 20).map(e => ({
+      date: tsToDate(e.createdAt),
+      title: eventLabel(e.eventType),
+      by: e.byName || 'Команда',
+      note: e.note || 'Щоденник',
+    })),
+    ...state.reminders.items.slice(0, 20).map(r => ({
+      date: tsToDate(r.createdAt),
+      title: r.title,
+      by: r.createdByName || 'Команда',
+      note: 'Календар',
+    })),
+    ...state.routines.items.slice(0, 20).map(r => ({
+      date: tsToDate(r.createdAt),
+      title: r.title,
+      by: r.createdByName || 'Команда',
+      note: 'Тренування',
+    })),
+  ].filter(i => i.date).sort((a, b) => b.date - a.date).slice(0, 8);
+
+  if (!items.length) return '<div class="empty-state">Командна активність зʼявиться після перших записів.</div>';
+  return items.map(item => `
+    <article class="timeline-row">
+      <time>${escapeHtml(item.date.toLocaleDateString('uk', { day: 'numeric', month: 'short' }))}</time>
+      <div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(`${item.note} · ${item.by}`)}</small></div>
+    </article>
+  `).join('');
 }
 
 function renderReminderRows(items) {
@@ -534,14 +783,17 @@ function renderReminderRows(items) {
     <article class="agenda-row ${r.done ? 'done' : ''}">
       ${r.virtual ? '<span class="agenda-dot"></span>' : `<input class="agenda-check" type="checkbox" data-reminder-done="${escapeHtml(r.id)}" ${r.done ? 'checked' : ''} aria-label="Виконано">`}
       <div><strong>${escapeHtml(r.title)}</strong><small>${escapeHtml([r.date, r.note || repeatLabel(r.repeat)].filter(Boolean).join(' · '))}</small></div>
-      <time>${escapeHtml(r.time || '—')}</time>
+      <div class="row-actions">
+        <time>${escapeHtml(r.time || '—')}</time>
+        ${r.virtual ? '' : `<button class="row-delete" data-reminder-delete="${escapeHtml(r.id)}" type="button" aria-label="Видалити задачу">×</button>`}
+      </div>
     </article>
   `).join('');
 }
 
 function renderEventRow(e) {
   const def = getEventDef(e.eventType);
-  return `<article class="diary-item"><div><strong>${escapeHtml(def?.label || e.eventType)}</strong><small>${escapeHtml([formatEventDate(e), e.note].filter(Boolean).join(' · '))}</small></div><small>${escapeHtml(e.timeLabel || '')}</small></article>`;
+  return `<article class="diary-item"><div><strong>${escapeHtml(eventLabel(e.eventType))}</strong><small>${escapeHtml([formatEventDate(e), e.note].filter(Boolean).join(' · '))}</small></div><small>${escapeHtml(e.timeLabel || '')}</small></article>`;
 }
 
 function openEventModal(type = 'pee_success') {
@@ -557,7 +809,7 @@ function openEventModal(type = 'pee_success') {
 function renderEventTypes() {
   const grid = $('eventTypeGrid');
   if (!grid) return;
-  grid.innerHTML = EVENT_TYPES.map(t => `<button class="type-btn ${app.eventType === t.id ? 'active' : ''}" data-event-type="${t.id}" type="button"><strong>${escapeHtml(t.short)}</strong><span>${escapeHtml(t.label)}</span></button>`).join('');
+  grid.innerHTML = EVENT_TYPES.map(t => `<button class="type-btn ${app.eventType === t.id ? 'active' : ''}" data-event-type="${t.id}" type="button"><strong>${escapeHtml(t.short)}</strong><span>${escapeHtml(eventLabel(t.id))}</span></button>`).join('');
 }
 
 function openReminderModal(type = 'custom') {
@@ -587,15 +839,58 @@ function openPetModal(mode = 'edit', opts = {}) {
   $('petVaccineInput').value = pet.lastVaccine || '';
   $('petDewormingInput').value = pet.lastDeworming || '';
   $('petHeatInput').value = pet.lastHeat || '';
+  $('petAnxietyInput').value = pet.anxietyLevel || 'medium';
+  $('petSocialInput').value = pet.socializationLevel || 'medium';
+  $('petFoodMotivationInput').value = pet.foodMotivation || 'medium';
+  $('petPlayMotivationInput').value = pet.playMotivation || 'medium';
+  $('petActivityInput').value = pet.activityLevel || 'medium';
   $('petIssuesInput').value = pet.issues || '';
   openModal('petModal');
   if (opts.force) $('petModal').dataset.force = 'true';
+}
+
+function openRoutineModal() {
+  $('routineTitle').value = '';
+  $('routineCategory').value = 'basic';
+  $('routineReps').value = '5';
+  $('routineDuration').value = '5';
+  $('routineDifficulty').value = 'easy';
+  $('routineStatus').value = 'new';
+  $('routineNote').value = '';
+  openModal('routineModal');
 }
 
 function openAiModal() {
   renderAiMessages();
   openModal('aiModal');
   $('aiInput')?.focus();
+}
+
+function openEmergencyModal(id) {
+  const protocol = EMERGENCY_PROTOCOLS.find(p => p.id === id);
+  if (!protocol) return;
+  setText('emergencyTitle', protocol.title);
+  const box = $('emergencyContent');
+  if (box) {
+    box.innerHTML = `
+      <div class="protocol-block danger">
+        <strong>${escapeHtml(protocol.signal)}</strong>
+        <p>${escapeHtml(protocol.stop)}</p>
+      </div>
+      <div class="protocol-grid">
+        <section>
+          <h3>Як виявити</h3>
+          <ul>${protocol.symptoms.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+        </section>
+        <section>
+          <h3>Що робити зараз</h3>
+          <ol>${protocol.actions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+        </section>
+      </div>
+      <button class="primary-btn full" data-close-modal="emergencyModal" type="button">Зрозуміло</button>
+    `;
+  }
+  openModal('emergencyModal');
 }
 
 async function saveEventFromForm(e) {
@@ -620,12 +915,15 @@ async function saveEventFromForm(e) {
 async function saveReminderFromForm(e) {
   e.preventDefault();
   try {
+    const repeat = $('reminderRepeat').value;
     await addReminder({
       title: $('reminderTitle').value.trim(),
       type: $('reminderType').value,
       date: $('reminderDate').value || localDateKey(),
       time: $('reminderTime').value,
-      repeat: $('reminderRepeat').value,
+      repeat,
+      intervalHours: repeat === 'interval' ? 3 : undefined,
+      anchor: repeat === 'after_meal' ? 'meal' : repeat === 'after_sleep' ? 'sleep' : undefined,
       note: $('reminderNote').value.trim(),
     });
     closeModal('reminderModal');
@@ -633,6 +931,26 @@ async function saveReminderFromForm(e) {
   } catch (err) {
     console.error(err);
     toast('Не вдалося додати задачу', 'error');
+  }
+}
+
+async function saveRoutineFromForm(e) {
+  e.preventDefault();
+  try {
+    await addRoutine({
+      title: $('routineTitle').value.trim(),
+      category: $('routineCategory').value,
+      reps: $('routineReps').value,
+      durationMin: $('routineDuration').value,
+      difficulty: $('routineDifficulty').value,
+      status: $('routineStatus').value,
+      note: $('routineNote').value.trim(),
+    });
+    closeModal('routineModal');
+    toast('Вправу додано', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Не вдалося додати вправу', 'error');
   }
 }
 
@@ -649,6 +967,11 @@ async function savePetFromForm(e) {
     lastVaccine: $('petVaccineInput').value,
     lastDeworming: $('petDewormingInput').value,
     lastHeat: $('petHeatInput').value,
+    anxietyLevel: $('petAnxietyInput').value,
+    socializationLevel: $('petSocialInput').value,
+    foodMotivation: $('petFoodMotivationInput').value,
+    playMotivation: $('petPlayMotivationInput').value,
+    activityLevel: $('petActivityInput').value,
     issues: $('petIssuesInput').value.trim(),
   };
   if (!payload.name) {
@@ -741,9 +1064,17 @@ function applyTheme() {
 function openModal(id) {
   const el = $(id);
   if (!el) return;
+  app.lastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   el.classList.remove('hidden');
   el.setAttribute('aria-hidden', 'false');
+  el.inert = false;
+  $('appContent')?.setAttribute('inert', '');
+  $('authScreen')?.setAttribute('inert', '');
   document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => {
+    const focusable = el.querySelector('input, select, textarea, button, [tabindex]:not([tabindex="-1"])');
+    focusable?.focus();
+  });
 }
 
 function closeModal(id) {
@@ -752,7 +1083,14 @@ function closeModal(id) {
   if (id === 'petModal' && el.dataset.force === 'true' && !state.pet.data?.name?.trim()) return;
   el.classList.add('hidden');
   el.setAttribute('aria-hidden', 'true');
-  if (!document.querySelector('.modal:not(.hidden)')) document.body.style.overflow = '';
+  el.inert = true;
+  if (!document.querySelector('.modal:not(.hidden)')) {
+    document.body.style.overflow = '';
+    $('appContent')?.removeAttribute('inert');
+    $('authScreen')?.removeAttribute('inert');
+    app.lastFocus?.focus?.();
+    app.lastFocus = null;
+  }
 }
 
 function confirmDialog(title, message, okText = 'Так', danger = false) {
@@ -835,6 +1173,58 @@ function getTodayReminders() {
   return [...calendar, ...health].slice(0, 8);
 }
 
+function getSmartToday(pet, todayEvents, reminders) {
+  const hour = new Date().getHours();
+  const pending = reminders.find(r => !r.done);
+  if (pending) {
+    return {
+      title: pending.title,
+      reason: `${pending.time || 'Без часу'} · ${repeatLabel(pending.repeat)} · найближча задача у календарі.`,
+      priority: 'Наступна задача',
+    };
+  }
+
+  const ageWeeks = getAgeInWeeks(pet.birthDate);
+  const lastToilet = [...todayEvents].find(e => ['pee_success', 'poo_success', 'pee_miss', 'poo_miss'].includes(e.eventType));
+  if (ageWeeks && ageWeeks < 20 && !lastToilet) {
+    return {
+      title: 'Почніть з туалету',
+      reason: `Для цуценяти ${weekLabel(ageWeeks)} туалет після сну, їжі й гри важливіший за довге тренування.`,
+      priority: 'Цуценя',
+    };
+  }
+
+  if (hour < 11 && !todayEvents.some(e => e.eventType === 'meal_morning')) {
+    return {
+      title: 'Ранковий режим',
+      reason: `Запишіть сніданок і коротку активність, щоб день ${pronoun(pet, 'dative')} був передбачуваним.`,
+      priority: 'Ранок',
+    };
+  }
+
+  if (!todayEvents.some(e => e.eventType === 'training')) {
+    return {
+      title: '5 хвилин тренування',
+      reason: `${petKind(pet)} ${ready(pet)} до короткої вправи: контакт, спокій або повідок.`,
+      priority: 'Навчання',
+    };
+  }
+
+  if (hour >= 18 && !todayEvents.some(e => e.eventType === 'meal_evening')) {
+    return {
+      title: 'Вечірній запис',
+      reason: 'Додайте вечерю, прогулянку або спостереження за поведінкою.',
+      priority: 'Вечір',
+    };
+  }
+
+  return {
+    title: `${petKind(pet, 'profile')} ${calm(pet)} сьогодні`,
+    reason: 'Основні записи є. Перевірте воду, спокій і найближчі задачі.',
+    priority: 'Стабільно',
+  };
+}
+
 function getCalendarReminders() {
   const filter = app.calendarFilter;
   const healthTypes = ['medicine', 'vaccine', 'vet', 'grooming', 'heat'];
@@ -857,26 +1247,61 @@ function filteredEvents() {
 
 function sortByTime(a, b) { return (a.time || '99:99').localeCompare(b.time || '99:99'); }
 function repeatLabel(value) {
-  return { once: 'Разово', daily: 'Щодня', weekly: 'Щотижня' }[value] || 'Разово';
+  return {
+    once: 'Разово',
+    daily: 'Щодня',
+    weekly: 'Щотижня',
+    interval: 'Кожні кілька годин',
+    after_meal: 'Після їжі',
+    after_sleep: 'Після сну',
+  }[value] || 'Разово';
 }
 function quickButtons() {
+  const pet = state.pet.data || {};
   const mode = state.pet.data?.toiletMode || 'pad';
   if (mode === 'outdoor') {
     return [
-      { id: 'pee_success', title: 'Пісяв на вулиці', meta: 'успіх' },
-      { id: 'poo_success', title: 'Какав на вулиці', meta: 'успіх' },
+      { id: 'pee_success', title: did(pet, 'Пісяв на вулиці', 'Пісяла на вулиці'), meta: 'успіх' },
+      { id: 'poo_success', title: did(pet, 'Какав на вулиці', 'Какала на вулиці'), meta: 'успіх' },
       { id: 'walk', title: 'Прогулянка', meta: 'рух' },
       { id: 'training', title: 'Тренування', meta: 'заняття' },
     ];
   }
   return [
-    { id: 'pee_success', title: 'Пісяв правильно', meta: 'пелюшка / місце' },
+    { id: 'pee_success', title: bathroomAction(pet, 'pee_success'), meta: 'пелюшка / місце' },
     { id: 'pee_miss', title: 'Промах', meta: 'без емоцій' },
     { id: 'walk', title: 'Прогулянка', meta: 'рух' },
     { id: 'training', title: 'Тренування', meta: 'заняття' },
   ];
 }
 function getEventDef(type) { return EVENT_TYPES.find(t => t.id === type); }
+function eventLabel(type) {
+  const pet = state.pet.data || {};
+  return bathroomAction(pet, type) || getEventDef(type)?.label || type;
+}
+function personalizeCopy(text = '') {
+  const pet = state.pet.data || {};
+  const replacements = [
+    ['Сама', did(pet, 'Сам', 'Сама')],
+    ['сама', did(pet, 'сам', 'сама')],
+    ['Кинула', did(pet, 'Кинув', 'Кинула')],
+    ['кинула', did(pet, 'кинув', 'кинула')],
+    ['Лягла', did(pet, 'Ліг', 'Лягла')],
+    ['лягла', did(pet, 'ліг', 'лягла')],
+    ['Підійшла', did(pet, 'Підійшов', 'Підійшла')],
+    ['підійшла', did(pet, 'підійшов', 'підійшла')],
+    ['Зробила', did(pet, 'Зробив', 'Зробила')],
+    ['зробила', did(pet, 'зробив', 'зробила')],
+    ['Спокійна', did(pet, 'Спокійний', 'Спокійна')],
+    ['спокійна', did(pet, 'спокійний', 'спокійна')],
+    ['готова', did(pet, 'готовий', 'готова')],
+    ['Готова', did(pet, 'Готовий', 'Готова')],
+  ];
+  return replacements.reduce((acc, [from, to]) => acc.replaceAll(from, to), String(text));
+}
+function toiletModeLabel(value) {
+  return { pad: 'Пелюшка', outdoor: 'Вулиця', transition: 'Перехід' }[value] || 'Не вказано';
+}
 function formatEventDate(event) {
   const date = tsToDate(event.createdAt);
   return date ? date.toLocaleDateString('uk', { day: 'numeric', month: 'short' }) : '';

@@ -1,0 +1,16 @@
+{
+  "name": "dog-coach-family-pwa",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  },
+  "scripts": {
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:indexes": "firebase deploy --only firestore:indexes"
+  }
+}

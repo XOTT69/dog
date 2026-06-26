@@ -58,23 +58,12 @@ export const VACCINE_INTERVAL_DAYS = 365;
 export const HEAT_CYCLE_DAYS = 180;
 
 // ===== CACHE =====
-export const SW_CACHE_VERSION = 'dogcoach-v2';
+export const SW_CACHE_VERSION = 'dogcoach-v5';
 export const AI_PLAN_CACHE_HOURS = 24;
-
-// ===== FIREBASE CONFIG =====
-const DEFAULT_AUTH_DOMAIN = 'dogs-55f5e.firebaseapp.com';
-
-function resolveAuthDomain() {
-  if (typeof window === 'undefined') return DEFAULT_AUTH_DOMAIN;
-  const host = window.location.hostname;
-  if (!host || host === 'localhost' || host === '127.0.0.1') return DEFAULT_AUTH_DOMAIN;
-  if (host.endsWith('.firebaseapp.com') || host.endsWith('.web.app')) return host;
-  return host;
-}
 
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: resolveAuthDomain(),
+  authDomain: 'dogs-55f5e.firebaseapp.com',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: '1053489833652',

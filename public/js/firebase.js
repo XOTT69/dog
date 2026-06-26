@@ -15,6 +15,7 @@ const db = firebase.firestore();
 
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+auth.useDeviceLanguage();
 
 // Enable offline persistence
 db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
@@ -91,6 +92,7 @@ export function initAuth(onReady) {
       localStorage.removeItem('dc_auth_redirect_pending');
       if (e.code && e.code !== 'auth/no-auth-event') {
         console.error('[Auth] Redirect error:', e);
+        localStorage.setItem('dc_auth_error', `${e.code}: ${e.message || 'Google sign-in failed'}`);
       }
       return null;
     });
@@ -119,7 +121,7 @@ export async function loginGoogle() {
   try {
     await auth.signInWithPopup(googleProvider);
   } catch (e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
       localStorage.setItem('dc_auth_redirect_pending', 'true');
       await auth.signInWithRedirect(googleProvider);
     } else {

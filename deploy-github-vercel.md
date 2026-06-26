@@ -46,7 +46,7 @@ Authorized redirect URIs:
 
 - `https://dogs-55f5e.firebaseapp.com/__/auth/handler`
 - `https://dogs-55f5e.web.app/__/auth/handler`
-- `https://your-app.vercel.app/__/auth/handler`, якщо застосунок відкривається з Vercel
+- `https://your-app.vercel.app/__/auth/handler`, тільки якщо окремо налаштований custom auth domain на Vercel
 - `https://your-custom-domain.com/__/auth/handler`, якщо є кастомний домен
 
 Authorized JavaScript origins:
@@ -55,10 +55,12 @@ Authorized JavaScript origins:
 - `https://your-custom-domain.com`
 - `http://localhost:4177` для локального тесту
 
-У коді `authDomain` автоматично стає поточним production-доменом, тому для Vercel/custom domain redirect URI саме такий:
+У коді `authDomain` фіксований:
 
 ```text
-https://ДОМЕН-ДЕ-ВІДКРИВАЄТЬСЯ-ДОДАТОК/__/auth/handler
+dogs-55f5e.firebaseapp.com
 ```
+
+Тому головний redirect URI для Google OAuth має бути саме `https://dogs-55f5e.firebaseapp.com/__/auth/handler`.
 
 Після зміни OAuth налаштувань зачекай 2-5 хвилин, зроби hard refresh або відкрий застосунок у приватному вікні.

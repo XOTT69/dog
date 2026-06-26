@@ -74,6 +74,7 @@ function initAuthFlow() {
   initAuth(async (user) => {
     if (!user) {
       showAuth();
+      showAuthErrorIfAny();
       return;
     }
 
@@ -107,6 +108,13 @@ function initAuthFlow() {
       hideLoading();
     }
   });
+}
+
+function showAuthErrorIfAny() {
+  const message = localStorage.getItem('dc_auth_error');
+  if (!message) return;
+  localStorage.removeItem('dc_auth_error');
+  toast(message, 'error');
 }
 
 function waitForInitialData() {

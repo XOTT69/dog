@@ -138,23 +138,23 @@ function _syncCurrentPet() {
  * @param {Function} onReady - Called once user state is determined
  */
 export function initAuth(onReady) {
+  auth.onAuthStateChanged((user) => {
+    batch(() => {
+      state.auth.user = user ? {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      } : null;
+      state.auth.loading = false;
+    });
+    onReady(user);
+  });
+
   auth.getRedirectResult().catch((e) => {
     if (e.code && e.code !== 'auth/no-auth-event') {
       console.error('[Auth] Redirect error:', e);
     }
-  }).finally(() => {
-    auth.onAuthStateChanged((user) => {
-      batch(() => {
-        state.auth.user = user ? {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-        } : null;
-        state.auth.loading = false;
-      });
-      onReady(user);
-    });
   });
 }
 
@@ -162,7 +162,25 @@ export function initAuth(onReady) {
  * Sign in with Google
  */
 export async function loginGoogle() {
-  await auth.signInWithRedirect(googleProvider);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  if (isIOS || isStandalone) {
+    await auth.signInWithRedirect(googleProvider);
+    return;
+  }
+
+  try {
+    await auth.signInWithPopup(googleProvider);
+  } catch (e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
+      await auth.signInWithRedirect(googleProvider);
+    } else {
+      throw e;
+    }
+  }
 }
 
 /**

@@ -62,24 +62,9 @@ export const SW_CACHE_VERSION = 'dogcoach-v2';
 export const AI_PLAN_CACHE_HOURS = 24;
 
 // ===== FIREBASE CONFIG =====
-const DEFAULT_AUTH_DOMAIN = 'dogs-55f5e.firebaseapp.com';
-
-function getFirebaseAuthDomain() {
-  if (typeof window === 'undefined' || !window.location) return DEFAULT_AUTH_DOMAIN;
-  const { hostname, host, protocol } = window.location;
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  const isFirebaseHosted = hostname.endsWith('.firebaseapp.com') || hostname.endsWith('.web.app');
-
-  if (protocol === 'https:' && !isLocal && !isFirebaseHosted) {
-    return host;
-  }
-
-  return DEFAULT_AUTH_DOMAIN;
-}
-
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCY2SkRPpopi7mtsihrlqocxdgG8cBjNHI',
-  authDomain: getFirebaseAuthDomain(),
+  authDomain: 'dogs-55f5e.firebaseapp.com',
   projectId: 'dogs-55f5e',
   storageBucket: 'dogs-55f5e.firebasestorage.app',
   messagingSenderId: '1053489833652',

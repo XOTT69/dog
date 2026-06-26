@@ -22,21 +22,12 @@ let launchActionHandled = false;
 // ===== BOOT =====
 
 function boot() {
-  if (normalizeLocalhostForFirebaseAuth()) return;
   applyTheme();
   bindGlobalEvents();
   renderChat();
   setActiveTab(resolveTabFromRoute(), { skipHistory: true });
   initAuthFlow();
   updateOnlineStatus();
-}
-
-function normalizeLocalhostForFirebaseAuth() {
-  if (window.location.hostname !== '127.0.0.1') return false;
-  const target = new URL(window.location.href);
-  target.hostname = 'localhost';
-  window.location.replace(target.toString());
-  return true;
 }
 
 // ===== AUTH FLOW =====

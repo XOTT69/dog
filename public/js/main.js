@@ -8,10 +8,10 @@ import {
   initAuth, loginGoogle, logout, ensureWorkspace,
   subscribePets, subscribeEvents, subscribeReminders, subscribeMembers, subscribeAiMessages,
   subscribeRoutines,
-  switchPet, addPet, savePetProfile, addEvent,
+  switchPet, addPet, savePetProfile, addEvent, deleteEvent,
   addReminder, updateReminder, deleteReminder,
   addRoutine, updateRoutine, deleteRoutine,
-  subscribePush, saveAiMessage, clearAiMessages, getIdToken,
+  removePet, subscribePush, saveAiMessage, clearAiMessages, getIdToken,
 } from './firebase.js';
 import { getCourses, getKnowledge, getProtocols, preloadAll } from './content-loader.js';
 import { fetchAIResponse, clearChatHistory } from './ai.js';
@@ -134,6 +134,7 @@ const app = {
   aiPending: false,
   renderQueued: false,
   lastFocus: null,
+  installPrompt: null,
 };
 
 boot();
@@ -214,8 +215,14 @@ function waitForInitialData() {
 function bindGlobalEvents() {
   document.addEventListener('click', handleClick);
   document.addEventListener('submit', handleDelegatedSubmit);
+  document.addEventListener('keydown', handleKeydown);
   window.addEventListener('online', updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    app.installPrompt = e;
+  });
 
   const unlock = () => {
     unlockAudio();
@@ -226,6 +233,17 @@ function bindGlobalEvents() {
   document.addEventListener('click', unlock, { once: true });
 
   subscribe(['pet', 'pets', 'events', 'reminders', 'routines', 'members', 'aiChat', 'ui.theme'], scheduleRender);
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Escape') {
+    const openModal = document.querySelector('.modal:not(.hidden)');
+    if (openModal) {
+      const modalId = openModal.id;
+      if (modalId === 'confirmModal') return;
+      closeModal(modalId);
+    }
+  }
 }
 
 async function handleDelegatedSubmit(e) {
@@ -333,6 +351,27 @@ async function handleClick(e) {
     return;
   }
 
+  const eventDelete = e.target.closest('[data-event-delete]');
+  if (eventDelete) {
+    const ok = await confirmDialog('Видалити запис?', 'Запис буде видалений з щоденника.', 'Видалити', true);
+    if (ok) await deleteEvent(eventDelete.dataset.eventDelete);
+    return;
+  }
+
+  const petDelete = e.target.closest('[data-pet-remove]');
+  if (petDelete) {
+    const ok = await confirmDialog('Видалити тварину?', 'Профіль буде видалений. Історія подій залишиться.', 'Видалити', true);
+    if (ok) {
+      try {
+        await removePet(petDelete.dataset.petRemove);
+        toast('Тварину видалено', 'success');
+      } catch (err) {
+        toast(err.message || 'Не вдалося видалити', 'error');
+      }
+    }
+    return;
+  }
+
   const academy = e.target.closest('[data-academy]');
   if (academy) {
     app.academySection = academy.dataset.academy;
@@ -367,6 +406,7 @@ async function runAction(action) {
     case 'theme': toggleTheme(); break;
     case 'export': exportData(); break;
     case 'copy-invite': copyInvite(); break;
+    case 'install-pwa': installPwa(); break;
     case 'enable-push': enablePush(); break;
     case 'clear-ai': clearAi(); break;
   }
@@ -638,6 +678,8 @@ function renderProfile() {
       </article>
       <article class="profile-card"><h3>Сповіщення</h3><p>${pushStatus()}</p><button class="text-btn" data-action="enable-push" type="button">Увімкнути</button></article>
       <article class="profile-card"><h3>Дані</h3><p>Експорт щоденника і профілю.</p><button class="text-btn" data-action="export" type="button">Експорт JSON</button></article>
+      ${app.installPrompt ? '<article class="profile-card"><h3>Встановити</h3><p>Додайте Dog Coach на головний екран.</p><button class="primary-btn" data-action="install-pwa" type="button">Встановити PWA</button></article>' : ''}
+      ${state.pets.items.length > 1 ? `<article class="profile-card"><h3>Видалити тварину</h3><p>Видалити профіль ${escapeHtml(pet.name || 'тварини')} зі спільного простору.</p><button class="primary-btn danger" data-pet-remove="${escapeHtml(pet.id || state.ui.currentPetId || '')}" type="button">Видалити</button></article>` : ''}
     </div>
     <div class="section-head"><div><h2>Оцінка тварини</h2><p>Режим, мотивація і поведінковий профіль</p></div></div>
     <section class="assessment-grid">${renderPetAssessment(pet)}</section>
@@ -792,8 +834,7 @@ function renderReminderRows(items) {
 }
 
 function renderEventRow(e) {
-  const def = getEventDef(e.eventType);
-  return `<article class="diary-item"><div><strong>${escapeHtml(eventLabel(e.eventType))}</strong><small>${escapeHtml([formatEventDate(e), e.note].filter(Boolean).join(' · '))}</small></div><small>${escapeHtml(e.timeLabel || '')}</small></article>`;
+  return `<article class="diary-item"><div><strong>${escapeHtml(eventLabel(e.eventType))}</strong><small>${escapeHtml([formatEventDate(e), e.note].filter(Boolean).join(' · '))}</small></div><div class="row-actions"><small>${escapeHtml(e.timeLabel || '')}</small><button class="row-delete" data-event-delete="${escapeHtml(e.id)}" type="button" aria-label="Видалити запис">&times;</button></div></article>`;
 }
 
 function openEventModal(type = 'pee_success') {
@@ -1148,7 +1189,9 @@ function updateOnlineStatus() {
 function getTodayEvents() {
   const start = startOfToday();
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const petId = state.ui.currentPetId;
   return state.events.items.filter(e => {
+    if (petId && e.petId && e.petId !== petId) return false;
     const date = tsToDate(e.createdAt);
     return date && date >= start && date < end;
   });
@@ -1238,7 +1281,9 @@ function getCalendarReminders() {
 }
 
 function filteredEvents() {
+  const petId = state.ui.currentPetId;
   return state.events.items.filter(e => {
+    if (petId && e.petId && e.petId !== petId) return false;
     if (app.diaryFilter === 'all') return true;
     const def = getEventDef(e.eventType);
     return def?.group === app.diaryFilter;
@@ -1381,6 +1426,20 @@ async function joinWorkspaceByCode() {
     hideLoading();
   }
 }
+async function installPwa() {
+  if (!app.installPrompt) return;
+  try {
+    await app.installPrompt.prompt();
+    const result = await app.installPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      toast('Dog Coach встановлено!', 'success');
+    }
+    app.installPrompt = null;
+  } catch {
+    toast('Не вдалося встановити', 'error');
+  }
+}
+
 async function clearAi() {
   const ok = await confirmDialog('Очистити AI чат?', 'Історія повідомлень буде видалена.', 'Очистити', true);
   if (!ok) return;

@@ -638,6 +638,47 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .timeline-row { grid-template-columns: 62px 1fr; }
 }
 
+.health-schedule-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: .75rem;
+  align-items: center;
+  padding: .75rem .85rem;
+  border-bottom: 1px solid var(--border);
+}
+.health-schedule-item:last-child { border-bottom: 0; }
+.health-schedule-icon { font-size: 1.3rem; line-height: 1; }
+.health-schedule-info strong { display: block; font-size: .9rem; }
+.health-schedule-info .text-muted,
+.text-muted { color: var(--muted); font-size: .78rem; }
+.health-schedule-date { text-align: right; font-size: .78rem; font-weight: 800; color: var(--muted); }
+.health-schedule-item.danger { background: var(--danger-soft); }
+.health-schedule-item.danger .health-schedule-date { color: var(--danger); }
+.health-schedule-item.warning { background: var(--warning-soft); }
+.health-schedule-item.warning .health-schedule-date { color: var(--warning); }
+
+.install-banner {
+  padding: .85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+.install-banner p { font-size: .86rem; color: var(--text); font-weight: 700; }
+.install-banner .dismiss-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
 @media (min-width: 900px) {
   .app { padding-left: 86px; padding-bottom: 0; }
   .app-header { left: 86px; }
